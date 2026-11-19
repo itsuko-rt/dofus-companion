@@ -4,14 +4,9 @@ import type { ClassData, SpellInfo } from '../src/load.ts';
 import type { RenderedEffect } from '../src/effects.ts';
 import { ELEMENTS, classStates, gradeAt, spellElements, type Element } from '../src/spells.ts';
 import { useCharacter } from './useCharacter';
+import { ELEMENT_CLASS } from './ui';
 
-const ELEMENT_STYLE: Record<Element, string> = {
-  Feu: 'bg-orange-500/15 text-orange-300 border-orange-500/40',
-  Eau: 'bg-sky-500/15 text-sky-300 border-sky-500/40',
-  Terre: 'bg-amber-700/20 text-amber-300 border-amber-600/40',
-  Air: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/40',
-  Neutre: 'bg-zinc-500/15 text-zinc-300 border-zinc-500/40',
-};
+const ELEMENT_STYLE = ELEMENT_CLASS;
 
 export default function SpellGuide({ data }: { data: ClassData }) {
   const ch = useCharacter();
@@ -33,15 +28,15 @@ export default function SpellGuide({ data }: { data: ClassData }) {
       <div className="mx-auto max-w-6xl px-4 py-6">
         <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
           <div>
-            <h1 className="text-xl font-semibold">{data.breed.name}</h1>
-            <p className="text-xs text-zinc-500">
+            <h1 className="font-display text-xl font-semibold">{data.breed.name}</h1>
+            <p className="text-xs text-text0">
               {data.spells.length} sorts · 22 emplacements, 2 variantes chacun (une seule active à la fois) · données {data.version}
             </p>
           </div>
-          <label className="flex items-center gap-2 text-xs text-zinc-400">
+          <label className="flex items-center gap-2 text-xs text-muted">
             Mon niveau
             <input type="number" min={1} max={200} value={level} onChange={(e) => ch.setLevel(Number(e.target.value))}
-              className="w-16 rounded border border-zinc-700 bg-zinc-900 px-1.5 py-1 text-sm text-zinc-100" />
+              className="w-16 rounded border border-line bg-bg px-1.5 py-1 text-sm text-text" />
             <span>{unlocked}/{data.spells.length} sorts obtenus</span>
           </label>
           <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filtrer par élément">
@@ -53,20 +48,20 @@ export default function SpellGuide({ data }: { data: ClassData }) {
         </div>
 
         {states.length > 0 && (
-          <details className="mt-5 rounded-lg border border-zinc-800 bg-zinc-900/40 p-3 text-sm">
-            <summary className="cursor-pointer select-none font-medium text-zinc-200">
+          <details className="mt-5 rounded-lg border border-line bg-surface p-3 text-sm">
+            <summary className="cursor-pointer select-none font-medium text-text">
               États de la classe ({states.length}) — quels sorts les posent ou les retirent
             </summary>
             <ul className="mt-2 grid gap-1.5 md:grid-cols-2">
               {states.slice(0, 30).map((st) => (
-                <li key={st.state} className="text-[13px] text-zinc-300">
-                  <b className="text-zinc-100">{st.state}</b>
+                <li key={st.state} className="text-[13px] text-text">
+                  <b className="text-text">{st.state}</b>
                   {st.applies.length > 0 && <> — posé par {st.applies.join(', ')}</>}
                   {st.removes.length > 0 && <> — retiré par {st.removes.join(', ')}</>}
                 </li>
               ))}
             </ul>
-            <p className="mt-2 text-xs text-zinc-500">Relevé automatique des effets « État … » des sorts. Le rôle de chaque état n&apos;est pas décrit par les données.</p>
+            <p className="mt-2 text-xs text-text0">Relevé automatique des effets « État … » des sorts. Le rôle de chaque état n&apos;est pas décrit par les données.</p>
           </details>
         )}
 
@@ -85,7 +80,7 @@ export default function SpellGuide({ data }: { data: ClassData }) {
 function Chip({ active, onClick, children, className = '' }: { active: boolean; onClick: () => void; children: React.ReactNode; className?: string }) {
   return (
     <button onClick={onClick} aria-pressed={active}
-      className={`rounded-full border px-2.5 py-0.5 text-xs ${active ? 'ring-1 ring-zinc-300' : 'opacity-70 hover:opacity-100'} ${className || 'border-zinc-700 text-zinc-300'}`}>
+      className={`rounded-full border px-2.5 py-0.5 text-xs ${active ? 'ring-1 ring-text' : 'opacity-70 hover:opacity-100'} ${className || 'border-line text-text'}`}>
       {children}
     </button>
   );
@@ -105,39 +100,39 @@ function SpellCard({ spell, level, elements }: { spell: SpellInfo; level: number
   ].filter(Boolean).join(' · ');
 
   return (
-    <article className={`rounded-lg border p-3 ${current ? 'border-zinc-800 bg-zinc-900/60' : 'border-zinc-800/60 bg-zinc-950 opacity-60'}`}>
+    <article className={`rounded-lg border p-3 ${current ? 'border-line bg-surface' : 'border-line bg-bg opacity-60'}`}>
       <header className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
-            <h2 className="text-[15px] font-medium text-zinc-50">{spell.name}</h2>
-            {spell.variant === 1 && <span className="rounded bg-zinc-800 px-1.5 text-[10px] uppercase tracking-wide text-zinc-400">variante</span>}
+            <h2 className="font-display text-[15px] font-semibold text-text">{spell.name}</h2>
+            {spell.variant === 1 && <span className="rounded bg-surface-2 px-1.5 text-[10px] uppercase tracking-wide text-muted">variante</span>}
             {elements.map((el) => <span key={el} className={`rounded-full border px-1.5 text-[10px] ${ELEMENT_STYLE[el]}`}>{el}</span>)}
           </div>
-          <p className="text-[11px] text-zinc-500">
+          <p className="text-[11px] text-text0">
             {current ? `Grade ${current.grade}/${spell.levels.length}` : `Obtenu au niveau ${spell.levels[0].minLevel}`}
           </p>
         </div>
-        <dl className="grid shrink-0 grid-cols-3 gap-x-3 text-center text-[11px] text-zinc-500">
-          <div><dt>PA</dt><dd className="text-sm font-semibold text-zinc-100">{shown.ap}</dd></div>
-          <div><dt>PO</dt><dd className="text-sm font-semibold text-zinc-100">{range}</dd></div>
-          <div><dt>Crit.</dt><dd className="text-sm font-semibold text-zinc-100">{shown.crit}%</dd></div>
+        <dl className="grid shrink-0 grid-cols-3 gap-x-3 text-center text-[11px] text-text0">
+          <div><dt>PA</dt><dd className="text-sm font-semibold text-text">{shown.ap}</dd></div>
+          <div><dt>PO</dt><dd className="text-sm font-semibold text-text">{range}</dd></div>
+          <div><dt>Crit.</dt><dd className="text-sm font-semibold text-text">{shown.crit}%</dd></div>
         </dl>
       </header>
-      {spell.description && <p className="mt-2 text-[13px] text-zinc-400">{spell.description}</p>}
+      {spell.description && <p className="mt-2 text-[13px] text-muted">{spell.description}</p>}
       <Effects list={shown.effects} />
-      {limits && <p className="mt-2 text-[11px] text-zinc-500">{limits}</p>}
+      {limits && <p className="mt-2 text-[11px] text-text0">{limits}</p>}
       {spell.levels.length > 1 && (
-        <button className="mt-2 text-[11px] text-sky-400 hover:underline" onClick={() => setOpen(!open)} aria-expanded={open}>
+        <button className="mt-2 text-[11px] text-accent hover:underline" onClick={() => setOpen(!open)} aria-expanded={open}>
           {open ? 'Masquer' : 'Voir'} les grades et coups critiques
         </button>
       )}
       {open && (
-        <div className="mt-2 flex flex-col gap-2 border-t border-zinc-800 pt-2">
+        <div className="mt-2 flex flex-col gap-2 border-t border-line pt-2">
           {spell.levels.map((l) => (
             <div key={l.grade} className="text-[12px]">
-              <div className="text-zinc-400">Grade {l.grade} · niveau {l.minLevel} · {l.ap} PA · PO {l.minRange === l.range ? l.range : `${l.minRange}–${l.range}`}</div>
+              <div className="text-muted">Grade {l.grade} · niveau {l.minLevel} · {l.ap} PA · PO {l.minRange === l.range ? l.range : `${l.minRange}–${l.range}`}</div>
               <Effects list={l.effects} />
-              {l.criticalEffects.length > 0 && <div className="mt-1 text-zinc-500">Critique :<Effects list={l.criticalEffects} /></div>}
+              {l.criticalEffects.length > 0 && <div className="mt-1 text-text0">Critique :<Effects list={l.criticalEffects} /></div>}
             </div>
           ))}
         </div>
@@ -149,11 +144,11 @@ function SpellCard({ spell, level, elements }: { spell: SpellInfo; level: number
 function Effects({ list }: { list: RenderedEffect[] }) {
   if (!list.length) return null;
   return (
-    <ul className="mt-1.5 flex flex-col gap-0.5 text-[13px] text-zinc-200">
+    <ul className="mt-1.5 flex flex-col gap-0.5 text-[13px] text-text">
       {list.map((e, i) => (
         <li key={i}>
           {e.text}
-          {(e.duration || e.zone) && <span className="text-zinc-500"> ({[e.duration, e.zone].filter(Boolean).join(', ')})</span>}
+          {(e.duration || e.zone) && <span className="text-text0"> ({[e.duration, e.zone].filter(Boolean).join(', ')})</span>}
         </li>
       ))}
     </ul>

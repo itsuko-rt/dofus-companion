@@ -1,6 +1,5 @@
-import { redirect } from 'next/navigation';
+import Home from '../components/Home';
 
-// No dashboard yet: the quest map is the only page.
-export default function Home() {
-  redirect('/quetes');
+export default function Page() {
+  return <Home />;
 }
