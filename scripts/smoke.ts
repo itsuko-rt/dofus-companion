@@ -9,12 +9,12 @@ async function check(name: string, fn: () => Promise<void>) {
 }
 const get = (path: string, init?: RequestInit) => fetch(`${BASE}${path}`, { redirect: 'manual', ...init });
 
-const PAGES = ['/', '/progression/quetes', '/progression/quetes/19', '/progression/succes', '/progression/dofus',
-  '/progression/scan', '/builds', '/equipement', '/personnage', '/personnage/sorts', '/personnage/sorts/9', '/personnage/sorts/12', '/compte'];
+const PAGES = ['/', '/progression/quetes', '/progression/quetes/incarnam', '/guides', '/guides/quetes', '/guides/quetes/incarnam', '/guides/dofus', '/guides/dofus/emeraude', '/a-propos', '/confidentialite', '/mentions-legales', '/progression/succes', '/progression/dofus',
+  '/progression/scan', '/builds', '/equipement', '/personnage', '/personnage/sorts', '/personnage/sorts/cra', '/personnage/sorts/pandawa', '/compte'];
 for (const p of PAGES) await check(`page ${p}`, async () => assert.equal((await get(p)).status, 200));
 
 await check('redirects keep old URLs', async () => {
-  for (const [from, to] of [['/quetes', '/progression/quetes'], ['/classes/9', '/personnage/sorts/9'], ['/personnage/builds', '/builds']]) {
+  for (const [from, to] of [['/quetes', '/progression/quetes'], ['/classes/9', '/personnage/sorts/9'], ['/personnage/sorts/9', '/personnage/sorts/cra'], ['/progression/quetes/19', '/progression/quetes/incarnam'], ['/personnage/builds', '/builds']]) {
     const r = await get(from);
     assert.ok([301, 307, 308].includes(r.status), `${from} → ${r.status}`);
     assert.equal(new URL(r.headers.get('location')!, BASE).pathname, to);

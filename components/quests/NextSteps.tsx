@@ -6,7 +6,11 @@ import type { Progress } from '../../src/criteria.ts';
 import { nextSteps } from '../../src/regions.ts';
 import { EmptyState } from '../ui';
 
-export const questHref = (n: GNode) => `/progression/quetes/${n.category}#${n.id}`;
+// Filled by useGame once the categories are loaded; before that, numeric URLs still work (they redirect).
+const slugs = new Map<number, string>();
+export const setRegionSlugs = (m: Map<number, string>) => { for (const [k, v] of m) slugs.set(k, v); };
+export const regionPath = (category: number | null | undefined) => `/progression/quetes/${slugs.get(category ?? -1) ?? category}`;
+export const questHref = (n: GNode) => `${regionPath(n.category)}#${n.id}`;
 
 export default function NextSteps({ graph, status, progress, categoryName, limit = 5 }: {
   graph: Graph; status: (id: string) => Status; progress: Progress; categoryName: Map<number, string>; limit?: number;

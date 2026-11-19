@@ -3,6 +3,7 @@ import type { GEdge, GNode, Graph, Status } from './graph.ts';
 import type { Atom, Progress } from './criteria.ts';
 import { reference } from './criteria.ts';
 import { preds } from './views.ts';
+import { slugify } from './site.ts';
 
 /**
  * Categories that are not progression: daily, repeatable or event quests, seasonal islands and
@@ -31,6 +32,17 @@ const ALIGNMENT = new Set([9 /* Alignement Bonta */, 10 /* Alignement Brâkmar *
 const SPECIAL = new Set([4 /* Quêtes mondiales */, 2 /* Temples */, 23 /* Krosmoz */, 42 /* Tours de la Fratrie */, 24 /* Tutoriel */, 32 /* Justiciers */]);
 export const groupOf = (category: number): RegionGroup =>
   SIDE_CATEGORIES.has(category) ? 'side' : DIVINE.has(category) ? 'divine' : ALIGNMENT.has(category) ? 'alignment' : SPECIAL.has(category) ? 'special' : 'regions';
+
+/** category id → URL slug ("Île de Frigost" → "ile-de-frigost"); a repeated name gets its id appended. */
+export function regionSlugMap(categories: { id: number; name: string }[]): Map<number, string> {
+  const seen = new Set<string>();
+  return new Map(categories.map((c) => {
+    let s = slugify(c.name) || String(c.id);
+    if (seen.has(s) || /^\d+$/.test(s)) s = `${s}-${c.id}`;
+    seen.add(s);
+    return [c.id, s];
+  }));
+}
 
 export interface RegionSummary {
   id: number; name: string; total: number; done: number; available: number;

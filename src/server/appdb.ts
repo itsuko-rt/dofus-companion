@@ -4,7 +4,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 
-const MIGRATIONS: string[] = [
+export const MIGRATIONS: string[] = [
   // 1 — accounts, sessions, password resets, characters, login throttling
   `CREATE TABLE users(
      id INTEGER PRIMARY KEY,
@@ -35,6 +35,8 @@ const MIGRATIONS: string[] = [
    );
    CREATE TABLE login_failures(key TEXT NOT NULL, at TEXT NOT NULL);
    CREATE INDEX login_failures_key ON login_failures(key, at);`,
+  // 2 — plan of the account (src/plans.ts). Only 'free' exists until payments are integrated.
+  `ALTER TABLE users ADD COLUMN plan TEXT NOT NULL DEFAULT 'free';`,
 ];
 
 const cache = new Map<string, DatabaseSync>();

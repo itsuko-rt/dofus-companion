@@ -5,8 +5,9 @@ import { BookOpen, Compass, History, ScanLine, Sparkles, Swords, Trophy } from '
 import { regionSummaries, isRecommended } from '../src/regions.ts';
 import { BRAND } from '../src/brand.ts';
 import { SUPPORTED_BREEDS } from './breeds';
+import AdSlot from './AdSlot';
 import Onboarding from './character/Onboarding';
-import NextSteps from './quests/NextSteps';
+import NextSteps, { regionPath } from './quests/NextSteps';
 import { useAchievementProgress } from './progression/useAchievementProgress';
 import { ButtonLink, Card, Diamond, ElementTag, ProgressBar, SectionTitle } from './ui';
 import { PLAYSTYLES } from './useCharacter';
@@ -110,7 +111,7 @@ export default function Home() {
                 <ul className="grid gap-2 sm:grid-cols-3">
                   {recommended.map((r) => (
                     <li key={r.id}>
-                      <Link href={`/progression/quetes/${r.id}`} className="group block rounded-lg border border-line bg-surface-2 p-3 transition hover:-translate-y-0.5 hover:border-sec-quests">
+                      <Link href={regionPath(r.id)} className="group block rounded-lg border border-line bg-surface-2 p-3 transition hover:-translate-y-0.5 hover:border-sec-quests">
                         <span className="block truncate font-medium">{r.name}</span>
                         <span className="text-xs text-accent">{r.available} disponible{r.available > 1 ? 's' : ''}</span>
                         <ProgressBar value={r.done} max={r.total} className="mt-2 !h-1" label={`${r.name} : ${r.done} sur ${r.total}`} />
@@ -137,8 +138,9 @@ export default function Home() {
               );
             })}
           </ul>
+          <AdSlot slot={process.env.NEXT_PUBLIC_ADSENSE_SLOT_HOME} />
           {breed && (
-            <Link href={`/personnage/sorts/${breed.id}`} className="flex items-center gap-3 rounded-xl border border-line bg-surface p-4 hover:border-faint">
+            <Link href={`/personnage/sorts/${breed.slug}`} className="flex items-center gap-3 rounded-xl border border-line bg-surface p-4 hover:border-faint">
               <BookOpen size={18} className="text-accent" />
               <span className="flex-1"><span className="font-display">Sorts du {breed.name}</span><span className="block text-sm text-muted">Ce qu’ils font et quand vous les obtenez.</span></span>
             </Link>

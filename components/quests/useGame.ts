@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Graph, type Status } from '../../src/graph.ts';
 import type { GraphData } from '../../src/load.ts';
 import { useCharacter } from '../useCharacter';
+import { regionSlugMap } from '../../src/regions.ts';
+import { setRegionSlugs } from './NextSteps';
 
 let cache: Promise<GraphData> | null = null;
 const fetchGraph = () => (cache ??= fetch('/api/graph').then(async (r) => {
@@ -21,6 +23,8 @@ export function useGame() {
   const graph = useMemo(() => (data ? new Graph(data.nodes, data.extraEdges) : null), [data]);
   const dofusQuests = useMemo(() => new Set(data?.dofusQuests ?? []), [data]);
   const categoryName = useMemo(() => new Map(data?.categories.map((c) => [c.id, c.name]) ?? []), [data]);
+  // during render (not in an effect) so links rendered in this same pass already use the slugs
+  useMemo(() => data && setRegionSlugs(regionSlugMap(data.categories)), [data]);
   const statuses = useMemo(() => {
     const m = new Map<string, Status>();
     if (graph) for (const id of graph.nodes.keys()) m.set(id, graph.status(id, ch.progress));

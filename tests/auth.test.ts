@@ -101,6 +101,9 @@ test('password reset: one-time link, logs out everywhere', async () => {
 
 test('migrations are idempotent', () => {
   const db = fresh();
-  migrate(db);
-  assert.equal((db.prepare('SELECT COUNT(*) n FROM schema_migrations').get() as { n: number }).n, 1);
+  const count = migrate(db); // second run: nothing applied twice
+  assert.equal((db.prepare('SELECT COUNT(*) n FROM schema_migrations').get() as { n: number }).n, count);
+  // migration 2: accounts default to the free plan
+  db.prepare("INSERT INTO users(email, password_hash, created_at) VALUES ('p@example.com', 'x', 'now')").run();
+  assert.equal((db.prepare("SELECT plan FROM users WHERE email = 'p@example.com'").get() as { plan: string }).plan, 'free');
 });

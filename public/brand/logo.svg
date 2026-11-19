@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Atlas des Douze: golden egg with a twelve-ray sun (one ray per God of the Twelve). Original artwork. -->
+  <defs>
+    <radialGradient id="shell" cx="38%" cy="30%" r="78%">
+      <stop offset="0" stop-color="#fff0b0"/>
+      <stop offset=".35" stop-color="#f6c24a"/>
+      <stop offset=".75" stop-color="#d98a16"/>
+      <stop offset="1" stop-color="#9a5408"/>
+    </radialGradient>
+    <radialGradient id="core" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#fffaf0"/>
+      <stop offset=".55" stop-color="#ffd59a"/>
+      <stop offset="1" stop-color="#ff8a2b"/>
+    </radialGradient>
+  </defs>
+  <path d="M256 30C146 30 80 186 80 300c0 104 78 182 176 182s176-78 176-182C432 186 366 30 256 30Z" fill="url(#shell)" stroke="#5e3204" stroke-width="16"/>
+  <g transform="translate(256 300)" fill="#fff3d6" stroke="#e8761a" stroke-width="4" stroke-linejoin="round">
+    <path id="ray" d="M0-140L14-48H-14Z"/>
+    <use href="#ray" transform="rotate(30)"/><use href="#ray" transform="rotate(60)"/><use href="#ray" transform="rotate(90)"/>
+    <use href="#ray" transform="rotate(120)"/><use href="#ray" transform="rotate(150)"/><use href="#ray" transform="rotate(180)"/>
+    <use href="#ray" transform="rotate(210)"/><use href="#ray" transform="rotate(240)"/><use href="#ray" transform="rotate(270)"/>
+    <use href="#ray" transform="rotate(300)"/><use href="#ray" transform="rotate(330)"/>
+    <circle r="52" fill="url(#core)" stroke="#e8761a" stroke-width="6"/>
+  </g>
+  <ellipse cx="190" cy="140" rx="34" ry="58" transform="rotate(-24 190 140)" fill="#fff" opacity=".45"/>
+</svg>

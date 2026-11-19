@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Egg, ExternalLink } from 'lucide-react';
 import type { DofusInfo } from '../../src/load.ts';
 import { useGame } from '../quests/useGame';
+import { regionPath } from '../quests/NextSteps';
 import { Card, PageHero, ProgressBar, StatusPill } from '../ui';
 
 export default function DofusView({ dofus }: { dofus: DofusInfo[] }) {
@@ -42,7 +43,7 @@ export default function DofusView({ dofus }: { dofus: DofusInfo[] }) {
                   </div>
                   <div className="flex flex-col gap-1 text-sm">
                     {d.quests.map((q) => (
-                      <Link key={`q${q.id}`} href={`/progression/quetes/${q.category}#quest:${q.id}`} className="flex items-center justify-between gap-2 rounded-lg bg-surface-2 px-2.5 py-1.5 hover:bg-line">
+                      <Link key={`q${q.id}`} href={`${regionPath(q.category)}#quest:${q.id}`} className="flex items-center justify-between gap-2 rounded-lg bg-surface-2 px-2.5 py-1.5 hover:bg-line">
                         <span className="truncate">Quête : {q.name}</span>{graph && <StatusPill status={status(`quest:${q.id}`)} />}
                       </Link>
                     ))}

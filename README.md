@@ -21,11 +21,13 @@ npm run dev          # http://localhost:3000
 | `/progression/scan` | Scan de progression : capture d'une fenêtre Dofus, OCR dans le navigateur, vérification puis enregistrement, historique avec annulation |
 | `/progression/dofus` | Les 34 Dofus et la quête ou le succès qui les donne |
 | `/equipement` | Encyclopédie des objets équipables |
+| `/guides`, `/guides/quetes/[région]`, `/guides/dofus/[dofus]` | Guides publics générés au build depuis les données du jeu (ordre des quêtes, chaîne de chaque Dofus) |
+| `/confidentialite` · `/mentions-legales` · `/a-propos` | Pages légales et présentation |
 | `/compte` | Compte du site (pas un compte Ankama) : personnages et progression synchronisés |
 
 Les anciennes adresses (`/quetes`, `/classes/…`) redirigent vers les nouvelles. Sans compte, la progression reste dans le navigateur. Avec un compte, elle est enregistrée dans `data/app.sqlite`, une base séparée de celle du jeu : l'import ne la touche jamais. Le lien de réinitialisation du mot de passe est écrit dans le journal du serveur tant qu'aucun fournisseur d'e-mail n'est configuré.
 
-Documents : [docs/RAPPORT_REFONTE_VISUELLE.md](docs/RAPPORT_REFONTE_VISUELLE.md) (refonte visuelle, illustrations) · [docs/RAPPORT_SUCCES_SCAN.md](docs/RAPPORT_SUCCES_SCAN.md) (succès, scan, API) · [docs/RAPPORT_SUIVI_QUETES.md](docs/RAPPORT_SUIVI_QUETES.md) (refonte du suivi des quêtes) · [docs/RAPPORT_DEVELOPPEMENT.md](docs/RAPPORT_DEVELOPPEMENT.md) · [docs/RAPPORT_ARCHITECTURE.md](docs/RAPPORT_ARCHITECTURE.md) (sources, architecture) · [docs/AUDIT_UX.md](docs/AUDIT_UX.md) (audit et direction de la refonte).
+Documents : [docs/LANCEMENT_PUBLIC.md](docs/LANCEMENT_PUBLIC.md) (mise en ligne : SEO, hébergement, publicité, démarches) · [docs/RAPPORT_REFONTE_VISUELLE.md](docs/RAPPORT_REFONTE_VISUELLE.md) (refonte visuelle, illustrations) · [docs/RAPPORT_SUCCES_SCAN.md](docs/RAPPORT_SUCCES_SCAN.md) (succès, scan, API) · [docs/RAPPORT_SUIVI_QUETES.md](docs/RAPPORT_SUIVI_QUETES.md) (refonte du suivi des quêtes) · [docs/RAPPORT_DEVELOPPEMENT.md](docs/RAPPORT_DEVELOPPEMENT.md) · [docs/RAPPORT_ARCHITECTURE.md](docs/RAPPORT_ARCHITECTURE.md) (sources, architecture) · [docs/AUDIT_UX.md](docs/AUDIT_UX.md) (audit et direction de la refonte).
 
 ## Sources de données
 
@@ -46,6 +48,8 @@ npm run typecheck
 npm run import -- --tag v6.0_3.7.14.18   # réimporte une version précise
 npm run build && npm start               # serveur de production (Node requis : routes API et comptes)
 node scripts/smoke.ts http://localhost:3000   # test de bout en bout d'un serveur lancé
+node scripts/check-links.ts http://localhost:3000   # liens cassés, canoniques, descriptions, JSON-LD (pages du sitemap)
+node scripts/make-icons.ts                    # favicons, icônes et image de partage depuis public/brand/*.svg
 node scripts/layout-report.ts                 # largeur des chaînes de quêtes par région
 ```
 

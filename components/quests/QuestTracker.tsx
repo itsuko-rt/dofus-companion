@@ -12,6 +12,7 @@ import FlowCanvas from '../FlowCanvas';
 import { Button, ProgressBar, STATUS } from '../ui';
 import type { Mark } from '../useCharacter';
 import QuestDrawer from './QuestDrawer';
+import { questHref, regionPath } from './NextSteps';
 import { useGame } from './useGame';
 
 const norm = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
@@ -49,7 +50,7 @@ function Stat({ label, value, tone }: { label: string; value: number | string; t
 
 function RegionRow({ r, current, recommended }: { r: RegionSummary; current: boolean; recommended: boolean }) {
   return (
-    <Link href={`/progression/quetes/${r.id}`} aria-current={current ? 'page' : undefined}
+    <Link href={regionPath(r.id)} aria-current={current ? 'page' : undefined}
       className={`group block rounded-lg px-2.5 py-1.5 ${current ? 'bg-brand/15 text-text' : 'text-muted hover:bg-surface-2 hover:text-text'}`}>
       <span className="flex items-center gap-2 text-sm">
         <span className="min-w-0 flex-1 truncate">{r.name}</span>
@@ -170,7 +171,7 @@ export default function QuestTracker({ region: regionParam }: { region?: number 
   const select = (id: string) => {
     const n = graph.nodes.get(id);
     // a quest from another region opens its region, without reloading the page
-    if (n?.kind === 'quest' && n.category !== region && !focus) router.push(`/progression/quetes/${n.category}#${id}`);
+    if (n?.kind === 'quest' && n.category !== region && !focus) router.push(`${regionPath(n.category)}#${id}`);
     else { setSelected(id); }
   };
   const mark = (id: string, m: Mark | 'with-prerequisites') => {
@@ -273,7 +274,7 @@ export default function QuestTracker({ region: regionParam }: { region?: number 
                     <button className="block w-full px-3 py-2 text-left text-sm hover:bg-line" onClick={() => {
                       setQuery('');
                       if (n.category === region) { setFocus(null); setSelected(n.id); setCenterOn(n.id); }
-                      else router.push(`/progression/quetes/${n.category}#${n.id}`);
+                      else router.push(questHref(n));
                     }}>
                       {n.label} <span className="text-xs text-muted">· {categoryName.get(n.category ?? -1)}{n.level ? ` · niv. ${n.level}` : ''}</span>
                     </button>

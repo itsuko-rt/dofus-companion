@@ -3,7 +3,9 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import { connectAccount } from '../useCharacter';
 
-export interface User { id: number; email: string }
+import type { Plan } from '../../src/plans.ts';
+
+export interface User { id: number; email: string; plan: Plan }
 interface State { ready: boolean; user: User | null }
 
 let state: State = { ready: false, user: null };

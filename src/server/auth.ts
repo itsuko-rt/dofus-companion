@@ -1,6 +1,7 @@
 // Accounts on this site (not Ankama accounts). Route handlers are plain Request → Response
 // functions so they can be tested without a running server.
 import { createHash, randomBytes, scrypt as scryptCb, timingSafeEqual } from 'node:crypto';
+import { asPlan, type Plan } from '../plans.ts';
 import { promisify } from 'node:util';
 import type { DatabaseSync } from 'node:sqlite';
 import { sanitizeCharacter, type Character } from '../character.ts';
@@ -81,12 +82,12 @@ function clientKey(req: Request, email: string) {
 }
 
 // ---------- sessions
-export function userFromRequest(db: DatabaseSync, req: Request): { id: number; email: string } | null {
+export function userFromRequest(db: DatabaseSync, req: Request): { id: number; email: string; plan: Plan } | null {
   const t = readCookie(req, SESSION_COOKIE);
   if (!t) return null;
-  const row = db.prepare(`SELECT u.id, u.email FROM sessions s JOIN users u ON u.id = s.user_id
-    WHERE s.token_hash = ? AND s.expires_at > ?`).get(sha256(t), iso(now())) as { id: number; email: string } | undefined;
-  return row ? { id: row.id, email: row.email } : null;
+  const row = db.prepare(`SELECT u.id, u.email, u.plan FROM sessions s JOIN users u ON u.id = s.user_id
+    WHERE s.token_hash = ? AND s.expires_at > ?`).get(sha256(t), iso(now())) as { id: number; email: string; plan: string } | undefined;
+  return row ? { id: row.id, email: row.email, plan: asPlan(row.plan) } : null;
 }
 
 function startSession(db: DatabaseSync, userId: number, req: Request) {
@@ -109,7 +110,7 @@ export async function register(db: DatabaseSync, req: Request): Promise<Response
   const hash = await hashPassword(b.password as string);
   const res = db.prepare('INSERT INTO users(email, password_hash, created_at) VALUES (?, ?, ?)').run(email, hash, iso(now()));
   const id = Number(res.lastInsertRowid);
-  return json({ user: { id, email } }, 201, { 'set-cookie': startSession(db, id, req) });
+  return json({ user: { id, email, plan: 'free' } }, 201, { 'set-cookie': startSession(db, id, req) });
 }
 
 export async function login(db: DatabaseSync, req: Request): Promise<Response> {
@@ -118,6 +119,7 @@ export async function login(db: DatabaseSync, req: Request): Promise<Response> {
   if (!b || !validEmail(b.email) || typeof b.password !== 'string') return json({ error: 'E-mail ou mot de passe incorrect.' }, 400);
   const key = clientKey(req, b.email);
   const since = iso(new Date(Date.now() - 15 * 60_000));
+  db.prepare('DELETE FROM login_failures WHERE at <= ?').run(since); // kept only as long as they matter (privacy policy)
   const failures = (db.prepare('SELECT COUNT(*) n FROM login_failures WHERE key = ? AND at > ?').get(key, since) as { n: number }).n;
   if (failures >= MAX_FAILURES) return json({ error: 'Trop de tentatives. Réessayez dans 15 minutes.' }, 429);
   const user = db.prepare('SELECT id, email, password_hash FROM users WHERE email = ?').get(b.email.trim()) as
@@ -129,7 +131,7 @@ export async function login(db: DatabaseSync, req: Request): Promise<Response> {
     return json({ error: 'E-mail ou mot de passe incorrect.' }, 401);
   }
   db.prepare('DELETE FROM login_failures WHERE key = ?').run(key);
-  return json({ user: { id: user.id, email: user.email } }, 200, { 'set-cookie': startSession(db, user.id, req) });
+  return json({ user: { id: user.id, email: user.email, plan: asPlan((db.prepare('SELECT plan FROM users WHERE id = ?').get(user.id) as { plan: string }).plan) } }, 200, { 'set-cookie': startSession(db, user.id, req) });
 }
 const DUMMY_HASH = 'scrypt$16384$8$1$AAAAAAAAAAAAAAAAAAAAAA==$' + Buffer.alloc(64).toString('base64');
 
