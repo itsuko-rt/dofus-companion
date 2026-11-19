@@ -140,6 +140,60 @@ export function loadQuestDetails(path: string, questId: number): QuestDetails | 
   }
 }
 
+function withDb<T>(path: string, fn: (db: DatabaseSync) => T): T {
+  const db = new DatabaseSync(path, { readOnly: true });
+  try { return fn(db); } finally { db.close(); }
+}
+const plainRows = <T>(rows: unknown[]) => rows.map((r) => ({ ...(r as object) })) as T[];
+
+export interface AchievementCategory { id: number; name: string; parentId: number | null; count: number }
+export const loadAchievementCategories = (path: string) => withDb(path, (db) => plainRows<AchievementCategory>(db.prepare(`
+  SELECT c.id, c.name, NULLIF(c.parent_id, 0) AS parentId, COUNT(a.id) AS count
+  FROM achievement_category c LEFT JOIN achievement a ON a.category_id = c.id
+  GROUP BY c.id ORDER BY c.parent_id, c.id`).all()));
+
+export interface AchievementInfo { id: number; name: string; description: string | null; level: number; points: number; objectives: string[] }
+export const loadAchievements = (path: string, categoryIds: number[]) => withDb(path, (db) => {
+  const ids = categoryIds.filter(Number.isInteger).slice(0, 50);
+  if (!ids.length) return [];
+  const rows = plainRows<{ id: number; name: string; description: string | null; level: number; points: number }>(db.prepare(
+    `SELECT id, name, description, level, points FROM achievement WHERE category_id IN (${ids.map(() => '?').join(',')}) ORDER BY level, name`).all(...ids));
+  const obj = db.prepare('SELECT name FROM achievement_objective WHERE achievement_id = ? ORDER BY ordinal');
+  return rows.map((a) => ({ ...a, objectives: (obj.all(a.id) as { name: string | null }[]).map((o) => o.name).filter((n): n is string => !!n) }));
+});
+
+export interface DofusInfo { itemId: number; name: string; level: number; quests: { id: number; name: string; category: number }[]; achievements: { id: number; name: string; categoryId: number }[] }
+export const loadDofus = (path: string) => withDb(path, (db) => {
+  const q = db.prepare('SELECT id, name, category_id AS category FROM quest WHERE id = ?');
+  const a = db.prepare('SELECT id, name, category_id AS categoryId FROM achievement WHERE id = ?');
+  return (db.prepare('SELECT item_id, name, level, quest_ids, achievement_ids FROM dofus ORDER BY level, name').all() as Record<string, any>[]).map((d) => ({
+    itemId: d.item_id, name: d.name, level: d.level,
+    quests: (JSON.parse(d.quest_ids) as number[]).map((id) => q.get(id)).filter(Boolean).map((r) => ({ ...(r as object) })) as DofusInfo['quests'],
+    achievements: (JSON.parse(d.achievement_ids) as number[]).map((id) => a.get(id)).filter(Boolean).map((r) => ({ ...(r as object) })) as DofusInfo['achievements'],
+  }));
+});
+
+/** Equipment types only (super types of wearable items), for the encyclopedia filter. */
+export const loadEquipmentTypes = (path: string) => withDb(path, (db) => plainRows<{ id: number; name: string; count: number }>(db.prepare(`
+  SELECT t.id, t.name, COUNT(i.id) AS count FROM item_type t JOIN item i ON i.type_id = t.id
+  WHERE t.super_type_id IN (1, 2, 3, 4, 5, 7, 10, 11, 12, 13)
+  GROUP BY t.id HAVING count > 0 ORDER BY t.name`).all()));
+
+export interface ItemSearch { q?: string; type?: number; min?: number; max?: number; limit?: number }
+export const searchItems = (path: string, s: ItemSearch) => withDb(path, (db) => {
+  const where = ['t.super_type_id IN (1, 2, 3, 4, 5, 7, 10, 11, 12, 13)'];
+  const args: (string | number)[] = [];
+  if (s.q) { where.push('i.name LIKE ?'); args.push(`%${s.q.slice(0, 60)}%`); }
+  if (s.type) { where.push('i.type_id = ?'); args.push(s.type); }
+  if (s.min) { where.push('i.level >= ?'); args.push(s.min); }
+  if (s.max) { where.push('i.level <= ?'); args.push(s.max); }
+  const rows = db.prepare(`SELECT i.id, i.name, t.name AS type, i.level, s.name AS setName, i.effects
+    FROM item i JOIN item_type t ON t.id = i.type_id LEFT JOIN item_set s ON s.id = i.set_id
+    WHERE ${where.join(' AND ')} ORDER BY i.level DESC, i.name LIMIT ?`).all(...args, Math.min(s.limit ?? 60, 120)) as Record<string, any>[];
+  return rows.map((r) => ({ id: r.id, name: r.name, type: r.type, level: r.level, setName: r.setName,
+    effects: (JSON.parse(r.effects) as { text: string | null; characteristic: number | null }[]).filter((e) => e.text && !/^(Échangeable|Attitude|Effet non documenté)/.test(e.text)).map((e) => e.text!) }));
+});
+
 export function loadGraph(path: string): Graph {
   const d = loadGraphData(path);
   return new Graph(d.nodes, d.extraEdges);
