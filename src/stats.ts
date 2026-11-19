@@ -3,7 +3,7 @@
 import type { Element } from './spells.ts';
 
 export interface ItemEffect { actionId: number; min: number; max: number; text: string | null; characteristic: number | null; sign: number }
-export interface Item { id: number; name: string; typeId: number; typeName: string | null; level: number; setId: number | null; effects: ItemEffect[] }
+export interface Item { id: number; name: string; typeId: number; typeName: string | null; superTypeId?: number | null; level: number; setId: number | null; effects: ItemEffect[] }
 export interface ItemSet { id: number; name: string; itemIds: number[]; bonuses: ItemEffect[][] }
 
 /** The `fashionista-build` v1 format (dofusfashionista.gg/api/v1/import/schema/1/). */

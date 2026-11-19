@@ -92,11 +92,11 @@ export function loadItems(path: string, ids: number[], max = 64) {
     const items = new Map<number, Item>();
     if (want.length) {
       const rows = db.prepare(`
-        SELECT i.id, i.name, i.type_id, t.name AS type_name, i.level, i.set_id, i.effects
+        SELECT i.id, i.name, i.type_id, t.name AS type_name, t.super_type_id, i.level, i.set_id, i.effects
         FROM item i LEFT JOIN item_type t ON t.id = i.type_id
         WHERE i.id IN (${want.map(() => '?').join(',')})`).all(...want) as Record<string, any>[];
       for (const r of rows) {
-        items.set(r.id, { id: r.id, name: r.name, typeId: r.type_id, typeName: r.type_name, level: r.level, setId: r.set_id, effects: JSON.parse(r.effects) });
+        items.set(r.id, { id: r.id, name: r.name, typeId: r.type_id, typeName: r.type_name, superTypeId: r.super_type_id, level: r.level, setId: r.set_id, effects: JSON.parse(r.effects) });
       }
     }
     const setIds = [...new Set([...items.values()].map((i) => i.setId).filter((x): x is number => x != null))];

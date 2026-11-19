@@ -1,21 +1,25 @@
 'use client';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { ExternalLink, Eye, GitCompare, Heart, Info, Sparkles, X } from 'lucide-react';
+import { Bookmark, BookmarkCheck, ExternalLink, Eye, GitCompare, Heart, Info, Shirt, Sparkles, X } from 'lucide-react';
 import type { Element } from '../../src/spells.ts';
 import { SUPPORTED_BREEDS } from '../breeds';
 import { Button, ButtonLink, Card, ElementTag, EmptyState, Term } from '../ui';
-import { useCharacter } from '../useCharacter';
+import { PLAYSTYLES, useCharacter } from '../useCharacter';
 
+interface ApiItem { id: number; name: string; type: string | null; level: number; set: string | null; effects: (string | null)[] }
 interface ApiBuild {
-  id: string; name: string; level: number; url: string; creator: string | null;
-  likes: number; favorites: number; views: number; patch: string | null; upToDate: boolean;
+  id: string; name: string; level: number; url: string; creator: string | null; origin: 'top' | 'recent';
+  likes: number; favorites: number; views: number; updated: string | null; patch: string | null; upToDate: boolean;
   elements: Element[]; totals: Record<string, number> | null;
-  items: { id: number; name: string; type: string | null; level: number; set: string | null; effects: (string | null)[] }[];
+  slots: { slot: string; items: ApiItem[] }[];
   sets: { name: string; pieces: number; total: number; bonus: (string | null)[] }[];
   missing: number[];
 }
-interface ApiResponse { patch: string | null; breed: string; source: string; fetchedAt: string; statNames: Record<string, string>; builds: ApiBuild[]; error?: string }
+interface ApiResponse {
+  patch: string | null; breed: { id: number; name: string }; gameVersion: string; fetchedAt: string;
+  spellsByElement: Partial<Record<Element, string[]>>; builds: ApiBuild[]; error?: string;
+}
 
 // Labels chosen for clarity (the game's own names, e.g. "Terre (%)", are ambiguous out of context).
 const GROUPS: { title: string; stats: [string, string, string?][] }[] = [
@@ -37,15 +41,26 @@ const GROUPS: { title: string; stats: [string, string, string?][] }[] = [
 ];
 const KEY_STATS = ['actionPoints', 'movementPoints', 'range', 'vitality'];
 
-const prevPatch = (p: string | null) => { if (!p) return null; const [a, b] = p.split('.').map(Number); return b > 0 ? `${a}.${b - 1}` : null; };
+type Sort = 'match' | 'likes' | 'views' | 'recent';
+const SORTS: { id: Sort | 'budget' | 'damage'; label: string; disabled?: string }[] = [
+  { id: 'match', label: 'Meilleure correspondance' },
+  { id: 'likes', label: 'Plus appréciés (j’aime)' },
+  { id: 'views', label: 'Plus consultés' },
+  { id: 'recent', label: 'Mis à jour récemment' },
+  { id: 'budget', label: 'Budget le plus bas', disabled: 'aucune source de prix fiable' },
+  { id: 'damage', label: 'Dégâts vérifiés', disabled: 'aucune source ne publie de dégâts vérifiés' },
+];
 
 export default function BuildsView() {
   const ch = useCharacter();
-  const breed = SUPPORTED_BREEDS.find((b) => b.id === ch.character.profile.breed);
-  const level = ch.character.level;
+  const [breedId, setBreedId] = useState<number | null>(null);
+  const breed = SUPPORTED_BREEDS.find((b) => b.id === (breedId ?? ch.character.profile.breed));
+  const [level, setLevel] = useState<number | null>(null);
+  const lvl = level ?? ch.character.level;
+  const [element, setElement] = useState<Element | 'all'>('all');
+  const [sort, setSort] = useState<Sort>('match');
   const [data, setData] = useState<ApiResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [element, setElement] = useState<Element | 'all'>('all');
   const [open, setOpen] = useState<string | null>(null);
   const [compare, setCompare] = useState<string[]>([]);
 
@@ -58,41 +73,44 @@ export default function BuildsView() {
 
   const groups = useMemo(() => {
     if (!data) return null;
-    const near = (b: ApiBuild) => Math.abs(b.level - level) + (b.level > level ? 15 : 0); // prefer builds you can already wear
-    const list = data.builds.filter((b) => element === 'all' || b.elements.includes(element)).sort((a, b) => near(a) - near(b));
-    const prev = prevPatch(data.patch);
+    // "match": prefer builds you can already wear, closest level, element focus, then popularity
+    const score = (b: ApiBuild) => Math.abs(b.level - lvl) + (b.level > lvl ? 15 : 0) - Math.min(b.likes, 10) * 0.3;
+    const cmp: Record<Sort, (a: ApiBuild, b: ApiBuild) => number> = {
+      match: (a, b) => score(a) - score(b),
+      likes: (a, b) => b.likes - a.likes || b.views - a.views,
+      views: (a, b) => b.views - a.views,
+      recent: (a, b) => (b.updated ?? '').localeCompare(a.updated ?? ''),
+    };
+    const list = data.builds.filter((b) => element === 'all' || b.elements.includes(element)).sort(cmp[sort]);
+    const [maj, min] = (data.patch ?? '0.0').split('.').map(Number);
+    const prev = min > 0 ? `${maj}.${min - 1}` : null;
     return {
       current: list.filter((b) => b.upToDate),
       previous: list.filter((b) => !b.upToDate && b.patch === prev),
       older: list.filter((b) => !b.upToDate && b.patch !== prev),
       prev,
     };
-  }, [data, element, level]);
+  }, [data, element, lvl, sort]);
 
   if (!ch.ready) return null;
-  if (!breed) {
-    return (
-      <div className="mx-auto max-w-3xl px-4 py-8">
-        <EmptyState title="Choisissez d’abord votre classe">
-          Les builds dépendent de la classe. <Link className="text-accent underline" href="/personnage">Compléter mon profil</Link>
-        </EmptyState>
-      </div>
-    );
-  }
-
   const compared = data?.builds.filter((b) => compare.includes(b.id)) ?? [];
   const toggleCompare = (id: string) => setCompare((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c.slice(-1), id]));
+  const saved = (id: string) => ch.character.builds.some((b) => b.id === id);
+  const control = 'rounded-lg border border-line bg-surface px-3 py-2 text-sm';
 
   const BuildCard = ({ b }: { b: ApiBuild }) => {
-    const wearable = b.level <= level;
+    const wearable = b.level <= lvl;
     const isOpen = open === b.id;
+    const isSaved = saved(b.id);
+    const isCurrent = ch.character.currentBuild === b.id;
     return (
-      <Card className={`flex flex-col gap-3 ${isOpen ? 'border-faint' : ''}`}>
+      <Card className={`flex flex-col gap-3 ${isOpen ? 'border-faint' : ''} ${isCurrent ? 'border-accent/70' : ''}`}>
         <div className="flex flex-wrap items-start gap-2">
           <div className="min-w-0 flex-1">
             <h3 className="truncate font-display text-[15px] font-semibold">{b.name}</h3>
             <p className="text-xs text-muted">
               Niveau {b.level} · patch {b.patch ?? '?'}{b.creator ? ` · par ${b.creator}` : ''}
+              {b.updated ? ` · mis à jour le ${new Date(b.updated).toLocaleDateString('fr-FR')}` : ''}
             </p>
           </div>
           <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${wearable ? 'bg-done/15 text-done' : 'bg-surface-2 text-muted'}`}>
@@ -101,9 +119,10 @@ export default function BuildsView() {
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           {b.elements.map((el) => <ElementTag key={el} element={el} />)}
+          {b.origin === 'top' && <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[11px] text-accent">Top communauté</span>}
           <span className="ml-auto flex items-center gap-3 text-xs text-muted">
-            <span className="inline-flex items-center gap-1"><Heart size={12} /> {b.likes}</span>
-            <span className="inline-flex items-center gap-1"><Eye size={12} /> {b.views}</span>
+            <span className="inline-flex items-center gap-1" title="« J’aime » sur Fashionista"><Heart size={12} /> {b.likes}</span>
+            <span className="inline-flex items-center gap-1" title="Vues sur Fashionista"><Eye size={12} /> {b.views}</span>
           </span>
         </div>
         {b.totals && (
@@ -115,14 +134,15 @@ export default function BuildsView() {
         )}
         <div className="flex flex-wrap gap-2">
           <Button variant={isOpen ? 'secondary' : 'primary'} onClick={() => setOpen(isOpen ? null : b.id)}>{isOpen ? 'Masquer le détail' : 'Voir l’équipement'}</Button>
-          <Button variant="ghost" aria-pressed={compare.includes(b.id)} onClick={() => toggleCompare(b.id)}>
-            <GitCompare size={15} /> {compare.includes(b.id) ? 'Comparé' : 'Comparer'}
+          <Button variant="ghost" aria-pressed={isSaved} title={isSaved ? 'Retirer de mon personnage' : 'Enregistrer dans mon personnage'}
+            onClick={() => (isSaved ? ch.removeBuild(b.id) : ch.saveBuild({ source: 'Dofus Fashionista', id: b.id, name: b.name, level: b.level, url: b.url }))}>
+            {isSaved ? <BookmarkCheck size={15} /> : <Bookmark size={15} />} {isSaved ? 'Enregistré' : 'Enregistrer'}
           </Button>
-          <a href={b.url} target="_blank" rel="noopener noreferrer" className="ml-auto inline-flex items-center gap-1 self-center text-xs text-muted hover:text-text">
-            Fashionista <ExternalLink size={12} />
-          </a>
+          <Button variant="ghost" aria-pressed={compare.includes(b.id)} onClick={() => toggleCompare(b.id)}><GitCompare size={15} /> {compare.includes(b.id) ? 'Comparé' : 'Comparer'}</Button>
+          <a href={b.url} target="_blank" rel="noopener noreferrer" className="ml-auto inline-flex items-center gap-1 self-center text-xs text-muted hover:text-text">Fashionista <ExternalLink size={12} /></a>
         </div>
-        {isOpen && <BuildDetail b={b} />}
+        {isOpen && <BuildDetail b={b} spells={b.elements.flatMap((el) => data?.spellsByElement[el] ?? [])} breedId={breed!.id}
+          current={isCurrent} onWear={() => { if (!isSaved) ch.saveBuild({ source: 'Dofus Fashionista', id: b.id, name: b.name, level: b.level, url: b.url }, true); else ch.wearBuild(isCurrent ? undefined : b.id); }} />}
       </Card>
     );
   };
@@ -136,82 +156,120 @@ export default function BuildsView() {
   ) : null;
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="font-display text-xl font-semibold">Équipement conseillé · {breed.name}</h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted">
-            Les builds les mieux notés par la communauté sur <a className="text-accent underline" href="https://dofusfashionista.gg" target="_blank" rel="noopener noreferrer">Dofus Fashionista</a>, classés selon votre niveau ({level}).
-            Les objets et les stats sont recalculés avec les données officielles du jeu.
-          </p>
+    <div className="h-full overflow-y-auto">
+      <div className="mx-auto max-w-6xl px-4 py-6">
+        <h1 className="flex items-center gap-2 font-display text-xl font-semibold"><Shirt size={20} className="text-accent" /> Builds de la communauté</h1>
+        <p className="mt-1 max-w-3xl text-sm text-muted">
+          Des équipements complets partagés sur <a className="text-accent underline" href="https://dofusfashionista.gg" target="_blank" rel="noopener noreferrer">Dofus Fashionista</a>,
+          classés pour votre personnage. Objets et stats sont recalculés avec les données officielles du jeu.
+        </p>
+
+        <Card className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+          <label className="text-xs text-muted">Classe
+            <select className={`${control} mt-1 w-full`} value={breed?.id ?? ''} onChange={(e) => setBreedId(e.target.value ? Number(e.target.value) : null)}>
+              <option value="">Choisir…</option>
+              {SUPPORTED_BREEDS.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+          </label>
+          <label className="text-xs text-muted">Niveau
+            <input type="number" min={1} max={200} className={`${control} mt-1 w-full`} value={lvl} onChange={(e) => setLevel(Math.min(200, Math.max(1, Number(e.target.value) || 1)))} />
+          </label>
+          <label className="text-xs text-muted">Élément
+            <select className={`${control} mt-1 w-full`} value={element} onChange={(e) => setElement(e.target.value as Element | 'all')}>
+              <option value="all">Tous</option>{(['Feu', 'Eau', 'Terre', 'Air'] as const).map((el) => <option key={el}>{el}</option>)}
+            </select>
+          </label>
+          <label className="text-xs text-muted">Style de jeu
+            <select className={`${control} mt-1 w-full`} disabled title="Fashionista ne précise pas le style de jeu de ses builds">
+              <option>{PLAYSTYLES.find((s) => s.id === ch.character.playstyle)?.label ?? 'Tous'} (non filtrable)</option>
+            </select>
+          </label>
+          <label className="text-xs text-muted">Version
+            <select className={`${control} mt-1 w-full`} disabled title="Nos données d’objets couvrent Dofus 3"><option>Dofus 3</option></select>
+          </label>
+          <label className="text-xs text-muted">Trier par
+            <select className={`${control} mt-1 w-full`} value={sort} onChange={(e) => setSort(e.target.value as Sort)}>
+              {SORTS.map((s) => <option key={s.id} value={s.id} disabled={!!s.disabled}>{s.label}{s.disabled ? ` — indisponible (${s.disabled})` : ''}</option>)}
+            </select>
+          </label>
+        </Card>
+
+        <div className="mt-3 flex flex-wrap gap-2">
+          <ButtonLink href="https://dofusfashionista.gg/setup/" target="_blank" rel="noopener noreferrer" variant="secondary"><Sparkles size={15} /> Créer un build optimisé (Fashionista)</ButtonLink>
+          <ButtonLink href="https://dofusbuilds.com/" target="_blank" rel="noopener noreferrer" variant="ghost">Simuler les dégâts (Dofus Builds) <ExternalLink size={13} /></ButtonLink>
+          <ButtonLink href="https://dofuscreator.com/" target="_blank" rel="noopener noreferrer" variant="ghost">Dofus Creator <ExternalLink size={13} /></ButtonLink>
         </div>
-        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filtrer par élément">
-          {(['all', 'Feu', 'Eau', 'Terre', 'Air'] as const).map((el) => (
-            <button key={el} onClick={() => setElement(el)} aria-pressed={element === el}
-              className={`rounded-full border px-3 py-1 text-xs ${element === el ? 'border-accent bg-accent/10 text-text' : 'border-line text-muted hover:text-text'}`}>
-              {el === 'all' ? 'Tous les éléments' : el}
-            </button>
-          ))}
-        </div>
+
+        {ch.character.builds.length > 0 && (
+          <Card className="mt-4">
+            <h2 className="mb-2 font-display text-sm font-semibold">Enregistrés dans « {ch.character.name} »</h2>
+            <ul className="flex flex-wrap gap-2 text-sm">
+              {ch.character.builds.map((b) => (
+                <li key={b.id} className={`flex items-center gap-2 rounded-lg border px-2.5 py-1 ${ch.character.currentBuild === b.id ? 'border-accent' : 'border-line'}`}>
+                  <a href={b.url} target="_blank" rel="noopener noreferrer" className="hover:underline">{b.name}</a>
+                  <span className="text-xs text-muted">niv. {b.level}{ch.character.currentBuild === b.id ? ' · porté' : ''}</span>
+                  <button aria-label={`Retirer ${b.name}`} onClick={() => ch.removeBuild(b.id)} className="text-faint hover:text-text"><X size={13} /></button>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
+
+        {!breed && <div className="mt-6"><EmptyState title="Choisissez une classe">Les builds dépendent de la classe.</EmptyState></div>}
+        {breed && error && <div className="mt-6"><EmptyState title="Impossible de charger les builds">{error}</EmptyState></div>}
+        {breed && !error && !groups && <p className="mt-6 text-sm text-muted">Chargement des builds de la communauté…</p>}
+        {groups && (
+          <>
+            {groups.current.length + groups.previous.length + groups.older.length === 0 && (
+              <div className="mt-6"><EmptyState title="Aucun build partagé pour ce filtre">Essayez « Tous » les éléments, ou créez le vôtre sur Fashionista.</EmptyState></div>
+            )}
+            <Section title={`À jour (patch ${data!.patch})`} hint="Optimisés pour la version actuelle du jeu." builds={groups.current} />
+            <Section title={`Patch précédent (${groups.prev})`} hint="Encore pertinents dans l’ensemble, mais quelques objets ont pu changer depuis." builds={groups.previous} />
+            <Section title="Anciens patchs" hint="À utiliser comme inspiration seulement : les objets et leurs effets ont pu beaucoup changer." builds={groups.older} warn />
+          </>
+        )}
+
+        <p className="mt-8 flex gap-2 text-xs text-faint">
+          <Info size={14} className="shrink-0" />
+          Popularité et vues : chiffres publiés par Fashionista. Stats indicatives : objets au jet maximal, bonus de panoplie, points et parchemins du build.
+          Non disponibles faute de source fiable : budget, prix, dégâts vérifiés et style de jeu.
+        </p>
+        {compared.length === 2 && <ComparePanel a={compared[0]} b={compared[1]} onClose={() => setCompare([])} />}
       </div>
-
-      <div className="mt-4 flex flex-wrap gap-2">
-        <ButtonLink href="https://dofusfashionista.gg/setup/" target="_blank" rel="noopener noreferrer" variant="secondary"><Sparkles size={15} /> Créer un build optimisé (Fashionista)</ButtonLink>
-        <ButtonLink href="https://dofusbuilds.com/" target="_blank" rel="noopener noreferrer" variant="ghost">Simuler les dégâts (Dofus Builds) <ExternalLink size={13} /></ButtonLink>
-        <ButtonLink href="https://dofuscreator.com/" target="_blank" rel="noopener noreferrer" variant="ghost">Dofus Creator <ExternalLink size={13} /></ButtonLink>
-      </div>
-
-      {error && <div className="mt-6"><EmptyState title="Impossible de charger les builds">{error}</EmptyState></div>}
-      {!error && !groups && <p className="mt-6 text-sm text-muted">Chargement des builds de la communauté…</p>}
-      {groups && (
-        <>
-          {groups.current.length + groups.previous.length + groups.older.length === 0 && (
-            <div className="mt-6"><EmptyState title="Aucun build partagé pour ce filtre">Essayez « Tous les éléments », ou créez le vôtre sur Fashionista.</EmptyState></div>
-          )}
-          <Section title={`À jour (patch ${data!.patch})`} hint="Optimisés pour la version actuelle du jeu." builds={groups.current} />
-          <Section title={`Patch précédent (${groups.prev})`} hint="Encore pertinents dans l’ensemble, mais quelques objets ont pu changer depuis." builds={groups.previous} />
-          <Section title="Anciens patchs" hint="À utiliser comme inspiration seulement : les objets et leurs effets ont pu beaucoup changer." builds={groups.older} warn />
-        </>
-      )}
-
-      <p className="mt-8 flex gap-2 text-xs text-faint">
-        <Info size={14} className="shrink-0" />
-        Stats indicatives : objets au jet maximal, bonus de panoplie, points de caractéristiques et parchemins du build. Le style de jeu (PvM, PvP) n’est pas encore filtrable :
-        Fashionista ne le fournit pas. Pas de prix affichés : aucune source fiable n’existe.
-      </p>
-
-      {compared.length === 2 && <ComparePanel a={compared[0]} b={compared[1]} onClose={() => setCompare([])} />}
     </div>
   );
 }
 
-function BuildDetail({ b }: { b: ApiBuild }) {
+function BuildDetail({ b, spells, breedId, current, onWear }: { b: ApiBuild; spells: string[]; breedId: number; current: boolean; onWear: () => void }) {
   return (
     <div className="flex flex-col gap-4 border-t border-line pt-3">
-      <div>
-        <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">Équipement ({b.items.length})</h4>
-        <ul className="flex flex-col">
-          {b.items.map((it) => (
-            <li key={it.id}>
-              <details className="rounded-lg px-2 py-1 hover:bg-surface-2">
-                <summary className="flex cursor-pointer list-none items-center gap-2 text-sm">
-                  <span className="w-20 shrink-0 truncate text-xs text-muted">{it.type}</span>
-                  <span className="min-w-0 flex-1 truncate font-medium">{it.name}</span>
-                  <span className="text-xs text-muted">niv. {it.level}</span>
-                </summary>
-                <ul className="mt-1 grid gap-0.5 pb-1 pl-[5.5rem] text-xs text-muted sm:grid-cols-2">
-                  {it.effects.filter(Boolean).map((e, i) => <li key={i}>{e}</li>)}
-                  {it.set && <li className="text-check">Panoplie : {it.set}</li>}
-                </ul>
-              </details>
-            </li>
-          ))}
-        </ul>
-        {b.missing.length > 0 && <p className="mt-1 text-xs text-check">{b.missing.length} objet(s) inconnu(s) de nos données, non comptés.</p>}
+      <div className="flex flex-col gap-2">
+        {b.slots.map((s) => (
+          <div key={s.slot}>
+            <h4 className="text-[11px] font-semibold uppercase tracking-wide text-muted">{s.slot}</h4>
+            <ul>
+              {s.items.map((it) => (
+                <li key={it.id}>
+                  <details className="rounded-lg px-2 py-1 hover:bg-surface-2">
+                    <summary className="flex cursor-pointer list-none items-center gap-2 text-sm">
+                      <span className="min-w-0 flex-1 truncate font-medium">{it.name}</span>
+                      <span className="text-xs text-muted">{it.type} · niv. {it.level}</span>
+                    </summary>
+                    <ul className="mt-1 grid gap-0.5 pb-1 text-xs text-muted sm:grid-cols-2">
+                      {it.effects.filter(Boolean).map((e, i) => <li key={i}>{e}</li>)}
+                      {it.set && <li className="text-check">Panoplie : {it.set}</li>}
+                    </ul>
+                  </details>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+        {b.missing.length > 0 && <p className="text-xs text-check">{b.missing.length} objet(s) inconnu(s) de nos données, non comptés.</p>}
       </div>
       {b.sets.length > 0 && (
         <div>
-          <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">Panoplies</h4>
+          <h4 className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted">Bonus de panoplie</h4>
           <ul className="flex flex-col gap-1 text-sm">
             {b.sets.map((s) => (
               <li key={s.name}><b className="font-medium">{s.name}</b> <span className="text-muted">({s.pieces}/{s.total})</span>
@@ -225,7 +283,7 @@ function BuildDetail({ b }: { b: ApiBuild }) {
         <div className="grid gap-3 sm:grid-cols-3">
           {GROUPS.map((g) => (
             <div key={g.title}>
-              <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted">{g.title}</h4>
+              <h4 className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted">{g.title}</h4>
               <dl className="flex flex-col gap-0.5 text-sm">
                 {g.stats.filter(([k]) => (b.totals![k] ?? 0) !== 0 || g.title === 'Principales').map(([k, label, def]) => (
                   <div key={k} className="flex justify-between gap-2">
@@ -238,6 +296,16 @@ function BuildDetail({ b }: { b: ApiBuild }) {
           ))}
         </div>
       )}
+      {spells.length > 0 && (
+        <div>
+          <h4 className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted">Sorts du même élément à jouer avec ce build</h4>
+          <p className="text-sm">{[...new Set(spells)].slice(0, 14).join(' · ')}</p>
+          <Link href={`/personnage/sorts/${breedId}`} className="text-xs text-accent underline">Voir le détail des sorts</Link>
+        </div>
+      )}
+      <Button variant={current ? 'ghost' : 'secondary'} className="self-start" onClick={onWear}>
+        <Shirt size={15} /> {current ? 'Ce n’est plus mon build actuel' : 'C’est mon build actuel'}
+      </Button>
     </div>
   );
 }
