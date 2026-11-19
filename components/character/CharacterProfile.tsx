@@ -100,6 +100,30 @@ export default function CharacterProfile() {
           </div>
         </Card>
 
+        <Card>
+          <SectionTitle hint={`${c.done.filter((d) => d.startsWith('quest:')).length} quêtes · ${c.done.filter((d) => d.startsWith('ach:')).length} succès`}>Progression et équipement</SectionTitle>
+          {c.builds.length === 0 ? (
+            <p className="text-sm text-muted">Aucun build enregistré. <a className="text-accent underline" href="/builds">Parcourir les builds de la communauté</a></p>
+          ) : (
+            <ul className="flex flex-col gap-1 text-sm">
+              {c.builds.map((b) => (
+                <li key={b.id} className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-1.5 ${c.currentBuild === b.id ? 'border-accent' : 'border-line'}`}>
+                  <a href={b.url} target="_blank" rel="noopener noreferrer" className="truncate hover:underline">{b.name} <span className="text-xs text-muted">niv. {b.level}</span></a>
+                  <span className="flex shrink-0 items-center gap-2">
+                    {c.currentBuild === b.id ? <span className="text-xs text-accent">Build actuel</span>
+                      : <button className="text-xs text-muted hover:text-text" onClick={() => ch.wearBuild(b.id)}>Porter</button>}
+                    <button className="text-xs text-muted hover:text-red-200" onClick={() => ch.removeBuild(b.id)}>Retirer</button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <label className="mt-4 block text-sm text-muted">Notes personnelles
+            <textarea className={`${field} min-h-24`} maxLength={4000} value={c.notes} placeholder="Objectifs, idées de stuff, rappels…"
+              onChange={(e) => ch.setInfo({ notes: e.target.value })} />
+          </label>
+        </Card>
+
         <div className="flex flex-wrap gap-2">
           <Button variant="ghost" onClick={() => { if (confirm(`Effacer la progression de ${c.name} (${c.done.length} terminées) ?`)) ch.reset(); }}>
             Réinitialiser la progression

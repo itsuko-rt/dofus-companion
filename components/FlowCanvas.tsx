@@ -6,7 +6,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import dagre from '@dagrejs/dagre';
-import { ArrowUpRight } from 'lucide-react';
+import { ArrowUpRight, Egg } from 'lucide-react';
 import type { GEdge, Graph, Status } from '../src/graph.ts';
 import { STATUS } from './ui';
 
@@ -17,7 +17,7 @@ const STROKE: Record<Status, string> = { done: '#3fb57a', available: '#e9b44c', 
 
 type QData = {
   label: string; level?: number | null; status: Status; kind: keyof typeof KIND_LABEL;
-  selected: boolean; external: string | null;
+  selected: boolean; external: string | null; dofus: boolean;
 };
 
 const QuestNode = memo(function QuestNode({ data }: NodeProps<Node<QData>>) {
@@ -34,6 +34,7 @@ const QuestNode = memo(function QuestNode({ data }: NodeProps<Node<QData>>) {
         <div className="line-clamp-2 text-[14px] font-medium leading-snug text-text" title={data.label}>{data.label}</div>
         <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted">
           <span>{KIND_LABEL[data.kind]}{data.level ? ` · niv. ${data.level}` : ''}</span>
+          {data.dofus && <span className="inline-flex items-center gap-0.5 text-accent" title="Cette quête donne un Dofus"><Egg size={11} aria-hidden />Dofus</span>}
           {data.external && (
             <span className="inline-flex items-center gap-0.5 text-check" title={`Demande aussi une quête de ${data.external}`}>
               <ArrowUpRight size={11} aria-hidden />{data.external}
@@ -71,11 +72,13 @@ interface Props {
   viewKey: string;
   /** Region shown as a badge on quests that also need a quest from elsewhere. */
   external?: (id: string) => string | null;
+  /** Quests rewarding a Dofus get a badge. */
+  dofus?: (id: string) => boolean;
   /** Nodes framed on open; by default the first rows, never zoomed below a readable size. */
   fitIds?: string[];
 }
 
-export default function FlowCanvas({ graph, nodeIds, edges, status, selected, onSelect, viewKey, external, fitIds }: Props) {
+export default function FlowCanvas({ graph, nodeIds, edges, status, selected, onSelect, viewKey, external, dofus, fitIds }: Props) {
   // Layout depends only on the view, not on progress: positions stay put when you tick a quest.
   const positions = useMemo(() => {
     const g = new dagre.graphlib.Graph();
@@ -102,9 +105,9 @@ export default function FlowCanvas({ graph, nodeIds, edges, status, selected, on
     return {
       id, type: gate ? 'gate' : 'quest', position: positions.get(id)!,
       width: gate ? GATE : W, height: gate ? GATE : H, draggable: false,
-      data: { label: n.label, level: n.level, status: status(id), kind: n.kind, selected: id === selected, external: external?.(id) ?? null },
+      data: { label: n.label, level: n.level, status: status(id), kind: n.kind, selected: id === selected, external: external?.(id) ?? null, dofus: dofus?.(id) ?? false },
     };
-  }), [nodeIds, positions, graph, status, selected, external]);
+  }), [nodeIds, positions, graph, status, selected, external, dofus]);
 
   const flowEdges = useMemo<Edge[]>(() => edges.filter((e) => nodeIds.has(e.from) && nodeIds.has(e.to)).map((e, i) => {
     const src = status(e.from);

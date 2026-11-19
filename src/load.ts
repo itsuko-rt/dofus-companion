@@ -19,6 +19,8 @@ export interface GraphData {
   categories: { id: number; name: string }[];
   nodes: NodeInput[];
   extraEdges: GEdge[];
+  /** quest:… node ids whose rewards include a Dofus (directly) */
+  dofusQuests: string[];
 }
 
 /** Everything the graph needs, as plain JSON (also what the UI downloads). */
@@ -42,7 +44,9 @@ export function loadGraphData(path: string): GraphData {
     const extraEdges = plain<GEdge>(db.prepare(
       "SELECT from_node AS \"from\", to_node AS \"to\", kind FROM edge WHERE kind = 'in_dungeon'",
     ).all());
-    return { version, categories, nodes, extraEdges };
+    const dofusQuests = [...new Set((db.prepare('SELECT quest_ids FROM dofus').all() as { quest_ids: string }[])
+      .flatMap((r) => (JSON.parse(r.quest_ids) as number[]).map((id) => `quest:${id}`)))];
+    return { version, categories, nodes, extraEdges, dofusQuests };
   } finally {
     db.close();
   }

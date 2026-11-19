@@ -11,7 +11,8 @@ import QuestDrawer from './QuestDrawer';
 import { useGame } from './useGame';
 
 export default function RegionView({ region }: { region: number }) {
-  const { data, error, graph, status, categoryName, ch } = useGame();
+  const { data, error, graph, status, categoryName, ch, dofusQuests } = useGame();
+  const isDofus = useCallback((id: string) => dofusQuests.has(id), [dofusQuests]);
   const [selected, setSelected] = useState<string | null>(null);
   const [focus, setFocus] = useState<string | null>(null);
   const [railOpen, setRailOpen] = useState(true);
@@ -112,7 +113,7 @@ export default function RegionView({ region }: { region: number }) {
           )}
           {view.nodes.size > 0 ? (
             <FlowCanvas graph={graph} nodeIds={view.nodes} edges={view.edges} status={status} selected={selected}
-              onSelect={select} viewKey={focus ? `f${focus}` : `r${region}`} external={focus ? undefined : external}
+              onSelect={select} viewKey={focus ? `f${focus}` : `r${region}`} external={focus ? undefined : external} dofus={isDofus}
               fitIds={focus ? [focus, ...preds(graph, focus).map((e) => e.from)] : undefined} />
           ) : (
             <div className="flex h-full items-center justify-center p-8 text-center text-sm text-muted">
@@ -120,7 +121,7 @@ export default function RegionView({ region }: { region: number }) {
             </div>
           )}
           {sel && sel.kind !== 'gate' && (
-            <QuestDrawer node={sel} graph={graph} status={status} ch={ch} region={categoryName.get(sel.category ?? -1)}
+            <QuestDrawer node={sel} graph={graph} status={status} ch={ch} region={categoryName.get(sel.category ?? -1)} givesDofus={dofusQuests.has(sel.id)}
               onSelect={select} onFocusChain={(id) => { setFocus(id); setSelected(id); }}
               onClose={() => { setSelected(null); history.replaceState(null, '', window.location.pathname); }} />
           )}

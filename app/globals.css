@@ -24,6 +24,10 @@
   --color-el-terre: #b7884b;
   --color-el-air: #45c986;
   --color-el-neutre: #a0a8b4;
+
+  /* classes (first release) */
+  --color-class-cra: #6fbf73;
+  --color-class-pandawa: #c9a227;
 }
 
 :root { color-scheme: dark; }

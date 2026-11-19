@@ -40,9 +40,9 @@ const INTRO: Record<Status, string> = {
   unknown: 'Une condition doit être vérifiée en jeu :',
 };
 
-export default function QuestDrawer({ node, graph, status, ch, region, onSelect, onFocusChain, onClose }: {
+export default function QuestDrawer({ node, graph, status, ch, region, givesDofus, onSelect, onFocusChain, onClose }: {
   node: GNode; graph: Graph; status: (id: string) => Status; ch: ReturnType<typeof useCharacter>;
-  region?: string; onSelect: (id: string) => void; onFocusChain?: (id: string) => void; onClose: () => void;
+  region?: string; givesDofus?: boolean; onSelect: (id: string) => void; onFocusChain?: (id: string) => void; onClose: () => void;
 }) {
   const st = status(node.id);
   const missing = st === 'done' || st === 'available' ? [] : graph.blockers(node.id, ch.progress);
@@ -85,7 +85,9 @@ export default function QuestDrawer({ node, graph, status, ch, region, onSelect,
       <>
         <p className="text-xs uppercase tracking-wide text-muted">{kind}{region ? ` · ${region}` : ''}</p>
         <h2 className="font-display text-lg font-semibold leading-snug">{node.label}</h2>
-        <div className="mt-1.5"><StatusPill status={st} /></div>
+        <div className="mt-1.5 flex flex-wrap gap-1.5"><StatusPill status={st} />
+          {givesDofus && <span className="inline-flex items-center rounded-full border border-accent/60 bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">Donne un Dofus</span>}
+        </div>
       </>
     }>
       <div className="flex flex-wrap gap-2">

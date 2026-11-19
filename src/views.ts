@@ -25,19 +25,6 @@ function close(g: Graph, nodes: Set<string>): View {
   return { nodes, edges: g.edges.filter((e) => DRAWN.has(e.kind) && nodes.has(e.from) && nodes.has(e.to)) };
 }
 
-/** Quests of one category (≈ region) plus their direct prerequisites, OR gates included. */
-export function regionView(g: Graph, category: number): View {
-  const nodes = new Set<string>();
-  for (const n of g.nodes.values()) if (n.kind === 'quest' && n.category === category) nodes.add(n.id);
-  for (const id of [...nodes]) {
-    for (const e of preds(g, id)) {
-      nodes.add(e.from);
-      if (e.from.startsWith('gate:')) for (const ge of preds(g, e.from)) nodes.add(ge.from);
-    }
-  }
-  return close(g, nodes);
-}
-
 /** Every prerequisite of `id` (transitively, up to `max` nodes) plus what it directly unlocks. */
 export function focusView(g: Graph, id: string, max = 250): View {
   const nodes = new Set([id]);

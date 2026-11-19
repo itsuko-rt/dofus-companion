@@ -45,7 +45,7 @@ export default function Home() {
       <div className="mx-auto grid max-w-6xl gap-5 px-4 py-6 lg:grid-cols-[1fr_360px]">
         <div className="flex flex-col gap-5">
           <Card className="flex flex-wrap items-center gap-4 bg-gradient-to-br from-surface-2 to-surface">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent/15 font-display text-xl font-bold text-accent" aria-hidden>
+            <div className={`flex h-14 w-14 items-center justify-center rounded-2xl font-display text-xl font-bold ${breed?.color ?? 'bg-accent/15 text-accent'}`} aria-hidden>
               {c.name.slice(0, 1).toUpperCase()}
             </div>
             <div className="min-w-0 flex-1">

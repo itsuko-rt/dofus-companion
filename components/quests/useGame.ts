@@ -19,6 +19,7 @@ export function useGame() {
   useEffect(() => { fetchGraph().then(setData, (e: Error) => setError(e.message)); }, []);
 
   const graph = useMemo(() => (data ? new Graph(data.nodes, data.extraEdges) : null), [data]);
+  const dofusQuests = useMemo(() => new Set(data?.dofusQuests ?? []), [data]);
   const categoryName = useMemo(() => new Map(data?.categories.map((c) => [c.id, c.name]) ?? []), [data]);
   const statuses = useMemo(() => {
     const m = new Map<string, Status>();
@@ -27,5 +28,5 @@ export function useGame() {
   }, [graph, ch.progress]);
   const status = useCallback((id: string): Status => statuses.get(id) ?? 'unknown', [statuses]);
 
-  return { data, error, graph, categoryName, status, ch };
+  return { data, error, graph, categoryName, status, ch, dofusQuests };
 }
