@@ -4,18 +4,13 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { BookOpen, Check, ChevronDown, CircleHelp, ExternalLink, Gift, History, ScanLine, Search, Sparkles, Trophy } from 'lucide-react';
 import type { AchievementCategory, AchievementInfo } from '../../src/load.ts';
-import { ACHIEVEMENT_STATE, achievementProgress, type AchievementState, type ObjectiveIndex, type ObjectiveState } from '../../src/achievements.ts';
+import { ACHIEVEMENT_STATE, achievementProgress, type AchievementState, type ObjectiveState } from '../../src/achievements.ts';
 import { CHANGE_SOURCES, type HistoryEntry } from '../../src/character.ts';
 import { reference, parse } from '../../src/criteria.ts';
-import { useGame } from '../quests/useGame';
+import { useAchievementProgress } from './useAchievementProgress';
 import { questHref } from '../quests/NextSteps';
-import { Button, Card, EmptyState, ProgressBar } from '../ui';
+import { Button, ButtonLink, Card, EmptyState, PageHero, ProgressBar, SECTION } from '../ui';
 
-let objCache: Promise<ObjectiveIndex> | null = null;
-const fetchObjectives = () => (objCache ??= fetch('/api/achievements/objectives').then((r) => {
-  if (!r.ok) throw new Error(r.statusText);
-  return r.json() as Promise<ObjectiveIndex>;
-}).catch((e) => { objCache = null; throw e; }));
 
 const norm = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
 type Filter = 'all' | AchievementState;
@@ -39,10 +34,7 @@ function Stat({ label, value, tone }: { label: string; value: number | string; t
 }
 
 export default function AchievementsView({ categories }: { categories: AchievementCategory[] }) {
-  const { graph, ch } = useGame();
-  const [index, setIndex] = useState<ObjectiveIndex | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  useEffect(() => { fetchObjectives().then(setIndex, (e: Error) => setError(e.message)); }, []);
+  const { graph, ch, index, error, progress, recent, almost } = useAchievementProgress();
 
   const roots = useMemo(() => categories.filter((c) => c.parentId == null && c.count + categories.filter((x) => x.parentId === c.id).reduce((s, x) => s + x.count, 0) > 0), [categories]);
   const rootOf = useMemo(() => new Map(categories.map((c) => [c.id, c.parentId ?? c.id])), [categories]);
@@ -52,17 +44,6 @@ export default function AchievementsView({ categories }: { categories: Achieveme
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState<number | null>(null);
   const [list, setList] = useState<AchievementInfo[] | null>(null);
-
-  // progress of every achievement (objectives evaluated against the character)
-  const progress = useMemo(() => {
-    const m = new Map<number, ReturnType<typeof achievementProgress> & { category: number }>();
-    if (!graph || !index) return m;
-    for (const n of graph.nodes.values()) {
-      if (n.kind !== 'achievement') continue;
-      m.set(n.refId, { ...achievementProgress(n.refId, index[n.refId] ?? [], ch.progress), category: n.category ?? -1 });
-    }
-    return m;
-  }, [graph, index, ch.progress]);
 
   const totals = useMemo(() => {
     const t = { all: 0, obtained: 0, ready: 0, in_progress: 0, not_started: 0, points: 0 };
@@ -84,19 +65,6 @@ export default function AchievementsView({ categories }: { categories: Achieveme
     for (const h of ch.character.history) for (const id of h.added) m.set(id, h);
     return m;
   }, [ch.character.history]);
-  const recent = useMemo(() => {
-    const out: { id: string; at: string }[] = [];
-    for (const h of [...ch.character.history].reverse()) for (const id of h.added) {
-      if (id.startsWith('ach:') && ch.progress.done.has(id) && !out.some((x) => x.id === id)) out.push({ id, at: h.at });
-    }
-    return out.slice(0, 5);
-  }, [ch.character.history, ch.progress.done]);
-  // "what next": achievements with most objectives already met, reachable at the character's level
-  const almost = useMemo(() => [...progress.entries()]
-    .filter(([id, p]) => (p.state === 'in_progress' || p.state === 'ready') && (graph?.nodes.get(`ach:${id}`)?.level ?? 0) <= ch.character.level + 20)
-    .sort((a, b) => Number(b[1].state === 'ready') - Number(a[1].state === 'ready') || b[1].met / b[1].total - a[1].met / a[1].total)
-    .slice(0, 5), [progress, graph, ch.character.level]);
-
   const selected = sub ?? root;
   const children = useMemo(() => categories.filter((c) => c.parentId === root), [categories, root]);
   useEffect(() => {
@@ -131,17 +99,13 @@ export default function AchievementsView({ categories }: { categories: Achieveme
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-6">
-        {/* dashboard */}
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h1 className="flex items-center gap-2 font-display text-2xl font-semibold"><Trophy size={22} className="text-accent" /> Succès</h1>
-            <p className="mt-1 text-sm text-muted">{ch.hasCharacter ? `${ch.character.name} · niv. ${ch.character.level}` : 'Aucun personnage : la progression reste dans ce navigateur.'}</p>
-          </div>
-          <Link href="/progression/scan" className="inline-flex items-center gap-2 rounded-lg bg-accent px-3.5 py-2 text-sm font-semibold text-accent-ink hover:brightness-110">
-            <ScanLine size={16} /> Scanner ma progression
-          </Link>
+      <PageHero color={SECTION.achievements} kicker="Journal de l’aventurier" title={<span className="inline-flex items-center gap-3"><Trophy size={26} className="text-[#ffe2a6]" /> Succès</span>}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-white/80">{ch.hasCharacter ? `${ch.character.name} · niv. ${ch.character.level}` : 'Aucun personnage : la progression reste dans ce navigateur.'}</p>
+          <ButtonLink href="/progression/scan" variant="primary"><ScanLine size={16} /> Scanner ma progression</ButtonLink>
         </div>
+      </PageHero>
+      <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-6">
         <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
           <Card className="flex flex-col gap-4">
             <div className="grid grid-cols-3 gap-4 sm:grid-cols-6">
@@ -236,7 +200,7 @@ export default function AchievementsView({ categories }: { categories: Achieveme
                   const src = provenance.get(`ach:${a.id}`);
                   return (
                     <li key={a.id} id={`ach-${a.id}`}>
-                      <Card className={`p-0 ${expanded ? 'border-faint' : ''}`}>
+                      <Card paper className={`p-0 transition ${expanded ? '' : 'hover:-translate-y-px'} ${p.state === 'obtained' ? 'outline outline-2 -outline-offset-2 outline-done/50' : ''}`}>
                         <button onClick={() => setOpen(expanded ? null : a.id)} aria-expanded={expanded} className="flex w-full items-center gap-3 p-3 text-left">
                           <div className="min-w-0 flex-1">
                             <p className="truncate font-medium">{a.name}</p>

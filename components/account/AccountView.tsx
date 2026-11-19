@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useEffect, useState, type FormEvent } from 'react';
 import { CheckCircle2, CloudOff, Loader2, LogOut, RefreshCw } from 'lucide-react';
 import { BRAND } from '../../src/brand.ts';
-import { Button, Card, SectionTitle } from '../ui';
+import { Button, Card, SectionTitle, PageHero, SECTION } from '../ui';
 import { useCharacter } from '../useCharacter';
 import { useSession } from './useSession';
 
@@ -16,6 +16,9 @@ export default function AccountView() {
   if (!s.ready) return <p className="p-8 text-sm text-muted">Chargement…</p>;
   return (
     <div className="h-full overflow-y-auto">
+      <PageHero color={SECTION.account} kicker={BRAND.name} title="Mon compte">
+        <p className="text-sm text-white/80">Vos personnages et votre progression, sur tous vos appareils.</p>
+      </PageHero>
       <div className="mx-auto max-w-xl px-4 py-8">
         {s.user ? <Dashboard /> : <AuthForms />}
         <p className="mt-6 text-xs text-faint">
@@ -47,8 +50,7 @@ function AuthForms() {
 
   return (
     <Card>
-      <h1 className="font-display text-xl font-semibold">Mon compte</h1>
-      <p className="mt-1 text-sm text-muted">Retrouvez vos personnages et votre progression sur tous vos appareils.</p>
+      <h2 className="font-display text-lg">Connexion au site</h2>
       <div className="mt-4 flex gap-1 border-b border-line" role="tablist">
         {tabs.map(([id, label]) => (
           <button key={id} role="tab" aria-selected={tab === id} onClick={() => { setTab(id); setError(null); setInfo(null); }}

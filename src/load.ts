@@ -214,12 +214,12 @@ export const loadObjectiveIndex = (path: string) => withDb(path, (db) => {
   return out;
 });
 
-export interface DofusInfo { itemId: number; name: string; level: number; quests: { id: number; name: string; category: number }[]; achievements: { id: number; name: string; categoryId: number }[] }
+export interface DofusInfo { itemId: number; iconId: number | null; name: string; level: number; quests: { id: number; name: string; category: number }[]; achievements: { id: number; name: string; categoryId: number }[] }
 export const loadDofus = (path: string) => withDb(path, (db) => {
   const q = db.prepare('SELECT id, name, category_id AS category FROM quest WHERE id = ?');
   const a = db.prepare('SELECT id, name, category_id AS categoryId FROM achievement WHERE id = ?');
-  return (db.prepare('SELECT item_id, name, level, quest_ids, achievement_ids FROM dofus ORDER BY level, name').all() as Record<string, any>[]).map((d) => ({
-    itemId: d.item_id, name: d.name, level: d.level,
+  return (db.prepare('SELECT d.item_id, d.name, d.level, d.quest_ids, d.achievement_ids, i.icon_id FROM dofus d LEFT JOIN item i ON i.id = d.item_id ORDER BY d.level, d.name').all() as Record<string, any>[]).map((d) => ({
+    itemId: d.item_id, iconId: d.icon_id ?? null, name: d.name, level: d.level,
     quests: (JSON.parse(d.quest_ids) as number[]).map((id) => q.get(id)).filter(Boolean).map((r) => ({ ...(r as object) })) as DofusInfo['quests'],
     achievements: (JSON.parse(d.achievement_ids) as number[]).map((id) => a.get(id)).filter(Boolean).map((r) => ({ ...(r as object) })) as DofusInfo['achievements'],
   }));

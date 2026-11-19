@@ -9,11 +9,12 @@ const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).jo
 
 type Variant = 'primary' | 'secondary' | 'ghost';
 const BTN: Record<Variant, string> = {
-  primary: 'bg-accent text-accent-ink hover:brightness-110 font-semibold',
-  secondary: 'border border-line bg-surface-2 text-text hover:border-faint',
+  // the official site's green call-to-action: display face, uppercase, pressed-in bottom edge
+  primary: 'bg-cta text-white font-display uppercase tracking-wide shadow-[inset_0_-3px_0_rgba(0,0,0,0.28),0_2px_8px_rgba(0,0,0,0.25)] hover:bg-cta-hi active:translate-y-px',
+  secondary: 'border border-line bg-surface-2 text-text hover:border-faint hover:bg-line/60',
   ghost: 'text-muted hover:bg-surface-2 hover:text-text',
 };
-const btnBase = 'inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm transition disabled:opacity-50';
+const btnBase = 'inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm transition disabled:pointer-events-none disabled:opacity-50';
 
 export function Button({ variant = 'secondary', className, ...p }: ComponentProps<'button'> & { variant?: Variant }) {
   return <button className={cx(btnBase, BTN[variant], className)} {...p} />;
@@ -22,14 +23,54 @@ export function ButtonLink({ variant = 'secondary', className, ...p }: Component
   return <Link className={cx(btnBase, BTN[variant], className)} {...p} />;
 }
 
-export function Card({ className, ...p }: ComponentProps<'div'>) {
-  return <div className={cx('rounded-xl border border-line bg-surface p-4', className)} {...p} />;
+/** Panel. `paper` turns it into parchment: same utilities inside, ink colours. */
+export function Card({ className, paper, ...p }: ComponentProps<'div'> & { paper?: boolean }) {
+  return <div className={cx('rounded-xl border p-4', paper ? 'parchment border-[#c4a46e] shadow-[0_6px_20px_rgba(0,0,0,0.35)]'
+    : 'border-line bg-surface shadow-[inset_0_1px_0_rgba(255,240,210,0.04)]', className)} {...p} />;
+}
+
+/** Section colours (globals.css --color-sec-*): each area keeps its own hue. */
+export const SECTION = {
+  quests: 'var(--color-sec-quests)', achievements: 'var(--color-sec-achievements)', builds: 'var(--color-sec-builds)',
+  characters: 'var(--color-sec-characters)', scan: 'var(--color-sec-scan)', account: 'var(--color-sec-account)',
+} as const;
+
+/**
+ * Banner at the top of a page: section colour, optional official artwork (local copy, see scripts/fetch-assets.ts)
+ * that simply does not show when it was not downloaded.
+ */
+export function PageHero({ title, kicker, color, image, children, className }: {
+  title: ReactNode; kicker?: ReactNode; color: string; image?: string; children?: ReactNode; className?: string;
+}) {
+  return (
+    <header className={cx('relative isolate overflow-hidden border-b border-black/30', className)}
+      style={{ backgroundColor: color, backgroundImage: `${image ? `url(${image}), ` : ''}linear-gradient(115deg, rgba(0,0,0,0.55), rgba(0,0,0,0.05))`, backgroundSize: 'cover', backgroundPosition: 'right center' }}>
+      <div className="absolute inset-0 -z-10 bg-gradient-to-r from-black/70 via-black/35 to-transparent" aria-hidden />
+      <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-6 sm:py-8">
+        {kicker && <p className="text-xs font-medium uppercase tracking-[0.16em] text-[#ffe2a6]">{kicker}</p>}
+        <h1 className="title-hero text-2xl leading-tight text-white sm:text-3xl">{title}</h1>
+        {children}
+      </div>
+    </header>
+  );
+}
+
+/** Rotated-square tile (roles, elements, statuses in the official style). */
+export function Diamond({ color, size = 34, children, label }: { color: string; size?: number; children?: ReactNode; label?: string }) {
+  return (
+    <span role={label ? 'img' : undefined} aria-label={label} className="inline-flex shrink-0 items-center justify-center" style={{ width: size * 1.42, height: size * 1.42 }}>
+      <span className="diamond flex items-center justify-center border-2 border-black/30 text-white shadow-[inset_0_2px_0_rgba(255,255,255,0.25),0_3px_8px_rgba(0,0,0,0.35)]"
+        style={{ width: size, height: size, background: `linear-gradient(135deg, ${color}, color-mix(in srgb, ${color} 60%, black))` }}>
+        <span className="flex items-center justify-center">{children}</span>
+      </span>
+    </span>
+  );
 }
 
 export function SectionTitle({ children, hint }: { children: ReactNode; hint?: ReactNode }) {
   return (
     <div className="mb-3 flex items-baseline justify-between gap-3">
-      <h2 className="font-display text-base font-semibold text-text">{children}</h2>
+      <h2 className="font-display text-base text-text">{children}</h2>
       {hint && <span className="text-xs text-muted">{hint}</span>}
     </div>
   );
@@ -69,7 +110,7 @@ export function ProgressBar({ value, max, className, label }: { value: number; m
   return (
     <div className={cx('h-1.5 w-full overflow-hidden rounded-full bg-surface-2', className)}
       role="progressbar" aria-valuemin={0} aria-valuemax={max} aria-valuenow={value} aria-label={label}>
-      <div className="h-full rounded-full bg-done" style={{ width: `${pct}%` }} />
+      <div className="h-full rounded-full bg-gradient-to-r from-done to-[color-mix(in_srgb,var(--color-done)_70%,var(--color-accent))] transition-[width] duration-700 ease-out" style={{ width: `${pct}%` }} />
     </div>
   );
 }
@@ -89,7 +130,7 @@ export function Drawer({ open, onClose, title, children }: { open: boolean; onCl
   return (
     <aside
       role="dialog" aria-modal="false" aria-label={typeof title === 'string' ? title : undefined}
-      className="absolute inset-y-0 right-0 z-20 flex w-full max-w-md flex-col border-l border-line bg-surface shadow-2xl shadow-black/50"
+      className="parchment absolute inset-y-0 right-0 z-20 flex w-full max-w-md animate-rise flex-col border-l-4 border-[#a8834a] shadow-2xl shadow-black/60"
       onKeyDown={(e) => e.key === 'Escape' && onClose()}
     >
       <div className="flex items-start gap-2 border-b border-line p-4">

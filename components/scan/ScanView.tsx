@@ -7,7 +7,7 @@ import { buildCatalog, matchLines, type Match } from '../../src/recognize.ts';
 import { prerequisitesToComplete } from '../../src/views.ts';
 import { CHANGE_SOURCES } from '../../src/character.ts';
 import { useGame } from '../quests/useGame';
-import { Button, Card, SectionTitle } from '../ui';
+import { Button, Card, PageHero, SECTION, SectionTitle } from '../ui';
 import { captureFrame, readLines } from './ocr';
 
 type Mode = 'quests_done' | 'quests_active' | 'achievements';
@@ -106,13 +106,14 @@ export default function ScanView() {
 
   return (
     <div className="h-full overflow-y-auto">
+      <PageHero color={SECTION.scan} kicker="Synchronisation du personnage" title="Scanner ma progression">
+        <p className="max-w-2xl text-sm text-white/80">
+          Ouvrez une fenêtre de Dofus, montrez-la ici : les noms lus sont comparés aux données du jeu, et vous validez ce qui doit être enregistré pour <b className="text-white">{ch.character.name}</b>.
+        </p>
+      </PageHero>
       <div className="mx-auto flex max-w-5xl flex-col gap-5 px-4 py-6">
         <div>
-          <h1 className="flex items-center gap-2 font-display text-2xl font-semibold"><ScanLine size={22} className="text-accent" /> Scanner ma progression</h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted">
-            Ouvrez une fenêtre de Dofus, montrez-la ici : les noms lus sont comparés aux données du jeu, et vous validez ce qui doit être enregistré pour <b className="text-text">{ch.character.name}</b>.
-          </p>
-          <p className="mt-2 flex items-start gap-1.5 text-xs text-faint"><ShieldCheck size={14} className="mt-px shrink-0 text-done" />
+          <p className="flex items-start gap-1.5 rounded-lg border border-done/40 bg-done/10 px-3 py-2 text-xs text-muted"><ShieldCheck size={14} className="mt-px shrink-0 text-done" />
             L’image est lue dans votre navigateur et n’est envoyée nulle part. Le site ne touche jamais au jeu : il ne clique pas, ne lit pas sa mémoire ni ses échanges réseau, et ne demande pas vos identifiants Ankama.
           </p>
         </div>

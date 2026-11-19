@@ -4,12 +4,14 @@ import type { ClassData, SpellInfo } from '../src/load.ts';
 import type { RenderedEffect } from '../src/effects.ts';
 import { ELEMENTS, classStates, gradeAt, spellElements, type Element } from '../src/spells.ts';
 import { useCharacter } from './useCharacter';
-import { ELEMENT_CLASS } from './ui';
+import { ELEMENT_CLASS, PageHero } from './ui';
+import { SUPPORTED_BREEDS } from './breeds';
 
 const ELEMENT_STYLE = ELEMENT_CLASS;
 
 export default function SpellGuide({ data }: { data: ClassData }) {
   const ch = useCharacter();
+  const info = SUPPORTED_BREEDS.find((b) => b.id === data.breed.id);
   const level = ch.character.level;
   const [element, setElement] = useState<Element | null>(null);
 
@@ -25,14 +27,11 @@ export default function SpellGuide({ data }: { data: ClassData }) {
 
   return (
     <div className="h-full overflow-y-auto">
+      <PageHero color={info?.hue ?? 'var(--color-sec-characters)'} image={info?.art.scene} kicker={info ? `${info.title} · ${info.roles.join(' · ')}` : 'Classe'} title={`Sorts du ${data.breed.name}`}>
+        <p className="text-sm text-white/80">{data.spells.length} sorts · 22 emplacements, 2 variantes chacun (une seule active à la fois) · données {data.version}</p>
+      </PageHero>
       <div className="mx-auto max-w-6xl px-4 py-6">
         <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
-          <div>
-            <h1 className="font-display text-xl font-semibold">{data.breed.name}</h1>
-            <p className="text-xs text-text0">
-              {data.spells.length} sorts · 22 emplacements, 2 variantes chacun (une seule active à la fois) · données {data.version}
-            </p>
-          </div>
           <label className="flex items-center gap-2 text-xs text-muted">
             Mon niveau
             <input type="number" min={1} max={200} value={level} onChange={(e) => ch.setLevel(Number(e.target.value))}

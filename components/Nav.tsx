@@ -6,6 +6,7 @@ import { BRAND } from '../src/brand.ts';
 import { SUPPORTED_BREEDS } from './breeds';
 import { useCharacter } from './useCharacter';
 import { useSession } from './account/useSession';
+import { Diamond } from './ui';
 
 // Quests, achievements and Dofus live under "Progression" (sub-tabs) to keep the bar short.
 const LINKS = [
@@ -21,13 +22,16 @@ export default function Nav() {
   const ch = useCharacter();
   const session = useSession();
   const breed = SUPPORTED_BREEDS.find((b) => b.id === ch.character.profile.breed)?.name;
+  const breedInfo = SUPPORTED_BREEDS.find((b) => b.id === ch.character.profile.breed);
   const link = (active: boolean) =>
-    `inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 ${active ? 'bg-surface-2 text-text' : 'text-muted hover:bg-surface hover:text-text'}`;
+    `relative inline-flex h-full items-center gap-1.5 px-2.5 font-display text-[13px] uppercase tracking-wide transition ${active
+      ? 'text-white after:absolute after:inset-x-2 after:bottom-0 after:h-[3px] after:rounded-t after:bg-cta-hi'
+      : 'text-muted hover:text-white'}`;
   return (
-    <nav className="flex h-12 shrink-0 items-center gap-1 overflow-x-auto border-b border-line bg-bg/95 px-3 text-sm" aria-label="Navigation principale">
-      <Link href="/" className="mr-3 flex shrink-0 items-center gap-2 font-display text-[15px] font-semibold tracking-tight text-text" aria-label={BRAND.name}>
-        <span className="flex h-6 w-6 items-center justify-center rounded-md bg-accent text-[12px] font-bold text-accent-ink" aria-hidden>{BRAND.mark}</span>
-        <span className="hidden lg:inline">{BRAND.name}</span>
+    <nav className="flex h-14 shrink-0 items-center gap-1 overflow-x-auto border-b border-black/50 bg-gradient-to-b from-[#241c15] to-[#18130e] px-3 shadow-[0_2px_10px_rgba(0,0,0,0.4)]" aria-label="Navigation principale">
+      <Link href="/" className="mr-3 flex h-full shrink-0 items-center gap-2" aria-label={BRAND.name}>
+        <Diamond color="var(--color-cta)" size={22}><span className="font-display text-[11px]">{BRAND.mark}</span></Diamond>
+        <span className="hidden font-display text-[15px] uppercase tracking-wide text-[#ffe2a6] lg:inline">{BRAND.name}</span>
       </Link>
       {LINKS.map((l) => {
         const Icon = l.icon;
@@ -38,11 +42,16 @@ export default function Nav() {
           </Link>
         );
       })}
-      <div className="ml-auto flex shrink-0 items-center gap-2">
+      <div className="ml-auto flex h-full shrink-0 items-center gap-2">
         {ch.hasCharacter && (
-          <Link href="/personnage" className="hidden items-center gap-2 rounded-lg border border-line bg-surface px-2.5 py-1 text-xs hover:border-faint sm:flex">
-            <span className="font-medium text-text">{ch.character.name}</span>
-            <span className="text-muted">{breed ? `${breed} · ` : ''}niv. {ch.character.level}</span>
+          <Link href="/personnage" className="hidden items-center gap-2 rounded-full border border-line bg-surface/80 py-0.5 pl-0.5 pr-3 text-xs hover:border-faint sm:flex">
+            <span className="h-8 w-8 overflow-hidden rounded-full border border-black/40" style={{ background: breedInfo?.hue ?? 'var(--color-surface-2)' }}>
+              {breedInfo && <img src={breedInfo.art.portrait} alt="" className="h-full w-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
+            </span>
+            <span className="leading-tight">
+              <span className="block font-medium text-text">{ch.character.name}</span>
+              <span className="text-muted">{breed ? `${breed} · ` : ''}niv. {ch.character.level}</span>
+            </span>
           </Link>
         )}
         <Link href="/compte" aria-current={path.startsWith('/compte') ? 'page' : undefined} aria-label="Mon compte" className={link(path.startsWith('/compte'))}>

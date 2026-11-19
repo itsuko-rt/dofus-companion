@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { Search, Shirt } from 'lucide-react';
 import { useCharacter } from '../useCharacter';
-import { Card, EmptyState } from '../ui';
+import { Card, EmptyState, PageHero, SECTION } from '../ui';
 
 interface ItemRow { id: number; name: string; type: string; level: number; setName: string | null; effects: string[] }
 
@@ -28,9 +28,10 @@ export default function EquipmentView({ types }: { types: { id: number; name: st
 
   return (
     <div className="h-full overflow-y-auto">
+      <PageHero color={SECTION.builds} kicker="Encyclopédie" title="Équipement">
+        <p className="text-sm text-white/80">Tous les objets équipables du jeu, avec leurs effets officiels.</p>
+      </PageHero>
       <div className="mx-auto max-w-6xl px-4 py-6">
-        <h1 className="flex items-center gap-2 font-display text-xl font-semibold"><Shirt size={20} className="text-accent" /> Équipement</h1>
-        <p className="mt-1 text-sm text-muted">Tous les objets équipables du jeu, avec leurs effets officiels.</p>
         <div className="mt-4 flex flex-wrap gap-2">
           <label className="relative w-full sm:w-72">
             <span className="sr-only">Rechercher un objet</span>

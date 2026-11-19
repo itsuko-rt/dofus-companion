@@ -3,7 +3,7 @@ import { useRef, useState } from 'react';
 import { Download, Plus, Trash2, Upload } from 'lucide-react';
 import { ELEMENTS, type Element } from '../../src/spells.ts';
 import { SUPPORTED_BREEDS } from '../breeds';
-import { Button, Card, SectionTitle, Term } from '../ui';
+import { Button, Card, PageHero, SECTION, SectionTitle, Term } from '../ui';
 import { PLAYSTYLES, exportBackup, importBackup, useCharacter, type Playstyle } from '../useCharacter';
 import Onboarding from './Onboarding';
 
@@ -59,7 +59,12 @@ export default function CharacterProfile() {
 
   const c = ch.character;
   const p = c.profile;
+  const info = SUPPORTED_BREEDS.find((b) => b.id === p.breed);
   return (
+    <>
+    <PageHero color={info?.hue ?? SECTION.characters} image={info?.art.scene} kicker={info ? `${info.name} · ${info.title}` : 'Personnage'} title={c.name}>
+      <p className="text-sm text-white/80">Niveau {c.level} · {c.done.filter((d) => d.startsWith('quest:')).length} quêtes · {c.done.filter((d) => d.startsWith('ach:')).length} succès</p>
+    </PageHero>
     <div className="mx-auto grid max-w-5xl gap-5 px-4 py-6 md:grid-cols-[240px_1fr]">
       <aside>
         <SectionTitle>Mes personnages</SectionTitle>
@@ -169,5 +174,6 @@ export default function CharacterProfile() {
         </div>
       </div>
     </div>
+    </>
   );
 }

@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { Egg, ExternalLink } from 'lucide-react';
 import type { DofusInfo } from '../../src/load.ts';
 import { useGame } from '../quests/useGame';
-import { Card, ProgressBar, StatusPill } from '../ui';
+import { Card, PageHero, ProgressBar, StatusPill } from '../ui';
 
 export default function DofusView({ dofus }: { dofus: DofusInfo[] }) {
   const { status, ch, graph } = useGame();
@@ -13,12 +13,13 @@ export default function DofusView({ dofus }: { dofus: DofusInfo[] }) {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="mx-auto max-w-6xl px-4 py-6">
-        <h1 className="flex items-center gap-2 font-display text-xl font-semibold"><Egg size={20} className="text-accent" /> Les Dofus</h1>
-        <p className="mt-1 max-w-2xl text-sm text-muted">
+      <PageHero color="#7a4a12" kicker="Œufs de dragon" title="Les Dofus">
+        <p className="max-w-2xl text-sm text-white/80">
           Les Dofus sont des œufs de dragon aux bonus puissants. Chacun s’obtient en terminant une quête ou un succès précis :
           ouvrez sa source pour voir toute la chaîne qui y mène.
         </p>
+      </PageHero>
+      <div className="mx-auto max-w-6xl px-4 py-6">
         <Card className="mt-4">
           <p className="text-sm">{owned} / {dofus.length} Dofus obtenus</p>
           <ProgressBar value={owned} max={dofus.length} className="mt-1.5" label="Dofus obtenus" />
@@ -28,10 +29,13 @@ export default function DofusView({ dofus }: { dofus: DofusInfo[] }) {
             const has = obtained(d);
             return (
               <li key={d.itemId}>
-                <Card className={`flex h-full flex-col gap-2 ${has ? 'border-done/60' : ''}`}>
-                  <div className="flex items-start gap-2">
+                <Card className={`flex h-full flex-col gap-2 transition hover:-translate-y-0.5 ${has ? 'border-done/60' : ''}`}>
+                  <div className="flex items-start gap-3">
+                    <span className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-full border ${has ? 'border-accent/70 bg-accent/15' : 'border-line bg-surface-2'}`}>
+                      {d.iconId != null && <img src={`/ankama/items/${d.iconId}.png`} alt="" width={48} height={48} loading="lazy" className={`drop-shadow-[0_3px_6px_rgba(0,0,0,0.5)] ${has ? '' : 'opacity-80 saturate-50'}`} onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
+                    </span>
                     <div className="min-w-0 flex-1">
-                      <h2 className="font-display font-semibold">{d.name}</h2>
+                      <h2 className="font-display">{d.name}</h2>
                       <p className="text-xs text-muted">niveau {d.level}</p>
                     </div>
                     {has && <StatusPill status="done" />}

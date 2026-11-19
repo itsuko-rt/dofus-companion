@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Bookmark, BookmarkCheck, ExternalLink, Eye, GitCompare, Heart, Info, Shirt, Sparkles, X } from 'lucide-react';
 import type { Element } from '../../src/spells.ts';
 import { SUPPORTED_BREEDS } from '../breeds';
-import { Button, ButtonLink, Card, ElementTag, EmptyState, Term } from '../ui';
+import { Button, ButtonLink, Card, ElementTag, EmptyState, PageHero, SECTION, Term } from '../ui';
 import { PLAYSTYLES, useCharacter } from '../useCharacter';
 
 interface ApiItem { id: number; name: string; type: string | null; level: number; set: string | null; effects: (string | null)[] }
@@ -157,12 +157,13 @@ export default function BuildsView() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="mx-auto max-w-6xl px-4 py-6">
-        <h1 className="flex items-center gap-2 font-display text-xl font-semibold"><Shirt size={20} className="text-accent" /> Builds de la communauté</h1>
-        <p className="mt-1 max-w-3xl text-sm text-muted">
-          Des équipements complets partagés sur <a className="text-accent underline" href="https://dofusfashionista.gg" target="_blank" rel="noopener noreferrer">Dofus Fashionista</a>,
+      <PageHero color={SECTION.builds} kicker="Forge et équipement" title="Builds de la communauté" image={SUPPORTED_BREEDS.find((b) => b.id === ch.character.profile.breed)?.art.scene}>
+        <p className="max-w-3xl text-sm text-white/80">
+          Des équipements complets partagés sur <a className="text-[#ffe2a6] underline" href="https://dofusfashionista.gg" target="_blank" rel="noopener noreferrer">Dofus Fashionista</a>,
           classés pour votre personnage. Objets et stats sont recalculés avec les données officielles du jeu.
         </p>
+      </PageHero>
+      <div className="mx-auto max-w-6xl px-4 py-6">
 
         <Card className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
           <label className="text-xs text-muted">Classe

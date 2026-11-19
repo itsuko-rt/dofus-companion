@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { ArrowLeft, ArrowRight, Check } from 'lucide-react';
 import type { Element } from '../../src/spells.ts';
 import { SUPPORTED_BREEDS } from '../breeds';
+import ClassCard from './ClassCard';
 import { Button, ELEMENT_CLASS } from '../ui';
 import { PLAYSTYLES, useCharacter, type Playstyle } from '../useCharacter';
 
@@ -49,9 +50,8 @@ export default function Onboarding({ onDone }: { onDone?: () => void }) {
           <p className="mb-4 text-sm text-muted">La classe définit vos sorts. D’autres classes arriveront ensuite.</p>
           <div className="grid gap-3 sm:grid-cols-2">
             {SUPPORTED_BREEDS.map((b) => (
-              <button key={b.id} type="button" aria-pressed={breed === b.id} onClick={() => setBreed(b.id)} className={choice(breed === b.id)}>
-                <span className="font-display text-base font-semibold">{b.name}</span>
-                <span className="mt-1 block text-sm text-muted">{b.blurb}</span>
+              <button key={b.id} type="button" aria-pressed={breed === b.id} onClick={() => setBreed(b.id)} className="rounded-xl text-left">
+                <ClassCard breed={b} selected={breed === b.id} />
               </button>
             ))}
           </div>

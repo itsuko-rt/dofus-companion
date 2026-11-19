@@ -6,6 +6,7 @@ Site de fan, non affilié à Ankama. Le nom « Atlas des Douze » reste à véri
 ```sh
 npm install
 npm run import       # une fois : construit data/game-<version>.sqlite (≈ 8 Go de mémoire, voir plus bas)
+npm run assets       # une fois : illustrations officielles dans public/ankama/ (© Ankama, non versionnées ; facultatif)
 npm run dev          # http://localhost:3000
 ```
 
@@ -24,7 +25,7 @@ npm run dev          # http://localhost:3000
 
 Les anciennes adresses (`/quetes`, `/classes/…`) redirigent vers les nouvelles. Sans compte, la progression reste dans le navigateur. Avec un compte, elle est enregistrée dans `data/app.sqlite`, une base séparée de celle du jeu : l'import ne la touche jamais. Le lien de réinitialisation du mot de passe est écrit dans le journal du serveur tant qu'aucun fournisseur d'e-mail n'est configuré.
 
-Documents : [docs/RAPPORT_SUCCES_SCAN.md](docs/RAPPORT_SUCCES_SCAN.md) (succès, scan, API) · [docs/RAPPORT_SUIVI_QUETES.md](docs/RAPPORT_SUIVI_QUETES.md) (refonte du suivi des quêtes) · [docs/RAPPORT_DEVELOPPEMENT.md](docs/RAPPORT_DEVELOPPEMENT.md) · [docs/RAPPORT_ARCHITECTURE.md](docs/RAPPORT_ARCHITECTURE.md) (sources, architecture) · [docs/AUDIT_UX.md](docs/AUDIT_UX.md) (audit et direction de la refonte).
+Documents : [docs/RAPPORT_REFONTE_VISUELLE.md](docs/RAPPORT_REFONTE_VISUELLE.md) (refonte visuelle, illustrations) · [docs/RAPPORT_SUCCES_SCAN.md](docs/RAPPORT_SUCCES_SCAN.md) (succès, scan, API) · [docs/RAPPORT_SUIVI_QUETES.md](docs/RAPPORT_SUIVI_QUETES.md) (refonte du suivi des quêtes) · [docs/RAPPORT_DEVELOPPEMENT.md](docs/RAPPORT_DEVELOPPEMENT.md) · [docs/RAPPORT_ARCHITECTURE.md](docs/RAPPORT_ARCHITECTURE.md) (sources, architecture) · [docs/AUDIT_UX.md](docs/AUDIT_UX.md) (audit et direction de la refonte).
 
 ## Sources de données
 

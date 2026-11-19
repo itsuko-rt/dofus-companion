@@ -243,7 +243,7 @@ export default function QuestTracker({ region: regionParam }: { region?: number 
             <MapIcon size={15} /> Régions
           </button>
           <div className="min-w-0">
-            <h1 className="font-display text-lg font-semibold leading-tight">{focus ? `Chaîne de « ${graph.nodes.get(focus)?.label} »` : summary.name}</h1>
+            <h1 className="title-hero text-lg leading-tight">{focus ? `Chaîne de « ${graph.nodes.get(focus)?.label} »` : summary.name}</h1>
             <div className="mt-1 flex items-center gap-2">
               <ProgressBar value={summary.done} max={summary.total} className="w-28" label={`Progression de ${summary.name}`} />
               <span className="whitespace-nowrap text-xs text-muted">{summary.done}/{summary.total} · niv. {summary.levelMin}–{summary.levelMax}</span>
