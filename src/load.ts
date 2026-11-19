@@ -116,6 +116,30 @@ export function loadItems(path: string, ids: number[], max = 64) {
   }
 }
 
+export interface QuestReward { xp: boolean; kamas: boolean; items: { id: number; name: string | null; qty: number }[]; spells: string[]; emotes: number; titles: number; jobs: number }
+export interface QuestDetails {
+  id: number;
+  start: { npc: string | null; zone: string | null };
+  steps: { name: string | null; description: string | null; objectives: string[]; rewards: QuestReward[] }[];
+  guides: { site: string; url: string; language: string; status: string; checkedAt: string }[];
+}
+
+export function loadQuestDetails(path: string, questId: number): QuestDetails | null {
+  if (!Number.isInteger(questId)) return null;
+  const db = new DatabaseSync(path, { readOnly: true });
+  try {
+    if (!db.prepare('SELECT 1 FROM quest WHERE id = ?').get(questId)) return null;
+    const start = db.prepare('SELECT npc_name, subarea_name FROM quest_start WHERE quest_id = ?').get(questId) as { npc_name: string | null; subarea_name: string | null } | undefined;
+    const steps = (db.prepare('SELECT name, description, objectives, rewards FROM quest_step WHERE quest_id = ? ORDER BY ordinal').all(questId) as Record<string, any>[])
+      .map((s) => ({ name: s.name, description: s.description, objectives: JSON.parse(s.objectives ?? '[]'), rewards: JSON.parse(s.rewards ?? '[]') }));
+    const guides = (db.prepare('SELECT site, url, language, status, checked_at FROM external_guide WHERE quest_id = ?').all(questId) as Record<string, any>[])
+      .map((g) => ({ site: g.site, url: g.url, language: g.language, status: g.status, checkedAt: g.checked_at }));
+    return { id: questId, start: { npc: start?.npc_name ?? null, zone: start?.subarea_name ?? null }, steps, guides };
+  } finally {
+    db.close();
+  }
+}
+
 export function loadGraph(path: string): Graph {
   const d = loadGraphData(path);
   return new Graph(d.nodes, d.extraEdges);
