@@ -1,6 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { readdirSync } from 'node:fs';
 import { Graph, type GEdge, type NodeInput } from './graph.ts';
+import type { RenderedEffect } from './effects.ts';
 
 /** Latest data/game-<version>.sqlite, or null if the import has not run. */
 export function latestDb(dir = 'data'): string | null {
@@ -41,6 +42,42 @@ export function loadGraphData(path: string): GraphData {
       "SELECT from_node AS \"from\", to_node AS \"to\", kind FROM edge WHERE kind = 'in_dungeon'",
     ).all());
     return { version, categories, nodes, extraEdges };
+  } finally {
+    db.close();
+  }
+}
+
+export interface SpellLevel {
+  grade: number; minLevel: number; ap: number; minRange: number; range: number; crit: number;
+  perTurn: number; perTarget: number; interval: number; initialCooldown: number;
+  effects: RenderedEffect[]; criticalEffects: RenderedEffect[];
+}
+export interface SpellInfo { id: number; slot: number; variant: number; name: string; description: string | null; levels: SpellLevel[] }
+export interface ClassData { version: string; breed: { id: number; name: string }; spells: SpellInfo[] }
+
+/** One class's spells, slot by slot, with their grades and French effect texts. */
+export function loadClass(path: string, breedId: number): ClassData | null {
+  const db = new DatabaseSync(path, { readOnly: true });
+  try {
+    const breed = db.prepare('SELECT id, name FROM breed WHERE id = ?').get(breedId) as { id: number; name: string } | undefined;
+    if (!breed) return null;
+    const version = (db.prepare('SELECT id FROM game_version').get() as { id: string }).id;
+    const spells = (db.prepare(
+      'SELECT id, slot, variant, name, description FROM spell WHERE breed_id = ? ORDER BY slot, variant',
+    ).all(breedId) as unknown as Omit<SpellInfo, 'levels'>[]).map((s) => ({ ...s, levels: [] as SpellLevel[] }));
+    const byId = new Map(spells.map((s) => [s.id, s]));
+    const levels = db.prepare(`
+      SELECT l.* FROM spell_level l JOIN spell s ON s.id = l.spell_id
+      WHERE s.breed_id = ? ORDER BY l.spell_id, l.grade`).all(breedId) as Record<string, any>[];
+    for (const l of levels) {
+      byId.get(l.spell_id)?.levels.push({
+        grade: l.grade, minLevel: l.min_player_level, ap: l.ap_cost, minRange: l.min_range, range: l.range,
+        crit: l.crit_chance, perTurn: l.max_cast_per_turn, perTarget: l.max_cast_per_target,
+        interval: l.min_cast_interval, initialCooldown: l.initial_cooldown,
+        effects: JSON.parse(l.effects), criticalEffects: JSON.parse(l.critical_effects),
+      });
+    }
+    return { version, breed: { ...breed }, spells: spells.map((s) => ({ ...s })) };
   } finally {
     db.close();
   }

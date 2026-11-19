@@ -5,12 +5,15 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import { Graph, type GEdge, type NodeInput } from '../src/graph.ts';
 import { atoms } from '../src/criteria.ts';
 import { CODES, EVALUATED, INFERRED } from '../src/codes.ts';
+import { renderEffect, type RawEffect } from '../src/effects.ts';
 
 const REPO = 'ledouxm/dofus-sqlite';
 const FILES = [
   'questsdata', 'queststepsdata', 'questcategoriesdata',
   'achievementsdata', 'achievementobjectivesdata', 'achievementcategoriesdata',
   'dungeonsdata', 'breedsdata', 'i18n_fr',
+  // spells (spelllevelsdata ≈ 200 MB, monstersdata ≈ 140 MB: parsed once, filtered, released)
+  'spellsdata', 'spellvariantsdata', 'spelllevelsdata', 'effectsdata', 'spellstatesdata', 'monstersdata',
 ] as const;
 const UA = { 'User-Agent': 'dofus-companion-import' };
 
@@ -76,6 +79,13 @@ async function main() {
     CREATE TABLE dungeon_boss(dungeon_id INTEGER, monster_id INTEGER, PRIMARY KEY(dungeon_id, monster_id));
     CREATE TABLE dungeon_achievement(dungeon_id INTEGER, achievement_id INTEGER, PRIMARY KEY(dungeon_id, achievement_id));
     CREATE TABLE breed(id INTEGER PRIMARY KEY, name TEXT, spell_ids TEXT);
+    -- class spells: each slot holds 2 variants (SpellVariantData); effects are rendered in French at import
+    CREATE TABLE spell(id INTEGER PRIMARY KEY, breed_id INTEGER NOT NULL, slot INTEGER, variant INTEGER,
+      name TEXT, description TEXT, icon_id INTEGER);
+    CREATE TABLE spell_level(id INTEGER PRIMARY KEY, spell_id INTEGER NOT NULL, grade INTEGER, min_player_level INTEGER,
+      ap_cost INTEGER, min_range INTEGER, range INTEGER, crit_chance INTEGER, max_cast_per_turn INTEGER,
+      max_cast_per_target INTEGER, min_cast_interval INTEGER, initial_cooldown INTEGER, global_cooldown INTEGER,
+      effects TEXT, critical_effects TEXT);
     -- derived graph, rebuilt on every import, never edited by hand
     CREATE TABLE node(id TEXT PRIMARY KEY, kind TEXT NOT NULL, ref_id INTEGER, label TEXT, criterion TEXT NOT NULL, points INTEGER);
     CREATE TABLE edge(from_node TEXT NOT NULL, to_node TEXT NOT NULL, kind TEXT NOT NULL);
@@ -120,6 +130,54 @@ async function main() {
     dungeons.flatMap((d) => [...new Set(arr(d.achievements))].map((a) => [d.id, a])));
   insert('breed', ['id', 'name', 'spell_ids'],
     rows('breedsdata').map((b) => [b.id, t(b.shortNameId), JSON.stringify(arr(b.breedSpellsId))]));
+
+  // ---- class spells
+  const spellData = rows('spellsdata');
+  const spellName = new Map(spellData.map((s) => [s.id as number, t(s.nameId)]));
+  const variants = rows('spellvariantsdata');
+  const classSpellIds = new Set(variants.flatMap((v) => arr(v.spellIds) as number[]));
+  const levels = rows('spelllevelsdata').filter((l) => classSpellIds.has(l.spellId));
+  const templates = new Map(rows('effectsdata').map((e) => [e.id as number, t(e.descriptionId) ?? undefined]));
+  const stateName = new Map(rows('spellstatesdata').map((s) => [s.id as number, t(s.nameId)]));
+  const monsterName = new Map(rows('monstersdata').map((m) => [m.id as number, t(m.nameId)]));
+  const lookups = {
+    template: (a: number) => templates.get(a),
+    spell: (id: number) => spellName.get(id) ?? undefined,
+    state: (id: number) => stateName.get(id) ?? undefined,
+    monster: (id: number) => monsterName.get(id) ?? undefined,
+  };
+  let undocumentedEffects = 0;
+  const render = (list: unknown) => JSON.stringify((arr(list) as Row[]).flatMap((e) => {
+    const raw: RawEffect = { actionId: e.actionId, diceNum: e.diceNum, diceSide: e.diceSide, value: e.value,
+      duration: e.duration, zoneShape: e.zoneDescr?.shape, zoneSize: e.zoneDescr?.param1 };
+    const r = renderEffect(raw, lookups);
+    if (r?.text.startsWith('Effet non documenté')) undocumentedEffects++;
+    return r ? [r] : [];
+  }));
+  const firstLevel = new Map<number, number>();
+  for (const l of levels) if (l.grade === 1) firstLevel.set(l.spellId, l.minPlayerLevel);
+  const spellRow = new Map(spellData.map((s) => [s.id as number, s]));
+  const slots = new Map<number, Row[]>();
+  for (const v of variants) {
+    if (!slots.has(v.breedId)) slots.set(v.breedId, []);
+    slots.get(v.breedId)!.push(v);
+  }
+  const spellRows: unknown[][] = [];
+  for (const [breed, vs] of slots) {
+    // slot order = unlock level of the slot's first variant, as in the in-game spell bar
+    vs.sort((a, b) => (firstLevel.get(arr(a.spellIds)[0]) ?? 999) - (firstLevel.get(arr(b.spellIds)[0]) ?? 999) || a.id - b.id);
+    vs.forEach((v, slot) => (arr(v.spellIds) as number[]).forEach((id, variant) => {
+      const s = spellRow.get(id);
+      if (s) spellRows.push([id, breed, slot, variant, t(s.nameId), t(s.descriptionId), s.iconId]);
+    }));
+  }
+  insert('spell', ['id', 'breed_id', 'slot', 'variant', 'name', 'description', 'icon_id'], spellRows);
+  insert('spell_level', ['id', 'spell_id', 'grade', 'min_player_level', 'ap_cost', 'min_range', 'range', 'crit_chance',
+    'max_cast_per_turn', 'max_cast_per_target', 'min_cast_interval', 'initial_cooldown', 'global_cooldown',
+    'effects', 'critical_effects'],
+    levels.map((l) => [l.id, l.spellId, l.grade, l.minPlayerLevel, l.apCost, l.minRange, l.range,
+      l.criticalHitProbability, l.maxCastPerTurn, l.maxCastPerTarget, l.minCastInterval, l.initialCooldown,
+      l.globalCooldown, render(l.effects), render(l.criticalEffect)]));
 
   // Graph inputs. An achievement's criterion = AND of its objectives' criteria.
   const objByAch = new Map<number, string[]>();
@@ -176,6 +234,7 @@ async function main() {
     parse_errors: graph.errors,
     quests_fully_interpreted: `${questsFullyInterpreted}/${quests.length}`,
     inferred_codes: INFERRED,
+    spells: { spells: spellRows.length, levels: levels.length, undocumented_effects: undocumentedEffects },
     documented_not_evaluable_by_kind: notEvaluatedByKind,
     undocumented_codes: Object.fromEntries(Object.entries(unknownCodes).sort((a, b) => b[1] - a[1])),
     dangling_references: dangling,
@@ -192,6 +251,7 @@ async function main() {
   console.log('documented but not evaluable', notEvaluatedByKind);
   console.log('undocumented codes', report.undocumented_codes);
   console.log(`longest chain: ${chain.path.length} quests (${report.longest_requires_chain[0]} … ${report.longest_requires_chain.at(-1)})`);
+  console.log(`spells ${spellRows.length} · levels ${levels.length} · undocumented effects ${undocumentedEffects}`);
   console.log(`report → data/report-${version}.json`);
 }
 

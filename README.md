@@ -7,6 +7,8 @@ npm run import       # une fois, pour construire la base
 npm run dev          # http://localhost:3000/quetes
 ```
 
+`/classes/9` (Crâ) et `/classes/12` (Pandawa) présentent les 44 sorts de chaque classe : 22 emplacements à 2 variantes, avec grades, PA, PO, critique et limites de lancer. Les effets sont rendus en français avec les modèles de texte du jeu (`src/effects.ts`). La page propose aussi un filtre par élément et la liste des états que la classe pose ou retire. Les sorts de toutes les classes sont importés. Ajouter une classe à l'interface revient à ajouter une ligne dans `components/breeds.ts`.
+
 La carte propose deux vues : une région (les quêtes de la catégorie et leurs prérequis directs venus d'ailleurs, en grisé) ou une quête centrée (toute sa chaîne de prérequis et ce qu'elle débloque).
 Le profil (niveau, classe, alignement, abonnement) et la progression cochée sont enregistrés dans le navigateur (`localStorage`). Il n'y a pas encore de comptes.
 Architecture et choix : [docs/RAPPORT_ARCHITECTURE.md](docs/RAPPORT_ARCHITECTURE.md).

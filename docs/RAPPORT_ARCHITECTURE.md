@@ -187,7 +187,7 @@ build_reference(breed_id, level_band, element, fashionista_id, solved_patch, tag
 
 - **Sorts, niveaux de déblocage, coûts en PA, portées, temps de relance et effets** : générés depuis la couche A (`spell`, `spell_level`). Rien n'est écrit à la main.
 - **Conseils de jeu, forces et faiblesses** : couche B, rédigés à la main avec des sources, marqués `community`, et rattachés à une version du jeu.
-- **Pandawa : les mécaniques citées dans ton cahier des charges (Sobre, Saoul, Karcham, Chamrak, tonneau) doivent être vérifiées dans `SpellData` et `SpellStateData` de la 3.7 avant d'écrire une ligne de guide ⚠️.** La classe a été retravaillée plusieurs fois et je ne garantis pas que ces noms d'états ou de sorts existent encore sous cette forme.
+- **Pandawa : vérifié dans les données 3.7.14.18 ✅.** Karcham (niv. 10) et Chamrak (niv. 120) sont les deux variantes d'un même emplacement et posent l'état « Porteur ». L'état **Saoul** est posé par 9 sorts (Ribote, Bombance, Picole, Alcoshu, Liqueur, Ébriété, Ivresse, Absinthe, Bistouille), l'état **Sobre** par 5 (Gueule de Bois, Bombance, Picole, Lait de Bambou, Prohibition). Le Tonneau apparaît dans Ébriété et Ivresse. Les données disent *quels* sorts posent quels états, mais pas *pourquoi* les jouer : cette partie reste un guide communautaire (couche B), à sourcer.
 - Les tranches 1-20 … 200 sont un **filtre** (`level_band`), pas une structure de code.
 
 ---

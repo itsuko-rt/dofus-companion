@@ -6,10 +6,10 @@ import { describe } from '../src/codes.ts';
 import type { GraphData } from '../src/load.ts';
 import FlowCanvas, { STATUS_STYLE } from './FlowCanvas';
 import { useCharacter, type Mark } from './useCharacter';
+import { SUPPORTED_BREEDS as BREEDS } from './breeds';
 
 const ALMANAX = 31; // daily calendar quests: not progression, hidden from "disponibles" unless selected
 const DEFAULT_REGION = 19; // Incarnam
-const BREEDS = [{ id: 9, name: 'Crâ' }, { id: 12, name: 'Pandawa' }];
 
 type Mode = { type: 'region'; category: number } | { type: 'focus'; id: string };
 
@@ -77,11 +77,11 @@ export default function QuestMap() {
   const sel = selected ? graph.nodes.get(selected) : undefined;
 
   return (
-    <div className="flex h-dvh flex-col">
+    <div className="flex h-full flex-col">
       <header className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-zinc-800 bg-zinc-950 px-4 py-2.5">
         <div className="flex items-baseline gap-2">
-          <h1 className="text-[15px] font-semibold tracking-tight">Dofus Companion</h1>
-          <span className="text-xs text-zinc-500">Carte des quêtes · données {data.version}</span>
+          <h1 className="text-[15px] font-semibold tracking-tight">Carte des quêtes</h1>
+          <span className="text-xs text-zinc-500">données {data.version}</span>
         </div>
         <ProfileBar ch={ch} />
         <div className="ml-auto flex gap-3 text-xs text-zinc-400" title="Hors Almanax">
@@ -172,7 +172,7 @@ export default function QuestMap() {
 }
 
 function Centered({ children }: { children: React.ReactNode }) {
-  return <div className="flex h-dvh items-center justify-center text-sm text-zinc-400">{children}</div>;
+  return <div className="flex h-full items-center justify-center text-sm text-zinc-400">{children}</div>;
 }
 
 type Ch = ReturnType<typeof useCharacter>;
