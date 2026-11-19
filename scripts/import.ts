@@ -6,6 +6,9 @@ import { Graph, type GEdge, type NodeInput } from '../src/graph.ts';
 import { atoms } from '../src/criteria.ts';
 import { CODES, EVALUATED, INFERRED } from '../src/codes.ts';
 import { renderEffect, type RawEffect } from '../src/effects.ts';
+import { renderObjective } from '../src/objectives.ts';
+import { matchGuides } from '../src/guides.ts';
+import { statSync } from 'node:fs';
 
 const REPO = 'ledouxm/dofus-sqlite';
 const FILES = [
@@ -15,7 +18,9 @@ const FILES = [
   // spells (spelllevelsdata ≈ 200 MB, monstersdata ≈ 140 MB: parsed once, filtered, released)
   'spellsdata', 'spellvariantsdata', 'spelllevelsdata', 'effectsdata', 'spellstatesdata', 'monstersdata',
   'itemtypesdata', 'characteristicsdata',
+  'questobjectivesdata', 'questobjectivetypesdata', 'queststeprewardsdata', 'npcsdata', 'subareasdata', 'achievementrewardsdata',
 ] as const;
+const DPLN_SITEMAP = 'https://www.dofuspourlesnoobs.com/sitemap.xml';
 // Items and sets come from dofusdude's release of the same game version: dofus-sqlite's JSON
 // rounds the 64-bit Unity reference ids, which breaks the item → effect links.
 const DODU_REPO = 'dofusdude/dofus3-main';
@@ -87,7 +92,13 @@ async function main() {
       is_dungeon_quest INTEGER, is_party_quest INTEGER, repeat_type INTEGER,
       start_npc_id INTEGER, start_map_id INTEGER, start_positions TEXT, criterion_raw TEXT NOT NULL);
     CREATE TABLE quest_step(id INTEGER PRIMARY KEY, quest_id INTEGER NOT NULL, ordinal INTEGER, name TEXT,
-      optimal_level INTEGER, objective_ids TEXT);
+      optimal_level INTEGER, objective_ids TEXT, description TEXT, objectives TEXT, rewards TEXT);
+    CREATE INDEX quest_step_quest ON quest_step(quest_id);
+    CREATE TABLE quest_start(quest_id INTEGER PRIMARY KEY, npc_name TEXT, subarea_name TEXT);
+    -- external, non-official guides (layer B): link only, with provenance
+    CREATE TABLE external_guide(quest_id INTEGER NOT NULL, site TEXT NOT NULL, url TEXT NOT NULL, language TEXT,
+      status TEXT, checked_at TEXT, PRIMARY KEY(quest_id, site));
+    CREATE TABLE dofus(item_id INTEGER PRIMARY KEY, name TEXT, level INTEGER, quest_ids TEXT, achievement_ids TEXT);
     CREATE TABLE achievement_category(id INTEGER PRIMARY KEY, name TEXT, parent_id INTEGER);
     CREATE TABLE achievement(id INTEGER PRIMARY KEY, name TEXT, description TEXT, category_id INTEGER,
       level INTEGER, points INTEGER, account_linked INTEGER);
@@ -138,9 +149,7 @@ async function main() {
     }));
   const stepOrder = new Map<number, number>();
   for (const q of quests) arr(q.stepIds).forEach((s: number, i: number) => stepOrder.set(s, i));
-  insert('quest_step', ['id', 'quest_id', 'ordinal', 'name', 'optimal_level', 'objective_ids'],
-    steps.map((s) => [s.id, s.questId, stepOrder.get(s.id) ?? null, t(s.nameId), s.optimalLevel,
-      JSON.stringify(arr(s.objectiveIds))]));
+  // quest steps are inserted after items and monsters are known (objective and reward names)
   insert('achievement_category', ['id', 'name', 'parent_id'],
     rows('achievementcategoriesdata').map((c) => [c.id, t(c.nameId), c.parentId ?? null]));
   insert('achievement', ['id', 'name', 'description', 'category_id', 'level', 'points', 'account_linked'],
@@ -229,9 +238,89 @@ async function main() {
   });
   insert('item_set', ['id', 'name', 'item_ids', 'bonuses'], setRows);
   const now = new Date().toISOString();
+  // ---- quest details: objectives, rewards, starting NPC and zone
+  const npcName = new Map(rows('npcsdata').map((n) => [n.id as number, t(n.nameId)]));
+  const subareas = rows('subareasdata');
+  const subareaName = new Map(subareas.map((sa) => [sa.id as number, t(sa.nameId)]));
+  const mapSubarea = new Map<number, string | null>();
+  for (const sa of subareas) for (const m of arr(sa.mapIds) as number[]) mapSubarea.set(m, t(sa.nameId));
+  const objTemplates = new Map(rows('questobjectivetypesdata').map((o) => [o.id as number, t(o.nameId) ?? undefined]));
+  const itemName = new Map(itemRows.map((r) => [r[0] as number, r[1] as string | null]));
+  const objLookups = {
+    template: (id: number) => objTemplates.get(id),
+    npc: (id: number) => npcName.get(id) ?? undefined,
+    item: (id: number) => itemName.get(id) ?? undefined,
+    monster: (id: number) => monsterName.get(id) ?? undefined,
+    subarea: (id: number) => subareaName.get(id) ?? undefined,
+    text: (id: number) => t(id) ?? undefined,
+  };
+  const objectiveById = new Map(rows('questobjectivesdata').map((o) => [o.id as number, o]));
+  const rewardById = new Map(rows('queststeprewardsdata').map((r) => [r.id as number, r]));
+  const pairs = (list: unknown) => (arr(list) as Row[]).map((x) => arr(x.values) as number[]).filter((v) => v.length >= 1);
+  insert('quest_step', ['id', 'quest_id', 'ordinal', 'name', 'optimal_level', 'objective_ids', 'description', 'objectives', 'rewards'],
+    steps.map((s) => {
+      const objectives = (arr(s.objectiveIds) as number[]).map((id) => objectiveById.get(id)).filter(Boolean).map((o) => {
+        const p = o!.parameters ?? {};
+        return renderObjective(o!.typeId, [p.parameter0, p.parameter1, p.parameter2], objLookups);
+      });
+      const rewards = (arr(s.rewardsIds) as number[]).map((id) => rewardById.get(id)).filter(Boolean).map((r) => ({
+        xp: r!.experienceRatio > 0, kamas: r!.kamasRatio > 0,
+        items: pairs(r!.itemsReward).map(([id, qty]) => ({ id, name: itemName.get(id) ?? null, qty: qty ?? 1 })),
+        spells: (arr(r!.spellsReward) as number[]).map((id) => spellName.get(id) ?? null).filter(Boolean),
+        emotes: arr(r!.emotesReward).length, titles: arr(r!.titlesReward).length, jobs: arr(r!.jobsReward).length,
+      }));
+      return [s.id, s.questId, stepOrder.get(s.id) ?? null, t(s.nameId), s.optimalLevel, JSON.stringify(arr(s.objectiveIds)),
+        t(s.descriptionId), JSON.stringify(objectives), JSON.stringify(rewards)];
+    }));
+  insert('quest_start', ['quest_id', 'npc_name', 'subarea_name'], quests.map((q) => {
+    const pos = arr(q.startPosition)[0] as Row | undefined;
+    return [q.id, pos ? npcName.get(pos.npcId) ?? null : null, pos ? mapSubarea.get(pos.mapId) ?? null : null];
+  }));
+
+  // ---- Dofus: items of type "Dofus" and the quests / achievements that reward them
+  const dofusType = new Set(rows('itemtypesdata').filter((x) => t(x.nameId) === 'Dofus').map((x) => x.id as number));
+  const dofusItems = itemRows.filter((r) => dofusType.has(r[2] as number));
+  const questOfStep = new Map(steps.map((s) => [s.id as number, s.questId as number]));
+  const rewardQuests = new Map<number, Set<number>>();
+  for (const r of rewardById.values()) for (const [id] of pairs(r.itemsReward)) {
+    const q = questOfStep.get(r.stepId);
+    if (q != null) rewardQuests.set(id, (rewardQuests.get(id) ?? new Set()).add(q));
+  }
+  const achRewardItems = new Map<number, number[]>();
+  for (const r of rows('achievementrewardsdata')) {
+    const ids = (arr(r.itemsReward) as unknown[]).map((x) => (typeof x === 'number' ? x : (arr((x as Row).values)[0] as number))).filter(Number.isInteger);
+    achRewardItems.set(r.id, ids);
+  }
+  const rewardAchievements = new Map<number, Set<number>>();
+  for (const a of achievements) for (const rid of arr(a.rewardIds) as number[]) for (const id of achRewardItems.get(rid) ?? []) {
+    rewardAchievements.set(id, (rewardAchievements.get(id) ?? new Set()).add(a.id));
+  }
+  insert('dofus', ['item_id', 'name', 'level', 'quest_ids', 'achievement_ids'], dofusItems.map((r) => {
+    const id = r[0] as number;
+    return [id, r[1], r[3], JSON.stringify([...(rewardQuests.get(id) ?? [])]), JSON.stringify([...(rewardAchievements.get(id) ?? [])])];
+  }));
+
+  // ---- Dofus Pour Les Noobs guides: exact title matches against its public sitemap (cached a week)
+  const sitemapPath = 'data/raw/dpln-sitemap.xml';
+  let guideCount = 0;
+  try {
+    const stale = !existsSync(sitemapPath) || Date.now() - statSync(sitemapPath).mtimeMs > 7 * 864e5;
+    if (stale) writeFileSync(sitemapPath, await (await fetchOk(DPLN_SITEMAP)).text());
+    const urls = [...readFileSync(sitemapPath, 'utf8').matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1])
+      .filter((u) => u.startsWith('https://www.dofuspourlesnoobs.com/'));
+    const checked = statSync(sitemapPath).mtime.toISOString();
+    const guides = matchGuides(quests.map((q) => ({ id: q.id as number, name: t(q.nameId) ?? '' })).filter((q) => q.name), urls);
+    insert('external_guide', ['quest_id', 'site', 'url', 'language', 'status', 'checked_at'],
+      guides.map((g) => [g.questId, 'Dofus Pour Les Noobs', g.url, 'fr', 'auto_title_match', checked]));
+    guideCount = guides.length;
+  } catch (e) {
+    console.warn(`DPLN sitemap unavailable, no guide links this time: ${(e as Error).message}`);
+  }
+
   insert('data_source', ['dataset', 'url', 'retrieved_at'], [
     ['game', rel.html_url, now],
     ['items, item_sets', `https://github.com/${DODU_REPO}/releases/tag/${version}`, now],
+    ['external_guide (Dofus Pour Les Noobs)', DPLN_SITEMAP, now],
   ]);
   insert('spell_level', ['id', 'spell_id', 'grade', 'min_player_level', 'ap_cost', 'min_range', 'range', 'crit_chance',
     'max_cast_per_turn', 'max_cast_per_target', 'min_cast_interval', 'initial_cooldown', 'global_cooldown',
@@ -297,6 +386,8 @@ async function main() {
     inferred_codes: INFERRED,
     spells: { spells: spellRows.length, levels: levels.length, undocumented_effects: undocumentedEffects },
     items: { items: itemRows.length, sets: setRows.length },
+    guides: { dpln_quests_linked: guideCount, of: quests.length },
+    dofus: dofusItems.length,
     documented_not_evaluable_by_kind: notEvaluatedByKind,
     undocumented_codes: Object.fromEntries(Object.entries(unknownCodes).sort((a, b) => b[1] - a[1])),
     dangling_references: dangling,
@@ -313,7 +404,7 @@ async function main() {
   console.log('documented but not evaluable', notEvaluatedByKind);
   console.log('undocumented codes', report.undocumented_codes);
   console.log(`longest chain: ${chain.path.length} quests (${report.longest_requires_chain[0]} … ${report.longest_requires_chain.at(-1)})`);
-  console.log(`items ${itemRows.length} · sets ${setRows.length}`);
+  console.log(`items ${itemRows.length} · sets ${setRows.length} · dofus ${dofusItems.length} · DPLN guides ${guideCount}/${quests.length}`);
   console.log(`spells ${spellRows.length} · levels ${levels.length} · undocumented effects ${undocumentedEffects}`);
   console.log(`report → data/report-${version}.json`);
 }
