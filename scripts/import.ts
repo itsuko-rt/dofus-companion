@@ -14,7 +14,12 @@ const FILES = [
   'dungeonsdata', 'breedsdata', 'i18n_fr',
   // spells (spelllevelsdata ≈ 200 MB, monstersdata ≈ 140 MB: parsed once, filtered, released)
   'spellsdata', 'spellvariantsdata', 'spelllevelsdata', 'effectsdata', 'spellstatesdata', 'monstersdata',
+  'itemtypesdata', 'characteristicsdata',
 ] as const;
+// Items and sets come from dofusdude's release of the same game version: dofus-sqlite's JSON
+// rounds the 64-bit Unity reference ids, which breaks the item → effect links.
+const DODU_REPO = 'dofusdude/dofus3-main';
+const DODU_FILES = ['items', 'item_sets'] as const;
 const UA = { 'User-Agent': 'dofus-companion-import' };
 
 type Row = Record<string, any>;
@@ -46,6 +51,20 @@ async function main() {
     console.log(`download ${f}.json`);
     writeFileSync(path, Buffer.from(await (await fetchOk(asset.browser_download_url)).arrayBuffer()));
   }
+
+  const doduDir = `data/raw/dofusdude-${version}`;
+  mkdirSync(doduDir, { recursive: true });
+  for (const f of DODU_FILES) {
+    const path = `${doduDir}/${f}.json`;
+    if (existsSync(path)) continue;
+    console.log(`download dofusdude ${f}.json`);
+    writeFileSync(path, Buffer.from(await (await fetchOk(`https://github.com/${DODU_REPO}/releases/download/${version}/${f}.json`)).arrayBuffer()));
+  }
+  /** Unity file with exact references: 64-bit rids kept as strings. */
+  const readUnity = (path: string) => {
+    const refs = JSON.parse(readFileSync(path, 'utf8').replace(/"rid":(-?\d+)/g, '"rid":"$1"')).references.RefIds as Row[];
+    return { refs, byRid: new Map(refs.map((r) => [r.rid as string, r.data as Row])) };
+  };
 
   const read = (f: string) => JSON.parse(readFileSync(`${rawDir}/${f}.json`, 'utf8'));
   const rows = (f: string): Row[] => read(f).references.RefIds.map((r: Row) => r.data).filter(Boolean);
@@ -80,6 +99,13 @@ async function main() {
     CREATE TABLE dungeon_achievement(dungeon_id INTEGER, achievement_id INTEGER, PRIMARY KEY(dungeon_id, achievement_id));
     CREATE TABLE breed(id INTEGER PRIMARY KEY, name TEXT, spell_ids TEXT);
     -- class spells: each slot holds 2 variants (SpellVariantData); effects are rendered in French at import
+    CREATE TABLE data_source(dataset TEXT PRIMARY KEY, url TEXT, retrieved_at TEXT);
+    CREATE TABLE characteristic(id INTEGER PRIMARY KEY, keyword TEXT, name TEXT);
+    CREATE TABLE item_type(id INTEGER PRIMARY KEY, name TEXT, super_type_id INTEGER);
+    -- effects: [{actionId, min, max, text, characteristic, sign}] — sign -1 for maluses
+    CREATE TABLE item(id INTEGER PRIMARY KEY, name TEXT, type_id INTEGER, level INTEGER, set_id INTEGER,
+      icon_id INTEGER, criterion TEXT, effects TEXT);
+    CREATE TABLE item_set(id INTEGER PRIMARY KEY, name TEXT, item_ids TEXT, bonuses TEXT);
     CREATE TABLE spell(id INTEGER PRIMARY KEY, breed_id INTEGER NOT NULL, slot INTEGER, variant INTEGER,
       name TEXT, description TEXT, icon_id INTEGER);
     CREATE TABLE spell_level(id INTEGER PRIMARY KEY, spell_id INTEGER NOT NULL, grade INTEGER, min_player_level INTEGER,
@@ -172,6 +198,41 @@ async function main() {
     }));
   }
   insert('spell', ['id', 'breed_id', 'slot', 'variant', 'name', 'description', 'icon_id'], spellRows);
+
+  // ---- items and sets (dofusdude), effects rendered with the game's templates
+  const effectData = new Map(rows('effectsdata').map((e) => [e.id as number, e]));
+  const charRows = rows('characteristicsdata');
+  insert('characteristic', ['id', 'keyword', 'name'], charRows.map((c) => [c.id, c.keyword, t(c.nameId)]));
+  insert('item_type', ['id', 'name', 'super_type_id'], rows('itemtypesdata').map((x) => [x.id, t(x.nameId), x.superTypeId]));
+  const itemEffect = (e: Row) => {
+    const d = effectData.get(e.actionId);
+    const r = renderEffect({ actionId: e.actionId, diceNum: e.diceNum, diceSide: e.diceSide, value: e.value, duration: 0 }, lookups);
+    return {
+      actionId: e.actionId, min: e.diceNum, max: e.diceSide || e.diceNum, text: r?.text ?? null,
+      characteristic: d && d.characteristic > 0 ? d.characteristic : null,
+      sign: d?.characteristicOperator === '-' ? -1 : 1,
+    };
+  };
+  const items = readUnity(`${doduDir}/items.json`);
+  const itemRows = items.refs.filter((r) => r.type?.class === 'ItemData' || r.type?.class === 'WeaponData').map((r) => {
+    const it = r.data as Row;
+    const effects = (arr(it.possibleEffects) as Row[]).map((x) => items.byRid.get(x.rid)).filter(Boolean).map((e) => itemEffect(e!));
+    return [it.id, t(it.nameId), it.typeId, it.level, it.itemSetId > 0 ? it.itemSetId : null, it.iconId, it.criterions ?? '', JSON.stringify(effects)];
+  });
+  insert('item', ['id', 'name', 'type_id', 'level', 'set_id', 'icon_id', 'criterion', 'effects'], itemRows);
+  const sets = readUnity(`${doduDir}/item_sets.json`);
+  const setRows = sets.refs.filter((r) => r.type?.class === 'ItemSetData').map((r) => {
+    const s = r.data as Row;
+    // bonuses[k] = effects granted when k pieces of the set are worn
+    const bonuses = (arr(s.effects) as Row[]).map((b) => (arr(b.values) as Row[]).map((x) => sets.byRid.get(x.rid)).filter(Boolean).map((e) => itemEffect(e!)));
+    return [s.id, t(s.nameId), JSON.stringify(arr(s.items)), JSON.stringify(bonuses)];
+  });
+  insert('item_set', ['id', 'name', 'item_ids', 'bonuses'], setRows);
+  const now = new Date().toISOString();
+  insert('data_source', ['dataset', 'url', 'retrieved_at'], [
+    ['game', rel.html_url, now],
+    ['items, item_sets', `https://github.com/${DODU_REPO}/releases/tag/${version}`, now],
+  ]);
   insert('spell_level', ['id', 'spell_id', 'grade', 'min_player_level', 'ap_cost', 'min_range', 'range', 'crit_chance',
     'max_cast_per_turn', 'max_cast_per_target', 'min_cast_interval', 'initial_cooldown', 'global_cooldown',
     'effects', 'critical_effects'],
@@ -235,6 +296,7 @@ async function main() {
     quests_fully_interpreted: `${questsFullyInterpreted}/${quests.length}`,
     inferred_codes: INFERRED,
     spells: { spells: spellRows.length, levels: levels.length, undocumented_effects: undocumentedEffects },
+    items: { items: itemRows.length, sets: setRows.length },
     documented_not_evaluable_by_kind: notEvaluatedByKind,
     undocumented_codes: Object.fromEntries(Object.entries(unknownCodes).sort((a, b) => b[1] - a[1])),
     dangling_references: dangling,
@@ -251,6 +313,7 @@ async function main() {
   console.log('documented but not evaluable', notEvaluatedByKind);
   console.log('undocumented codes', report.undocumented_codes);
   console.log(`longest chain: ${chain.path.length} quests (${report.longest_requires_chain[0]} … ${report.longest_requires_chain.at(-1)})`);
+  console.log(`items ${itemRows.length} · sets ${setRows.length}`);
   console.log(`spells ${spellRows.length} · levels ${levels.length} · undocumented effects ${undocumentedEffects}`);
   console.log(`report → data/report-${version}.json`);
 }

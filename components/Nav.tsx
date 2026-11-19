@@ -26,7 +26,7 @@ export default function Nav() {
         const active = l.match(path);
         const Icon = l.icon;
         return (
-          <Link key={l.href} href={l.href} aria-current={active ? 'page' : undefined}
+          <Link key={l.href} href={l.href} aria-current={active ? 'page' : undefined} aria-label={l.label}
             className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 ${active ? 'bg-surface-2 text-text' : 'text-muted hover:bg-surface hover:text-text'}`}>
             <Icon size={15} aria-hidden /> <span className="hidden sm:inline">{l.label}</span>
           </Link>

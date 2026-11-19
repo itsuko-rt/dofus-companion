@@ -1,46 +1,53 @@
-# Dofus Companion
+# Atlas des Douze
 
-Données officielles, graphe de dépendances calculé et carte des quêtes interactive (`/quetes`).
-
-```sh
-npm run import       # une fois, pour construire la base
-npm run dev          # http://localhost:3000/quetes
-```
-
-`/classes/9` (Crâ) et `/classes/12` (Pandawa) présentent les 44 sorts de chaque classe : 22 emplacements à 2 variantes, avec grades, PA, PO, critique et limites de lancer. Les effets sont rendus en français avec les modèles de texte du jeu (`src/effects.ts`). La page propose aussi un filtre par élément et la liste des états que la classe pose ou retire. Les sorts de toutes les classes sont importés. Ajouter une classe à l'interface revient à ajouter une ligne dans `components/breeds.ts`.
-
-La carte propose deux vues : une région (les quêtes de la catégorie et leurs prérequis directs venus d'ailleurs, en grisé) ou une quête centrée (toute sa chaîne de prérequis et ce qu'elle débloque).
-Le profil (niveau, classe, alignement, abonnement) et la progression cochée sont enregistrés dans le navigateur (`localStorage`). Il n'y a pas encore de comptes.
-Architecture et choix : [docs/RAPPORT_ARCHITECTURE.md](docs/RAPPORT_ARCHITECTURE.md).
-
-Prérequis : Node ≥ 24 (utilise `node:sqlite` et l'exécution native de TypeScript, aucune dépendance d'exécution).
+Compagnon de progression Dofus : quêtes, personnage et équipement, calculés depuis les données officielles du jeu.
+Site de fan, non affilié à Ankama. Le nom « Atlas des Douze » reste à vérifier côté marques déposées (INPI, EUIPO).
 
 ```sh
-npm install          # TypeScript pour le typecheck uniquement
-npm run import       # télécharge la dernière release dofus-sqlite → data/game-<version>.sqlite + data/report-<version>.json
-npm test             # tests unitaires + tests sur les vraies données (ignorés si l'import n'a pas tourné)
-npm run typecheck
+npm install
+npm run import       # une fois : construit data/game-<version>.sqlite (≈ 8 Go de mémoire, voir plus bas)
+npm run dev          # http://localhost:3000
 ```
 
-`npm run import -- --tag v6.0_3.7.14.18` réimporte une version précise.
-
-| Fichier | Rôle |
+| Page | Contenu |
 |---|---|
-| `src/criteria.ts` | Parseur et évaluateur (3 états : vrai / faux / inconnu) du langage de critères Ankama (`PL>29&(Qf=272\|Qf=273)`) |
-| `src/graph.ts` | Nœuds (quête, succès, donjon, porte OU), arêtes `requires` / `any_of` / `excludes` / `in_dungeon`, `status()`, `unlockedBy()` |
-| `src/load.ts` | Recharge le graphe depuis la base importée |
-| `src/views.ts` | Sous-graphes affichés : vue région, vue centrée |
-| `app/api/graph/route.ts` | Sert le graphe en JSON, généré une seule fois au build |
-| `components/` | Carte (React Flow + dagre), panneau de détail, profil et progression locale |
-| `scripts/import.ts` | Import de la couche A (officielle) + rapport de contrôle |
+| `/` | Accueil. Au premier passage, création guidée du personnage (classe, niveau, style de jeu, élément) ; ensuite, tableau de bord : progression, régions conseillées, prochaines étapes |
+| `/progression/quetes` | Les régions triées par niveau, avec la progression de chacune ; quêtes annexes à part (Almanax, avis de recherche, îles saisonnières…) |
+| `/progression/quetes/[région]` | Chaînes de quêtes lues de haut en bas, fiche de quête en langage simple, chaîne complète des prérequis |
+| `/personnage` | Plusieurs personnages locaux : profil, alignement, abonnement |
+| `/personnage/builds` | Builds communautaires de Dofus Fashionista, filtrés par patch et par niveau, avec objets et stats recalculés à partir de nos données ; comparaison de deux builds |
+| `/personnage/sorts/[classe]` | Les 44 sorts de la classe et leurs effets en français |
 
-Le sens des codes de critère, leur catégorie et leurs sources (dodumap, rendu `/criterion` de DofusDB) sont dans `src/codes.ts`.
+Les anciennes adresses (`/quetes`, `/classes/…`) redirigent vers les nouvelles. La progression est enregistrée dans le navigateur (`localStorage`) : il n'y a pas encore de comptes.
 
-- **Évalués :**
-  - progression : `PL`, `Qf`, `Qa`, `QF`, `QQ`, `OA`, `Oa` ;
-  - fiche du personnage : `PG`, `Ps`, `Pa`, `Pr`, `PZ`, `SC`, `Pj`, `PJ` ;
-  - côté serveur, traités comme vrais à la manière du client : `Sc`, `Sv`.
-- **Documentés mais non évaluables** (objectifs de succès, inventaire, carte, Almanax, évènements) : affichés avec leur libellé.
-- **Non documentés :** état « inconnu », affichés tels quels, jamais devinés. Ils sont listés dans le rapport d'import.
+Documents : [docs/RAPPORT_ARCHITECTURE.md](docs/RAPPORT_ARCHITECTURE.md) (sources, architecture) · [docs/AUDIT_UX.md](docs/AUDIT_UX.md) (audit et direction de la refonte).
 
-`node scripts/profile-codes.ts` montre, pour chaque code, ses opérateurs et les tables d'ID que ses valeurs touchent. À relancer quand un patch ajoute des codes.
+## Sources de données
+
+| Données | Source |
+|---|---|
+| Quêtes, succès, donjons, sorts, effets, traductions | [dofus-sqlite](https://github.com/ledouxm/dofus-sqlite), release de la version du jeu |
+| Objets et panoplies | [dofusdude/dofus3-main](https://github.com/dofusdude/dofus3-main), release de la même version. Le JSON de dofus-sqlite arrondit les identifiants Unity 64 bits, ce qui casse le lien entre objets et effets |
+| Builds communautaires | API publique en lecture seule de [Dofus Fashionista](https://dofusfashionista.gg/api/v1/), mise en cache une heure côté serveur (`/api/builds`) |
+
+La provenance de chaque jeu de données est enregistrée dans la table `data_source` de la base.
+
+## Développement
+
+```sh
+npm test             # tests unitaires + tests sur les vraies données (ignorés sans import)
+npm run typecheck
+npm run import -- --tag v6.0_3.7.14.18   # réimporte une version précise
+```
+
+Prérequis : Node 24 ou plus récent (utilise `node:sqlite` et l'exécution native de TypeScript). L'import charge des fichiers de 100 à 200 Mo : il réserve 8 Go de mémoire.
+
+| Dossier | Rôle |
+|---|---|
+| `src/` | Moteur pur, testé : conditions (`criteria.ts`, `codes.ts`), graphe (`graph.ts`, `views.ts`), parcours (`regions.ts`), effets (`effects.ts`), sorts (`spells.ts`), stats de build (`stats.ts`), lecture de la base (`load.ts`) |
+| `scripts/import.ts` | Import, puis rapport de contrôle `data/report-<version>.json` |
+| `app/` | Routes Next.js (pages statiques, sauf `/api/builds`) |
+| `components/ui.tsx` | Composants partagés (bouton, carte, statut, tiroir, glossaire). Les couleurs sont des jetons dans `app/globals.css` |
+| `components/quests`, `character`, `builds` | Interface par section |
+
+Codes de condition : leur sens, leur catégorie et leurs sources sont dans `src/codes.ts`. Un code non documenté donne l'état « À vérifier en jeu », jamais une supposition. `node scripts/profile-codes.ts` liste les codes présents : à relancer après un patch.
