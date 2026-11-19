@@ -14,9 +14,27 @@ export const SIDE_CATEGORIES = new Set([
   29 /* Archipel de Vulkania */, 26 /* Île de Nowel */, 47 /* Temporis */,
 ]);
 
+/**
+ * Sidebar groups of the quest tracker. Like SIDE_CATEGORIES, the game data has no such flag:
+ * divine dimensions, alignment and special questlines are classified from game knowledge.
+ */
+export type RegionGroup = 'regions' | 'divine' | 'alignment' | 'special' | 'side';
+export const REGION_GROUPS: { id: RegionGroup; label: string }[] = [
+  { id: 'regions', label: 'Régions' },
+  { id: 'divine', label: 'Dimensions divines' },
+  { id: 'alignment', label: 'Alignement' },
+  { id: 'special', label: 'Quêtes spéciales' },
+  { id: 'side', label: 'Annexes et événements' },
+];
+const DIVINE = new Set([34 /* Enutrosor */, 35 /* Srambad */, 36 /* Xélorium */, 38 /* Ecaflipus */]);
+const ALIGNMENT = new Set([9 /* Alignement Bonta */, 10 /* Alignement Brâkmar */]);
+const SPECIAL = new Set([4 /* Quêtes mondiales */, 2 /* Temples */, 23 /* Krosmoz */, 42 /* Tours de la Fratrie */, 24 /* Tutoriel */, 32 /* Justiciers */]);
+export const groupOf = (category: number): RegionGroup =>
+  SIDE_CATEGORIES.has(category) ? 'side' : DIVINE.has(category) ? 'divine' : ALIGNMENT.has(category) ? 'alignment' : SPECIAL.has(category) ? 'special' : 'regions';
+
 export interface RegionSummary {
   id: number; name: string; total: number; done: number; available: number;
-  levelMin: number; levelMax: number; levelMedian: number; side: boolean;
+  levelMin: number; levelMax: number; levelMedian: number; side: boolean; group: RegionGroup;
 }
 
 const median = (xs: number[]) => {
@@ -44,6 +62,7 @@ export function regionSummaries(
       levelMax: levels.length ? Math.max(...levels) : 0,
       levelMedian: median(levels),
       side: SIDE_CATEGORIES.has(c.id),
+      group: groupOf(c.id),
     };
   }).sort((a, b) => Number(a.side) - Number(b.side) || a.levelMedian - b.levelMedian || a.name.localeCompare(b.name));
 }

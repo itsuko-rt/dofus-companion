@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { latestDb, loadGraphData } from '../../../../src/load.ts';
-import RegionView from '../../../../components/quests/RegionView';
+import QuestTracker from '../../../../components/quests/QuestTracker';
 
 // One static page per quest category (≈ region), built from the imported game DB.
 export const dynamicParams = false;
@@ -17,5 +17,5 @@ export async function generateMetadata({ params }: { params: Promise<{ region: s
 
 export default async function Page({ params }: { params: Promise<{ region: string }> }) {
   const { region } = await params;
-  return <RegionView region={Number(region)} />;
+  return <QuestTracker region={Number(region)} />;
 }

@@ -56,3 +56,11 @@ test('zones: single cell omitted, known shapes named', () => {
   assert.equal(renderEffect(fx(98, 1, 2, 0, 0, { zoneShape: 67, zoneSize: 2 }), L)?.zone, 'cercle de 2');
   assert.equal(renderEffect(fx(98, 1, 2, 0, 0, { zoneShape: 81, zoneSize: 1 }), L)?.zone, 'zone Q de 1');
 });
+
+test('game UI markup is removed from texts', async () => {
+  const { cleanGameText } = await import('../src/load.ts');
+  assert.equal(cleanGameText('Cliquez sur {{ui,EndTurnWidget,btn_EndTurn::Fin de tour}} puis {{ui,a,b}}.'), 'Cliquez sur Fin de tour puis .');
+  assert.equal(cleanGameText('Il vous reste 6 {{ui,CharacterInformations,lbl_pa,2::<sprite name="PA">PA}}.'), 'Il vous reste 6 PA.');
+  assert.equal(cleanGameText('Parlez à {{npc,7581::Ganymède}}'), 'Parlez à Ganymède');
+  assert.equal(cleanGameText(null), null);
+});

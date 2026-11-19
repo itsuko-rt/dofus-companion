@@ -1,10 +1,10 @@
 'use client';
-import { useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { Download, Plus, Trash2, Upload } from 'lucide-react';
 import { ELEMENTS, type Element } from '../../src/spells.ts';
 import { SUPPORTED_BREEDS } from '../breeds';
 import { Button, Card, SectionTitle, Term } from '../ui';
-import { PLAYSTYLES, useCharacter, type Playstyle } from '../useCharacter';
+import { PLAYSTYLES, exportBackup, importBackup, useCharacter, type Playstyle } from '../useCharacter';
 import Onboarding from './Onboarding';
 
 const field = 'mt-1 block w-full rounded-lg border border-line bg-bg px-3 py-2 text-sm text-text';
@@ -13,7 +13,38 @@ const opt = (v: string) => (v === '' ? undefined : Number(v));
 export default function CharacterProfile() {
   const ch = useCharacter();
   const [creating, setCreating] = useState(false);
+  const [backupMsg, setBackupMsg] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   if (!ch.ready) return null;
+
+  const download = () => {
+    const url = URL.createObjectURL(new Blob([exportBackup()], { type: 'application/json' }));
+    const a = Object.assign(document.createElement('a'), { href: url, download: `atlas-des-douze-sauvegarde-${new Date().toISOString().slice(0, 10)}.json` });
+    a.click();
+    URL.revokeObjectURL(url);
+    setBackupMsg('Sauvegarde téléchargée.');
+  };
+  const restore = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      if (file.size > 5_000_000) throw new Error('Fichier trop volumineux pour une sauvegarde.');
+      const { imported: n, replaced } = importBackup(await file.text());
+      setBackupMsg(`${n} personnage${n > 1 ? 's' : ''} importé${n > 1 ? 's' : ''}${replaced ? ` (dont ${replaced} remplacé${replaced > 1 ? 's' : ''} par la version du fichier)` : ''}.`);
+    } catch (e) { setBackupMsg((e as Error).message); }
+    if (fileRef.current) fileRef.current.value = '';
+  };
+  const backup = (
+    <Card>
+      <SectionTitle hint="Fichier JSON">Sauvegarde</SectionTitle>
+      <p className="mb-3 text-sm text-muted">Exportez tous vos personnages et leur progression pour les garder de côté ou les reprendre sur un autre appareil.</p>
+      <div className="flex flex-wrap gap-2">
+        <Button onClick={download} disabled={!ch.characters.length}><Download size={15} /> Exporter</Button>
+        <Button onClick={() => fileRef.current?.click()}><Upload size={15} /> Importer</Button>
+        <input ref={fileRef} type="file" accept="application/json,.json" className="hidden" onChange={(e) => restore(e.target.files?.[0])} />
+      </div>
+      {backupMsg && <p role="status" className="mt-2 text-sm text-muted">{backupMsg}</p>}
+    </Card>
+  );
 
   if (creating || !ch.hasCharacter) {
     return (
@@ -21,6 +52,7 @@ export default function CharacterProfile() {
         <h1 className="mb-4 font-display text-xl font-semibold">Nouveau personnage</h1>
         <Onboarding onDone={() => setCreating(false)} />
         {ch.hasCharacter && <Button variant="ghost" className="mt-3" onClick={() => setCreating(false)}>Annuler</Button>}
+        {!ch.hasCharacter && <div className="mt-6">{backup}</div>}
       </div>
     );
   }
@@ -123,6 +155,8 @@ export default function CharacterProfile() {
               onChange={(e) => ch.setInfo({ notes: e.target.value })} />
           </label>
         </Card>
+
+        {backup}
 
         <div className="flex flex-wrap gap-2">
           <Button variant="ghost" onClick={() => { if (confirm(`Effacer la progression de ${c.name} (${c.done.length} terminées) ?`)) ch.reset(); }}>

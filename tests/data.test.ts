@@ -22,3 +22,24 @@ test('real data: every Qf reference points to an existing quest', { skip }, () =
   assert.deepEqual(dangling, []);
   assert.ok(g.nodes.size > 4000);
 });
+
+test('real data: graph validation (missing references, prerequisite cycles)', { skip }, async () => {
+  const { validateGraph } = await import('../src/views.ts');
+  const v = validateGraph(loadGraph(db!));
+  console.log(`  missing references: ${v.missing.length} ${v.missing.slice(0, 10).join(', ')} · cycles: ${v.cycles.length}`);
+  for (const c of v.cycles.slice(0, 5)) console.log(`  cycle: ${c.join(' → ')}`);
+  assert.equal(v.cycles.length, 0, 'a prerequisite cycle would make quests impossible to unlock');
+});
+
+test('real data: quest chains stay compact (no endless row)', { skip }, async () => {
+  const { regionLayout } = await import('../src/regions.ts');
+  const { packLayout } = await import('../src/layout.ts');
+  const { loadGraphData } = await import('../src/load.ts');
+  const g = loadGraph(db!);
+  for (const c of loadGraphData(db!).categories) {
+    const r = regionLayout(g, c.id);
+    const l = packLayout([...r.linked, ...r.singles.map((n) => n.id)], r.edges, (id) => (id.startsWith('gate:') ? { w: 30, h: 30 } : { w: 204, h: 54 }), (id) => g.nodes.get(id)?.level ?? 0);
+    // 5 500 px ≈ 25 quests side by side; Frigost (the largest) is about 5 000 since bundling
+    assert.ok(l.width < 5500, `${c.name}: ${Math.round(l.width)} px wide`);
+  }
+});

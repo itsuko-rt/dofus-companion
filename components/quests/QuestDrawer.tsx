@@ -1,13 +1,14 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { BookOpen, Check, ExternalLink, Gift, GitBranch, MapPin, RotateCcw, Sparkles, Timer } from 'lucide-react';
+import { BookOpen, Check, CheckCheck, ExternalLink, Gift, GitBranch, MapPin, RotateCcw, Sparkles, Timer, Trophy } from 'lucide-react';
 import type { QuestDetails } from '../../src/load.ts';
 import { reference, type Atom } from '../../src/criteria.ts';
 import { describe } from '../../src/codes.ts';
+import { preds } from '../../src/views.ts';
 import type { GNode, Graph, Status } from '../../src/graph.ts';
 import { SUPPORTED_BREEDS } from '../breeds';
 import { Button, Drawer, STATUS, StatusPill } from '../ui';
-import type { useCharacter } from '../useCharacter';
+import type { Mark, useCharacter } from '../useCharacter';
 
 /** One game condition as a sentence a new player understands. */
 function plain(a: Atom, g: Graph): { text: string; link?: string } {
@@ -40,13 +41,17 @@ const INTRO: Record<Status, string> = {
   unknown: 'Une condition doit être vérifiée en jeu :',
 };
 
-export default function QuestDrawer({ node, graph, status, ch, region, givesDofus, onSelect, onFocusChain, onClose }: {
+export default function QuestDrawer({ node, graph, status, ch, region, givesDofus, onMark, onSelect, onFocusChain, onClose }: {
   node: GNode; graph: Graph; status: (id: string) => Status; ch: ReturnType<typeof useCharacter>;
-  region?: string; givesDofus?: boolean; onSelect: (id: string) => void; onFocusChain?: (id: string) => void; onClose: () => void;
+  region?: string; givesDofus?: boolean; onMark: (id: string, mark: Mark | 'with-prerequisites') => void;
+  onSelect: (id: string) => void; onFocusChain?: (id: string) => void; onClose: () => void;
 }) {
   const st = status(node.id);
   const missing = st === 'done' || st === 'available' ? [] : graph.blockers(node.id, ch.progress);
-  const next = [...(graph.dependents.get(node.id) ?? [])].map((id) => graph.nodes.get(id)!).filter((n) => n && n.kind !== 'gate');
+  const after = [...(graph.dependents.get(node.id) ?? [])].map((id) => graph.nodes.get(id)!).filter((n) => n && n.kind !== 'gate');
+  const next = after.filter((n) => n.kind !== 'achievement');
+  const achievements = after.filter((n) => n.kind === 'achievement');
+  const prereqCount = st === 'done' ? 0 : preds(graph, node.id).length;
   const isActive = ch.progress.active.has(node.id);
   const [details, setDetails] = useState<QuestDetails | null>(null);
   const [unlocked, setUnlocked] = useState<GNode[]>([]);
@@ -60,7 +65,7 @@ export default function QuestDrawer({ node, graph, status, ch, region, givesDofu
   const complete = () => {
     // what this completion opens, computed before saving it
     setUnlocked(graph.unlockedBy(node.id, ch.progress).map((id) => graph.nodes.get(id)!).filter((n) => n && n.kind !== 'gate'));
-    ch.setMark(node.id, 'done');
+    onMark(node.id, 'done');
   };
   const description = details?.steps.find((s) => s.description)?.description;
   const rewards = details?.steps.flatMap((s) => s.rewards) ?? [];
@@ -83,7 +88,7 @@ export default function QuestDrawer({ node, graph, status, ch, region, givesDofu
   return (
     <Drawer open onClose={onClose} title={
       <>
-        <p className="text-xs uppercase tracking-wide text-muted">{kind}{region ? ` · ${region}` : ''}</p>
+        <p className="text-xs uppercase tracking-wide text-muted">{kind}{region ? ` · ${region}` : ''}{node.level ? ` · niv. ${node.level}` : ''}</p>
         <h2 className="font-display text-lg font-semibold leading-snug">{node.label}</h2>
         <div className="mt-1.5 flex flex-wrap gap-1.5"><StatusPill status={st} />
           {givesDofus && <span className="inline-flex items-center rounded-full border border-accent/60 bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">Donne un Dofus</span>}
@@ -92,11 +97,16 @@ export default function QuestDrawer({ node, graph, status, ch, region, givesDofu
     }>
       <div className="flex flex-wrap gap-2">
         {st === 'done'
-          ? <Button onClick={() => ch.setMark(node.id, null)}><RotateCcw size={15} /> Annuler « terminée »</Button>
+          ? <Button onClick={() => onMark(node.id, null)}><RotateCcw size={15} /> Annuler « terminée »</Button>
           : <Button variant="primary" onClick={complete}><Check size={16} /> J&apos;ai terminé {node.kind === 'achievement' ? 'ce succès' : 'cette quête'}</Button>}
         {node.kind === 'quest' && st !== 'done' && (
-          <Button variant="ghost" onClick={() => ch.setMark(node.id, isActive ? null : 'active')}>
+          <Button variant="ghost" onClick={() => onMark(node.id, isActive ? null : 'active')}>
             <Timer size={15} /> {isActive ? 'Plus en cours' : 'Je l’ai commencée'}
+          </Button>
+        )}
+        {st !== 'done' && prereqCount > 0 && (
+          <Button variant="ghost" onClick={() => onMark(node.id, 'with-prerequisites')} title="Marque aussi terminées toutes les quêtes qui y mènent">
+            <CheckCheck size={15} /> Terminer avec ses prérequis
           </Button>
         )}
       </div>
@@ -171,6 +181,13 @@ export default function QuestDrawer({ node, graph, status, ch, region, givesDofu
         </section>
       )}
 
+      {achievements.length > 0 && (
+        <section className="mt-5">
+          <h3 className="mb-1 flex items-center gap-1.5 text-sm font-semibold"><Trophy size={15} className="text-accent" /> Succès liés</h3>
+          <div className="flex flex-col">{achievements.slice(0, 20).map(row)}</div>
+        </section>
+      )}
+
       {onFocusChain && (
         <Button variant="ghost" className="mt-4 -ml-2" onClick={() => onFocusChain(node.id)}>
           <GitBranch size={15} /> Voir toute la chaîne qui mène à cette quête
@@ -183,9 +200,10 @@ export default function QuestDrawer({ node, graph, status, ch, region, givesDofu
           {guide ? (
             <>
               <a href={guide.url} target="_blank" rel="noopener noreferrer"
-                className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-accent underline underline-offset-2">
-                Voir le tutoriel complet sur {guide.site} <ExternalLink size={13} />
+                className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-accent-ink hover:brightness-110">
+                <BookOpen size={15} /> Lire le guide complet <ExternalLink size={13} />
               </a>
+              <p className="mt-1.5 text-xs text-muted">Sur {guide.site}.</p>
               <p className="mt-1 text-xs text-faint">Lien trouvé automatiquement (page au titre identique), vérifié le {new Date(guide.checkedAt).toLocaleDateString('fr-FR')}. Guide externe, non officiel.</p>
             </>
           ) : (

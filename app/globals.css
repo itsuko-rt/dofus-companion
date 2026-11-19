@@ -5,10 +5,10 @@
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, "Segoe UI", sans-serif;
   --font-display: var(--font-sora), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 
-  --color-bg: #0b0e13;
-  --color-surface: #131821;
-  --color-surface-2: #1a212c;
-  --color-line: #253041;
+  --color-bg: #0a0e17;
+  --color-surface: #111827;
+  --color-surface-2: #182033;
+  --color-line: #243049;
   --color-text: #e7eaf0;
   --color-muted: #9aa4b2;
   --color-faint: #6b7686;
@@ -17,7 +17,9 @@
   --color-accent-ink: #1a1306;
   --color-done: #3fb57a;
   --color-locked: #5b6575;
-  --color-check: #8b7cf6;
+  --color-check: #9a7cf6;
+  --color-info: #5b9cf5;    /* in progress, choices, neutral highlights */
+  --color-brand: #7c86ff;   /* subtle blue-violet accent for navigation */
 
   --color-el-feu: #f26b3a;
   --color-el-eau: #3ba4f5;
@@ -39,3 +41,6 @@ body { background: var(--color-bg); color: var(--color-text); }
 .react-flow__controls button { background: var(--color-surface-2); border-color: var(--color-line); fill: var(--color-text); }
 .react-flow__controls button:hover { background: var(--color-line); }
 .react-flow__attribution { display: none; }
+.react-flow__minimap { border: 1px solid var(--color-line); border-radius: 10px; overflow: hidden; }
+.react-flow__node:focus-visible { outline: 2px solid var(--color-brand); outline-offset: 3px; border-radius: 10px; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0s !important; animation-duration: 0s !important; } }

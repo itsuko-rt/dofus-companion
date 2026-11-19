@@ -126,6 +126,29 @@ export async function connectAccount(userId: number | null) {
   try { await pull(); } catch { emit({ ...store, sync: 'error' }); }
 }
 
+// ---------- backups (same format for every profile, independent of the account)
+const BACKUP_APP = 'atlas-des-douze';
+
+export function exportBackup(): string {
+  return JSON.stringify({ app: BACKUP_APP, version: 1, exportedAt: new Date().toISOString(), characters: store.characters }, null, 2);
+}
+
+/** Adds the backup's characters; one with the same id is replaced. */
+export function importBackup(text: string): { imported: number; replaced: number } {
+  let data: unknown;
+  try { data = JSON.parse(text); } catch { throw new Error('Ce fichier n’est pas une sauvegarde valide (JSON illisible).'); }
+  const list = (data as { app?: unknown; characters?: unknown })?.characters;
+  if ((data as { app?: unknown })?.app !== BACKUP_APP || !Array.isArray(list)) throw new Error('Ce fichier n’est pas une sauvegarde de ce site.');
+  const now = new Date().toISOString();
+  // stamped now so the imported copy wins over the account's on the next sync
+  const imported = list.map((c) => sanitizeCharacter(c, newCharacterId())).filter((c): c is Character => c !== null).map((c) => ({ ...c, updatedAt: now }));
+  if (!imported.length) throw new Error('Aucun personnage valide dans ce fichier.');
+  const ids = new Set(imported.map((c) => c.id));
+  const replaced = store.characters.filter((c) => ids.has(c.id)).length;
+  set({ activeId: store.activeId ?? imported[0].id, characters: [...store.characters.filter((c) => !ids.has(c.id)), ...imported] });
+  return { imported: imported.length, replaced };
+}
+
 // ---------- hook
 export function useCharacter() {
   const s = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
@@ -165,6 +188,13 @@ export function useCharacter() {
       done: mark === 'done' ? [...c.done.filter((d) => d !== id), id] : c.done.filter((d) => d !== id),
       active: mark === 'active' ? [...c.active.filter((d) => d !== id), id] : c.active.filter((d) => d !== id),
     })),
+    /** Marks several nodes done at once (a quest and its prerequisites). */
+    markDone: (ids: string[]) => update((c) => {
+      const add = new Set(ids);
+      return { ...c, done: [...c.done.filter((d) => !add.has(d)), ...add], active: c.active.filter((d) => !add.has(d)) };
+    }),
+    /** Puts back a previous progress snapshot (undo). */
+    restoreProgress: (done: string[], active: string[]) => update((c) => ({ ...c, done, active })),
     saveBuild: (b: Omit<SavedBuild, 'savedAt'>, wear = false) => update((c) => ({
       ...c,
       builds: [...c.builds.filter((x) => x.id !== b.id), { ...b, savedAt: new Date().toISOString() }],

@@ -57,6 +57,10 @@ export interface SpellLevel {
   perTurn: number; perTarget: number; interval: number; initialCooldown: number;
   effects: RenderedEffect[]; criticalEffects: RenderedEffect[];
 }
+/** Game UI markup in texts: "{{ui,…::Fin de tour}}" → "Fin de tour", "<sprite name=\"PA\">PA" → "PA", bare "{{…}}" dropped. */
+export const cleanGameText = (t: string | null): string | null =>
+  t == null ? null : t.replace(/\{\{[^{}]*?::([^{}]*)\}\}/g, '$1').replace(/\{\{[^{}]*\}\}/g, '').replace(/<[^>]+>/g, '').replace(/[ \t]{2,}/g, ' ');
+
 export interface SpellInfo { id: number; slot: number; variant: number; name: string; description: string | null; levels: SpellLevel[] }
 export interface ClassData { version: string; breed: { id: number; name: string }; spells: SpellInfo[] }
 
@@ -69,7 +73,7 @@ export function loadClass(path: string, breedId: number): ClassData | null {
     const version = (db.prepare('SELECT id FROM game_version').get() as { id: string }).id;
     const spells = (db.prepare(
       'SELECT id, slot, variant, name, description FROM spell WHERE breed_id = ? ORDER BY slot, variant',
-    ).all(breedId) as unknown as Omit<SpellInfo, 'levels'>[]).map((s) => ({ ...s, levels: [] as SpellLevel[] }));
+    ).all(breedId) as unknown as Omit<SpellInfo, 'levels'>[]).map((s) => ({ ...s, description: cleanGameText(s.description), levels: [] as SpellLevel[] }));
     const byId = new Map(spells.map((s) => [s.id, s]));
     const levels = db.prepare(`
       SELECT l.* FROM spell_level l JOIN spell s ON s.id = l.spell_id
@@ -135,7 +139,7 @@ export function loadQuestDetails(path: string, questId: number): QuestDetails | 
     if (!db.prepare('SELECT 1 FROM quest WHERE id = ?').get(questId)) return null;
     const start = db.prepare('SELECT npc_name, subarea_name FROM quest_start WHERE quest_id = ?').get(questId) as { npc_name: string | null; subarea_name: string | null } | undefined;
     const steps = (db.prepare('SELECT name, description, objectives, rewards FROM quest_step WHERE quest_id = ? ORDER BY ordinal').all(questId) as Record<string, any>[])
-      .map((s) => ({ name: s.name, description: s.description, objectives: JSON.parse(s.objectives ?? '[]'), rewards: JSON.parse(s.rewards ?? '[]') }));
+      .map((s) => ({ name: s.name, description: cleanGameText(s.description), objectives: JSON.parse(s.objectives ?? '[]'), rewards: JSON.parse(s.rewards ?? '[]') }));
     const guides = (db.prepare('SELECT site, url, language, status, checked_at FROM external_guide WHERE quest_id = ?').all(questId) as Record<string, any>[])
       .map((g) => ({ site: g.site, url: g.url, language: g.language, status: g.status, checkedAt: g.checked_at }));
     return { id: questId, start: { npc: start?.npc_name ?? null, zone: start?.subarea_name ?? null }, steps, guides };
