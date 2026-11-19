@@ -6,7 +6,6 @@ import { BRAND } from '../src/brand.ts';
 import { SUPPORTED_BREEDS } from './breeds';
 import { useCharacter } from './useCharacter';
 import { useSession } from './account/useSession';
-import { Diamond } from './ui';
 
 // Quests, achievements and Dofus live under "Progression" (sub-tabs) to keep the bar short.
 const LINKS = [
@@ -25,12 +24,12 @@ export default function Nav() {
   const breedInfo = SUPPORTED_BREEDS.find((b) => b.id === ch.character.profile.breed);
   const link = (active: boolean) =>
     `relative inline-flex h-full items-center gap-1.5 px-2.5 font-display text-[13px] uppercase tracking-wide transition ${active
-      ? 'text-white after:absolute after:inset-x-2 after:bottom-0 after:h-[3px] after:rounded-t after:bg-cta-hi'
+      ? 'text-white after:absolute after:inset-x-2 after:bottom-0 after:h-[3px] after:bg-cta-hi'
       : 'text-muted hover:text-white'}`;
   return (
-    <nav className="flex h-14 shrink-0 items-center gap-1 overflow-x-auto border-b border-black/50 bg-gradient-to-b from-[#241c15] to-[#18130e] px-3 shadow-[0_2px_10px_rgba(0,0,0,0.4)]" aria-label="Navigation principale">
+    <nav className="flex h-14 shrink-0 items-center gap-1 overflow-x-auto border-b border-line bg-[#1b1611] px-3" aria-label="Navigation principale">
       <Link href="/" className="mr-3 flex h-full shrink-0 items-center gap-2" aria-label={BRAND.name}>
-        <Diamond color="var(--color-cta)" size={22}><span className="font-display text-[11px]">{BRAND.mark}</span></Diamond>
+        <img src="/favicon-96x96.png" alt="" width={30} height={30} />
         <span className="hidden font-display text-[15px] uppercase tracking-wide text-[#ffe2a6] lg:inline">{BRAND.name}</span>
       </Link>
       {LINKS.map((l) => {
@@ -44,8 +43,8 @@ export default function Nav() {
       })}
       <div className="ml-auto flex h-full shrink-0 items-center gap-2">
         {ch.hasCharacter && (
-          <Link href="/personnage" className="hidden items-center gap-2 rounded-full border border-line bg-surface/80 py-0.5 pl-0.5 pr-3 text-xs hover:border-faint sm:flex">
-            <span className="h-8 w-8 overflow-hidden rounded-full border border-black/40" style={{ background: breedInfo?.hue ?? 'var(--color-surface-2)' }}>
+          <Link href="/personnage" className="hidden items-center gap-2 rounded-md border border-line bg-surface py-0.5 pl-0.5 pr-3 text-xs hover:border-faint sm:flex">
+            <span className="h-8 w-8 overflow-hidden rounded border border-black/40" style={{ background: breedInfo?.hue ?? 'var(--color-surface-2)' }}>
               {breedInfo && <img src={breedInfo.art.portrait} alt="" className="h-full w-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
             </span>
             <span className="leading-tight">

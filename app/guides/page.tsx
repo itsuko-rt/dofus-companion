@@ -29,7 +29,7 @@ export default function Page() {
             const Icon = g.icon;
             return (
               <li key={g.href}>
-                <Link href={g.href} className="flex h-full flex-col gap-2 rounded-xl border border-line bg-surface p-4 transition hover:-translate-y-0.5 hover:border-faint">
+                <Link href={g.href} className="flex h-full flex-col gap-2 rounded-md border border-line bg-surface p-4 transition-colors hover:border-faint">
                   <Diamond color={g.color} size={26}><Icon size={15} /></Diamond>
                   <h2 className="font-display text-lg">{g.title}</h2>
                   <p className="text-sm text-muted">{g.text}</p>

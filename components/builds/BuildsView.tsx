@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { Bookmark, BookmarkCheck, ExternalLink, Eye, GitCompare, Heart, Info, Shirt, Sparkles, X } from 'lucide-react';
+import { Bookmark, BookmarkCheck, ExternalLink, Eye, GitCompare, Heart, Info, Shirt, Wrench, X } from 'lucide-react';
 import type { Element } from '../../src/spells.ts';
 import { SUPPORTED_BREEDS } from '../breeds';
 import { Button, ButtonLink, Card, ElementTag, EmptyState, PageHero, SECTION, Term } from '../ui';
@@ -113,13 +113,13 @@ export default function BuildsView() {
               {b.updated ? ` · mis à jour le ${new Date(b.updated).toLocaleDateString('fr-FR')}` : ''}
             </p>
           </div>
-          <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${wearable ? 'bg-done/15 text-done' : 'bg-surface-2 text-muted'}`}>
+          <span className={`rounded-sm px-2 py-0.5 text-[11px] font-medium ${wearable ? 'bg-done/15 text-done' : 'bg-surface-2 text-muted'}`}>
             {wearable ? 'Équipable à votre niveau' : `Niveau ${b.level} requis`}
           </span>
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           {b.elements.map((el) => <ElementTag key={el} element={el} />)}
-          {b.origin === 'top' && <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[11px] text-accent">Top communauté</span>}
+          {b.origin === 'top' && <span className="rounded-sm bg-accent/15 px-2 py-0.5 text-[11px] text-accent">Top communauté</span>}
           <span className="ml-auto flex items-center gap-3 text-xs text-muted">
             <span className="inline-flex items-center gap-1" title="« J’aime » sur Fashionista"><Heart size={12} /> {b.likes}</span>
             <span className="inline-flex items-center gap-1" title="Vues sur Fashionista"><Eye size={12} /> {b.views}</span>
@@ -196,7 +196,7 @@ export default function BuildsView() {
         </Card>
 
         <div className="mt-3 flex flex-wrap gap-2">
-          <ButtonLink href="https://dofusfashionista.gg/setup/" target="_blank" rel="noopener noreferrer" variant="secondary"><Sparkles size={15} /> Créer un build optimisé (Fashionista)</ButtonLink>
+          <ButtonLink href="https://dofusfashionista.gg/setup/" target="_blank" rel="noopener noreferrer" variant="secondary"><Wrench size={15} aria-hidden /> Créer un build optimisé (Fashionista)</ButtonLink>
           <ButtonLink href="https://dofusbuilds.com/" target="_blank" rel="noopener noreferrer" variant="ghost">Simuler les dégâts (Dofus Builds) <ExternalLink size={13} /></ButtonLink>
           <ButtonLink href="https://dofuscreator.com/" target="_blank" rel="noopener noreferrer" variant="ghost">Dofus Creator <ExternalLink size={13} /></ButtonLink>
         </div>

@@ -79,7 +79,7 @@ export default function SpellGuide({ data }: { data: ClassData }) {
 function Chip({ active, onClick, children, className = '' }: { active: boolean; onClick: () => void; children: React.ReactNode; className?: string }) {
   return (
     <button onClick={onClick} aria-pressed={active}
-      className={`rounded-full border px-2.5 py-0.5 text-xs ${active ? 'ring-1 ring-text' : 'opacity-70 hover:opacity-100'} ${className || 'border-line text-text'}`}>
+      className={`rounded-sm border px-2.5 py-0.5 text-xs ${active ? 'ring-1 ring-text' : 'opacity-70 hover:opacity-100'} ${className || 'border-line text-text'}`}>
       {children}
     </button>
   );
@@ -105,7 +105,7 @@ function SpellCard({ spell, level, elements }: { spell: SpellInfo; level: number
           <div className="flex flex-wrap items-center gap-1.5">
             <h2 className="font-display text-[15px] font-semibold text-text">{spell.name}</h2>
             {spell.variant === 1 && <span className="rounded bg-surface-2 px-1.5 text-[10px] uppercase tracking-wide text-muted">variante</span>}
-            {elements.map((el) => <span key={el} className={`rounded-full border px-1.5 text-[10px] ${ELEMENT_STYLE[el]}`}>{el}</span>)}
+            {elements.map((el) => <span key={el} className={`rounded-sm border px-1.5 text-[10px] ${ELEMENT_STYLE[el]}`}>{el}</span>)}
           </div>
           <p className="text-[11px] text-text0">
             {current ? `Grade ${current.grade}/${spell.levels.length}` : `Obtenu au niveau ${spell.levels[0].minLevel}`}

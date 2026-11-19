@@ -1,9 +1,10 @@
 @import "tailwindcss";
 
 /*
- * Design tokens, World of Twelve direction (docs/RAPPORT_REFONTE_VISUELLE.md).
+ * Design tokens, World of Twelve direction (docs/RAPPORT_REFONTE_VISUELLE.md, rules in docs/DESIGN_SYSTEM.md).
  * Warm night tones like the official site's illustrated sections, parchment for "paper" content,
  * green for calls to action, gold for what is available now. Use bg-bg, bg-surface, text-muted, border-line…
+ * Restraint: flat fills, tight radii, shadows only on layers that float above the page.
  */
 @theme {
   --font-sans: var(--font-roboto), ui-sans-serif, system-ui, "Segoe UI", sans-serif;
@@ -51,6 +52,16 @@
   --color-class-cra: #7cc242;
   --color-class-pandawa: #e0503f;
 
+  /* tight radii like the game's panels; overriding the scale keeps every existing rounded-* consistent */
+  --radius-lg: 0.375rem;
+  --radius-xl: 0.5rem;
+  --radius-2xl: 0.5rem;
+  /* one elevation, for popovers, drawers and toasts only */
+  --shadow-md: 0 2px 6px rgb(0 0 0 / 0.3);
+  --shadow-lg: 0 4px 14px rgb(0 0 0 / 0.4);
+  --shadow-xl: 0 4px 14px rgb(0 0 0 / 0.4);
+  --shadow-2xl: 0 4px 14px rgb(0 0 0 / 0.4);
+
   --animate-rise: rise 0.35s ease-out both;
   @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 }
@@ -59,9 +70,8 @@
 body {
   color: var(--color-text);
   background-color: var(--color-bg);
-  /* faint parchment grain + warm vignette, pure CSS (no image request) */
+  /* faint parchment grain, pure CSS (no image request) */
   background-image:
-    radial-gradient(120% 80% at 50% -10%, rgba(240, 178, 58, 0.07), transparent 60%),
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 .9 0 0 0 0 .75 0 0 0 .035 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
@@ -80,16 +90,14 @@ body {
   --color-brand: #1e7a70;
   color: var(--color-text);
   background-color: var(--color-parchment);
-  background-image: radial-gradient(130% 90% at 50% 0%, rgba(255, 250, 235, 0.55), transparent 70%),
-    radial-gradient(120% 120% at 50% 100%, rgba(150, 105, 45, 0.18), transparent 60%);
 }
 
 /* Diamond tiles, like the role and element markers of the official site. */
-.diamond { transform: rotate(45deg); border-radius: 6px; }
+.diamond { transform: rotate(45deg); border-radius: 3px; }
 .diamond > * { transform: rotate(-45deg); }
 
-/* Titles in the official style: rounded display face, uppercase, soft shadow on artwork. */
-.title-hero { font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.01em; text-shadow: 0 2px 0 rgba(0, 0, 0, 0.35), 0 6px 24px rgba(0, 0, 0, 0.45); }
+/* Titles in the official style: rounded display face, uppercase; a 1 px shadow keeps them legible on artwork. */
+.title-hero { font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.01em; text-shadow: 0 1px 0 rgba(0, 0, 0, 0.45); }
 
 :focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; border-radius: 4px; }
 
@@ -97,6 +105,6 @@ body {
 .react-flow__controls button { background: var(--color-surface-2); border-color: var(--color-line); fill: var(--color-text); }
 .react-flow__controls button:hover { background: var(--color-line); }
 .react-flow__attribution { display: none; }
-.react-flow__minimap { border: 1px solid var(--color-line); border-radius: 10px; overflow: hidden; }
-.react-flow__node:focus-visible { outline: 2px solid var(--color-brand); outline-offset: 3px; border-radius: 10px; }
+.react-flow__minimap { border: 1px solid var(--color-line); border-radius: 6px; overflow: hidden; }
+.react-flow__node:focus-visible { outline: 2px solid var(--color-brand); outline-offset: 3px; border-radius: 6px; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0s !important; animation-duration: 0s !important; } }

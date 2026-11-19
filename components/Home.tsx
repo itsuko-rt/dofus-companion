@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useMemo } from 'react';
-import { BookOpen, Compass, History, ScanLine, Sparkles, Swords, Trophy } from 'lucide-react';
+import { BookOpen, Compass, History, MapPin, ScanLine, Swords, Trophy } from 'lucide-react';
 import { regionSummaries, isRecommended } from '../src/regions.ts';
 import { BRAND } from '../src/brand.ts';
 import { SUPPORTED_BREEDS } from './breeds';
@@ -15,13 +15,13 @@ import { PLAYSTYLES } from './useCharacter';
 function Gauge({ label, value, max, color }: { label: string; value: number; max: number; color: string }) {
   const pct = max ? Math.round((value / max) * 100) : 0;
   return (
-    <div className="min-w-0 rounded-lg border border-white/10 bg-black/35 px-3 py-2 backdrop-blur-sm">
+    <div className="min-w-0 rounded-md border border-line bg-bg/85 px-3 py-2">
       <p className="flex items-baseline justify-between gap-2">
         <span className="truncate text-xs uppercase tracking-wide text-white/75">{label}</span>
         <span className="font-display text-lg leading-none text-white">{pct} %</span>
       </p>
-      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/15">
-        <div className="h-full rounded-full transition-[width] duration-700 ease-out" style={{ width: `${pct}%`, background: color }} />
+      <div className="mt-1.5 h-1.5 overflow-hidden rounded-sm bg-white/15">
+        <div className="h-full transition-[width] duration-500 ease-out" style={{ width: `${pct}%`, background: color }} />
       </div>
       <p className="mt-1 text-[11px] text-white/60">{value} / {max}</p>
     </div>
@@ -45,7 +45,7 @@ export default function Home() {
       <div className="h-full overflow-y-auto">
         <section className="relative isolate overflow-hidden border-b border-black/40 bg-sec-characters"
           style={{ backgroundImage: `url(${SUPPORTED_BREEDS[0].art.scene})`, backgroundSize: 'cover', backgroundPosition: 'right center' }}>
-          <div className="absolute inset-0 -z-10 bg-gradient-to-r from-black/80 via-black/50 to-black/10" aria-hidden />
+          <div className="absolute inset-0 -z-10 bg-gradient-to-r from-bg via-bg/70 to-transparent" aria-hidden />
           <div className="mx-auto max-w-5xl px-4 py-12 sm:py-16">
             <p className="text-xs font-medium uppercase tracking-[0.16em] text-[#ffe2a6]">Bienvenue, aventurier</p>
             <h1 className="title-hero mt-2 max-w-2xl text-3xl leading-tight text-white sm:text-4xl">Votre aventure dans le Monde des Douze, étape par étape</h1>
@@ -76,9 +76,9 @@ export default function Home() {
       {/* hero: the character in its class scene */}
       <section className="relative isolate overflow-hidden border-b border-black/40"
         style={{ backgroundColor: breed?.hue ?? 'var(--color-sec-characters)', backgroundImage: breed ? `url(${breed.art.scene})` : undefined, backgroundSize: 'cover', backgroundPosition: 'right center' }}>
-        <div className="absolute inset-0 -z-10 bg-gradient-to-r from-black/85 via-black/55 to-black/5" aria-hidden />
+        <div className="absolute inset-0 -z-10 bg-gradient-to-r from-bg via-bg/70 to-transparent" aria-hidden />
         <div className="mx-auto flex max-w-6xl flex-wrap items-end gap-5 px-4 py-8 sm:py-10">
-          <div className="h-24 w-24 shrink-0 overflow-hidden rounded-2xl border-2 border-[#ffe2a6]/60 shadow-[0_8px_24px_rgba(0,0,0,0.5)] sm:h-28 sm:w-28"
+          <div className="h-24 w-24 shrink-0 overflow-hidden rounded-md border-2 border-[#ffe2a6]/60 sm:h-28 sm:w-28"
             style={{ background: breed?.hue ?? 'var(--color-surface-2)' }}>
             {breed && <img src={breed.art.portrait} alt={`Portrait de ${breed.name}`} className="h-full w-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
           </div>
@@ -107,11 +107,11 @@ export default function Home() {
               : <p className="text-sm text-muted">Chargement…</p>}
             {recommended.length > 0 && (
               <>
-                <p className="mb-2 mt-4 flex items-center gap-1.5 text-sm text-muted"><Sparkles size={14} className="text-accent" /> Régions conseillées pour votre niveau</p>
+                <p className="mb-2 mt-4 flex items-center gap-1.5 text-sm text-muted"><MapPin size={14} className="text-accent" aria-hidden /> Régions conseillées pour votre niveau</p>
                 <ul className="grid gap-2 sm:grid-cols-3">
                   {recommended.map((r) => (
                     <li key={r.id}>
-                      <Link href={regionPath(r.id)} className="group block rounded-lg border border-line bg-surface-2 p-3 transition hover:-translate-y-0.5 hover:border-sec-quests">
+                      <Link href={regionPath(r.id)} className="block rounded-md border border-line bg-surface-2 p-3 transition-colors hover:border-sec-quests">
                         <span className="block truncate font-medium">{r.name}</span>
                         <span className="text-xs text-accent">{r.available} disponible{r.available > 1 ? 's' : ''}</span>
                         <ProgressBar value={r.done} max={r.total} className="mt-2 !h-1" label={`${r.name} : ${r.done} sur ${r.total}`} />
@@ -129,7 +129,7 @@ export default function Home() {
               const Icon = s.icon;
               return (
                 <li key={s.href}>
-                  <Link href={s.href} className="group flex h-full flex-col gap-2 rounded-xl border border-line bg-surface p-4 transition hover:-translate-y-0.5 hover:border-faint">
+                  <Link href={s.href} className="flex h-full flex-col gap-2 rounded-md border border-line bg-surface p-4 transition-colors hover:border-faint">
                     <Diamond color={s.color} size={26}><Icon size={15} /></Diamond>
                     <h2 className="font-display uppercase tracking-wide">{s.label}</h2>
                     <p className="text-sm text-muted">{s.text}</p>

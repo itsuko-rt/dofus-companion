@@ -187,7 +187,7 @@ export default function ScanView() {
                 <p className="mb-2 text-xs text-muted">Ces quêtes sont des prérequis obligatoires des quêtes reconnues : elles sont sans doute terminées. Cochez celles à enregistrer.</p>
                 <div className="flex flex-wrap gap-1.5">
                   {inferred.slice(0, 60).map((id) => (
-                    <label key={id} className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs ${deduced.has(id) ? 'border-brand text-text' : 'border-line text-muted'}`}>
+                    <label key={id} className={`inline-flex items-center gap-1 rounded-sm border px-2 py-0.5 text-xs ${deduced.has(id) ? 'border-brand text-text' : 'border-line text-muted'}`}>
                       <input type="checkbox" checked={deduced.has(id)} onChange={() => toggle(deduced, setDeduced, id)} className="accent-[var(--color-brand)]" />
                       {graph.nodes.get(id)?.label}
                     </label>

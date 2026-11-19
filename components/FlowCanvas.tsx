@@ -29,7 +29,7 @@ const QuestNode = memo(function QuestNode({ data }: NodeProps<Node<QData>>) {
   const tone = data.active ? 'border-info text-info' : `${s.border} ${s.text}`;
   return (
     <div title={`${data.label}${data.level ? ` · niv. ${data.level}` : ''} · ${data.active ? 'En cours' : s.label}`}
-      className={`flex h-[54px] w-[204px] items-center gap-2 rounded-lg border bg-gradient-to-b from-surface-2 to-surface px-2 text-left shadow-[inset_0_1px_0_rgba(255,240,210,0.06)] transition-[opacity,box-shadow] duration-150 hover:shadow-md hover:shadow-black/40
+      className={`flex h-[54px] w-[204px] items-center gap-2 rounded-md border bg-surface-2 px-2 text-left transition-opacity duration-150 hover:brightness-110
         ${tone} ${data.selected ? 'ring-2 ring-text ring-offset-2 ring-offset-bg' : ''} ${data.dim ? 'opacity-30' : ''} ${data.status === 'locked' && !data.active ? 'bg-surface/70' : ''}`}>
       <Handle type="target" position={Position.Top} className="!h-1 !w-1 !min-w-0 !border-0 !bg-faint" />
       <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${data.active ? 'bg-info/15' : s.bg}`} aria-hidden>

@@ -39,7 +39,7 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
   return (
     <div className="h-full overflow-y-auto">
       <PageHero color="#7a4a12" kicker={`Dofus · niveau ${d.level}`} title={d.name}>
-        {icon && <img src={icon} alt={`Icône du ${d.name}`} width={64} height={64} className="drop-shadow-[0_4px_8px_rgba(0,0,0,0.6)]" />}
+        {icon && <img src={icon} alt={`Icône du ${d.name}`} width={64} height={64} />}
       </PageHero>
       <article className="mx-auto max-w-4xl px-4 py-6">
         <Breadcrumbs trail={[['Accueil', '/'], ['Guides', '/guides'], ['Dofus', '/guides/dofus'], [d.name, `/guides/dofus/${slug}`]]} />

@@ -310,7 +310,7 @@ export default function QuestTracker({ region: regionParam }: { region?: number 
 
         <main className="relative min-h-[60vh] flex-1">
           {help && (
-            <div className="absolute right-3 top-3 z-20 w-80 rounded-xl border border-line bg-surface-2/95 p-3 text-sm shadow-xl backdrop-blur">
+            <div className="absolute right-3 top-3 z-20 w-80 rounded-md border border-line bg-surface-2 p-3 text-sm shadow-xl">
               <p className="mb-2 flex items-center gap-1.5 font-semibold"><MousePointerClick size={15} className="text-brand" /> Commandes</p>
               <ul className="flex flex-col gap-1 text-muted">
                 <li><b className="text-text">Clic</b> : détails de la quête</li>
@@ -326,7 +326,7 @@ export default function QuestTracker({ region: regionParam }: { region?: number 
             </div>
           )}
           {focus && (
-            <div className="absolute left-1/2 top-3 z-10 flex -translate-x-1/2 items-center gap-3 rounded-full border border-line bg-surface-2/95 px-4 py-1.5 text-sm shadow-lg">
+            <div className="absolute left-1/2 top-3 z-10 flex -translate-x-1/2 items-center gap-3 rounded-md border border-line bg-surface-2/95 px-4 py-1.5 text-sm shadow-lg">
               <span>Tout ce qui mène à <b>« {graph.nodes.get(focus)?.label} »</b></span>
               <Button variant="ghost" className="!px-2 !py-0.5" onClick={() => setFocus(null)}>Revenir à la région</Button>
             </div>

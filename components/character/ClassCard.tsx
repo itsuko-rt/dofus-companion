@@ -7,9 +7,9 @@ type Breed = (typeof SUPPORTED_BREEDS)[number];
 
 export default function ClassCard({ breed, selected, compact }: { breed: Breed; selected?: boolean; compact?: boolean }) {
   return (
-    <span className={`group relative flex overflow-hidden rounded-xl border-2 text-left transition duration-200 hover:-translate-y-0.5 ${selected ? 'border-[#ffe2a6] shadow-[0_0_0_3px_rgba(255,226,166,0.25)]' : 'border-black/40 hover:border-[#ffe2a6]/60'}`}
-      style={{ background: `linear-gradient(135deg, color-mix(in srgb, ${breed.hue} 55%, #1e1914), #1e1914 70%)` }}>
-      <img src={breed.art.portrait} alt="" className={`${compact ? 'h-24 w-24' : 'h-36 w-32 sm:w-36'} shrink-0 object-cover object-top transition duration-300 group-hover:scale-105`}
+    <span className={`relative flex overflow-hidden rounded-md border-2 text-left transition-colors ${selected ? 'border-[#ffe2a6]' : 'border-black/40 hover:border-[#ffe2a6]/60'}`}
+      style={{ background: `color-mix(in srgb, ${breed.hue} 28%, var(--color-surface))` }}>
+      <img src={breed.art.portrait} alt="" className={`${compact ? 'h-24 w-24' : 'h-36 w-32 sm:w-36'} shrink-0 object-cover object-top`}
         onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }} />
       <span className="flex min-w-0 flex-1 flex-col justify-center gap-1 p-3">
         <span className="title-hero text-xl text-white">{breed.name}</span>

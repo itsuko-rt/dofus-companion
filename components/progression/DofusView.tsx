@@ -30,10 +30,10 @@ export default function DofusView({ dofus }: { dofus: DofusInfo[] }) {
             const has = obtained(d);
             return (
               <li key={d.itemId}>
-                <Card className={`flex h-full flex-col gap-2 transition hover:-translate-y-0.5 ${has ? 'border-done/60' : ''}`}>
+                <Card className={`flex h-full flex-col gap-2 ${has ? 'border-done/60' : ''}`}>
                   <div className="flex items-start gap-3">
                     <span className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-full border ${has ? 'border-accent/70 bg-accent/15' : 'border-line bg-surface-2'}`}>
-                      {d.iconId != null && <img src={`/ankama/items/${d.iconId}.png`} alt="" width={48} height={48} loading="lazy" className={`drop-shadow-[0_3px_6px_rgba(0,0,0,0.5)] ${has ? '' : 'opacity-80 saturate-50'}`} onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
+                      {d.iconId != null && <img src={`/ankama/items/${d.iconId}.png`} alt="" width={48} height={48} loading="lazy" className={has ? '' : 'opacity-80 saturate-50'} onError={(e) => { e.currentTarget.style.display = 'none'; }} />}
                     </span>
                     <div className="min-w-0 flex-1">
                       <h2 className="font-display">{d.name}</h2>

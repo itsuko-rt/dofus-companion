@@ -10,11 +10,11 @@ const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).jo
 type Variant = 'primary' | 'secondary' | 'ghost';
 const BTN: Record<Variant, string> = {
   // the official site's green call-to-action: display face, uppercase, pressed-in bottom edge
-  primary: 'bg-cta text-white font-display uppercase tracking-wide shadow-[inset_0_-3px_0_rgba(0,0,0,0.28),0_2px_8px_rgba(0,0,0,0.25)] hover:bg-cta-hi active:translate-y-px',
+  primary: 'bg-cta text-white font-display uppercase tracking-wide shadow-[inset_0_-2px_0_rgba(0,0,0,0.3)] hover:bg-cta-hi active:shadow-none',
   secondary: 'border border-line bg-surface-2 text-text hover:border-faint hover:bg-line/60',
   ghost: 'text-muted hover:bg-surface-2 hover:text-text',
 };
-const btnBase = 'inline-flex items-center justify-center gap-2 rounded-lg px-3.5 py-2 text-sm transition disabled:pointer-events-none disabled:opacity-50';
+const btnBase = 'inline-flex items-center justify-center gap-2 rounded-md px-3.5 py-2 text-sm transition-colors disabled:pointer-events-none disabled:opacity-50';
 
 export function Button({ variant = 'secondary', className, ...p }: ComponentProps<'button'> & { variant?: Variant }) {
   return <button className={cx(btnBase, BTN[variant], className)} {...p} />;
@@ -25,8 +25,7 @@ export function ButtonLink({ variant = 'secondary', className, ...p }: Component
 
 /** Panel. `paper` turns it into parchment: same utilities inside, ink colours. */
 export function Card({ className, paper, ...p }: ComponentProps<'div'> & { paper?: boolean }) {
-  return <div className={cx('rounded-xl border p-4', paper ? 'parchment border-[#c4a46e] shadow-[0_6px_20px_rgba(0,0,0,0.35)]'
-    : 'border-line bg-surface shadow-[inset_0_1px_0_rgba(255,240,210,0.04)]', className)} {...p} />;
+  return <div className={cx('rounded-md border p-4', paper ? 'parchment border-[#c4a46e]' : 'border-line bg-surface', className)} {...p} />;
 }
 
 /** Section colours (globals.css --color-sec-*): each area keeps its own hue. */
@@ -36,16 +35,18 @@ export const SECTION = {
 } as const;
 
 /**
- * Banner at the top of a page: section colour, optional official artwork (local copy, see scripts/fetch-assets.ts)
- * that simply does not show when it was not downloaded.
+ * Banner at the top of a page: dark band tinted with the section colour and underlined in it, optional official
+ * artwork on the right (local copy, see scripts/fetch-assets.ts) that simply does not show when it was not downloaded.
+ * One scrim, only over artwork, for legibility.
  */
 export function PageHero({ title, kicker, color, image, children, className }: {
   title: ReactNode; kicker?: ReactNode; color: string; image?: string; children?: ReactNode; className?: string;
 }) {
   return (
-    <header className={cx('relative isolate overflow-hidden border-b border-black/30', className)}
-      style={{ backgroundColor: color, backgroundImage: `${image ? `url(${image}), ` : ''}linear-gradient(115deg, rgba(0,0,0,0.55), rgba(0,0,0,0.05))`, backgroundSize: 'cover', backgroundPosition: 'right center' }}>
-      <div className="absolute inset-0 -z-10 bg-gradient-to-r from-black/70 via-black/35 to-transparent" aria-hidden />
+    <header className={cx('relative isolate overflow-hidden border-b-2', className)}
+      style={{ borderColor: color, backgroundColor: `color-mix(in srgb, ${color} 22%, var(--color-bg))`,
+        backgroundImage: image ? `url(${image})` : undefined, backgroundSize: 'cover', backgroundPosition: 'right center' }}>
+      {image && <div className="absolute inset-0 -z-10 bg-gradient-to-r from-bg via-bg/70 to-transparent" aria-hidden />}
       <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-6 sm:py-8">
         {kicker && <p className="text-xs font-medium uppercase tracking-[0.16em] text-[#ffe2a6]">{kicker}</p>}
         <h1 className="title-hero text-2xl leading-tight text-white sm:text-3xl">{title}</h1>
@@ -59,8 +60,8 @@ export function PageHero({ title, kicker, color, image, children, className }: {
 export function Diamond({ color, size = 34, children, label }: { color: string; size?: number; children?: ReactNode; label?: string }) {
   return (
     <span role={label ? 'img' : undefined} aria-label={label} className="inline-flex shrink-0 items-center justify-center" style={{ width: size * 1.42, height: size * 1.42 }}>
-      <span className="diamond flex items-center justify-center border-2 border-black/30 text-white shadow-[inset_0_2px_0_rgba(255,255,255,0.25),0_3px_8px_rgba(0,0,0,0.35)]"
-        style={{ width: size, height: size, background: `linear-gradient(135deg, ${color}, color-mix(in srgb, ${color} 60%, black))` }}>
+      <span className="diamond flex items-center justify-center border border-black/40 text-white"
+        style={{ width: size, height: size, background: color }}>
         <span className="flex items-center justify-center">{children}</span>
       </span>
     </span>
@@ -88,7 +89,7 @@ export function StatusPill({ status, className }: { status: Status; className?: 
   const s = STATUS[status];
   const Icon = s.icon;
   return (
-    <span title={s.help} className={cx('inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium', s.text, s.bg, s.border, className)}>
+    <span title={s.help} className={cx('inline-flex items-center gap-1 rounded-sm border px-2 py-0.5 text-xs font-medium', s.text, s.bg, s.border, className)}>
       <Icon size={12} aria-hidden /> {s.label}
     </span>
   );
@@ -102,15 +103,15 @@ export const ELEMENT_CLASS: Record<Element, string> = {
   Neutre: 'text-el-neutre border-el-neutre/50 bg-el-neutre/10',
 };
 export function ElementTag({ element }: { element: Element }) {
-  return <span className={cx('rounded-full border px-2 py-0.5 text-[11px] font-medium', ELEMENT_CLASS[element])}>{element}</span>;
+  return <span className={cx('rounded-sm border px-2 py-0.5 text-[11px] font-medium', ELEMENT_CLASS[element])}>{element}</span>;
 }
 
 export function ProgressBar({ value, max, className, label }: { value: number; max: number; className?: string; label?: string }) {
   const pct = max ? Math.round((value / max) * 100) : 0;
   return (
-    <div className={cx('h-1.5 w-full overflow-hidden rounded-full bg-surface-2', className)}
+    <div className={cx('h-1.5 w-full overflow-hidden rounded-sm bg-surface-2', className)}
       role="progressbar" aria-valuemin={0} aria-valuemax={max} aria-valuenow={value} aria-label={label}>
-      <div className="h-full rounded-full bg-gradient-to-r from-done to-[color-mix(in_srgb,var(--color-done)_70%,var(--color-accent))] transition-[width] duration-700 ease-out" style={{ width: `${pct}%` }} />
+      <div className="h-full bg-done transition-[width] duration-500 ease-out" style={{ width: `${pct}%` }} />
     </div>
   );
 }
@@ -130,7 +131,7 @@ export function Drawer({ open, onClose, title, children }: { open: boolean; onCl
   return (
     <aside
       role="dialog" aria-modal="false" aria-label={typeof title === 'string' ? title : undefined}
-      className="parchment absolute inset-y-0 right-0 z-20 flex w-full max-w-md animate-rise flex-col border-l-4 border-[#a8834a] shadow-2xl shadow-black/60"
+      className="parchment absolute inset-y-0 right-0 z-20 flex w-full max-w-md animate-rise flex-col border-l-4 border-[#a8834a] shadow-2xl"
       onKeyDown={(e) => e.key === 'Escape' && onClose()}
     >
       <div className="flex items-start gap-2 border-b border-line p-4">
@@ -144,7 +145,7 @@ export function Drawer({ open, onClose, title, children }: { open: boolean; onCl
 
 export function EmptyState({ title, children }: { title: string; children?: ReactNode }) {
   return (
-    <div className="rounded-xl border border-dashed border-line p-6 text-center">
+    <div className="rounded-md border border-dashed border-line p-6 text-center">
       <p className="font-medium text-text">{title}</p>
       {children && <div className="mt-1 text-sm text-muted">{children}</div>}
     </div>

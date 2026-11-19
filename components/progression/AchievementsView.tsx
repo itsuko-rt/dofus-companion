@@ -2,7 +2,7 @@
 // Achievement tracker: progress per category and per objective, for the selected character.
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { BookOpen, Check, ChevronDown, CircleHelp, ExternalLink, Gift, History, ScanLine, Search, Sparkles, Trophy } from 'lucide-react';
+import { BookOpen, Check, ChevronDown, CircleHelp, ExternalLink, Gift, Hourglass, History, ScanLine, Search, Trophy } from 'lucide-react';
 import type { AchievementCategory, AchievementInfo } from '../../src/load.ts';
 import { ACHIEVEMENT_STATE, achievementProgress, type AchievementState, type ObjectiveState } from '../../src/achievements.ts';
 import { CHANGE_SOURCES, type HistoryEntry } from '../../src/character.ts';
@@ -108,12 +108,10 @@ export default function AchievementsView({ categories }: { categories: Achieveme
       <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-6">
         <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
           <Card className="flex flex-col gap-4">
-            <div className="grid grid-cols-3 gap-4 sm:grid-cols-6">
-              <Stat label="Succès" value={totals.all} />
-              <Stat label="Obtenus" value={totals.obtained} tone="text-done" />
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+              <Stat label={`obtenus sur ${totals.all}`} value={totals.obtained} tone="text-done" />
               <Stat label="À confirmer" value={totals.ready} tone="text-accent" />
               <Stat label="En cours" value={totals.in_progress} tone="text-info" />
-              <Stat label="Restants" value={totals.all - totals.obtained} tone="text-muted" />
               <Stat label={`${totals.points} points`} value={`${pct} %`} />
             </div>
             <ul className="grid gap-x-5 gap-y-2 sm:grid-cols-2 xl:grid-cols-3" aria-label="Progression par catégorie">
@@ -132,7 +130,7 @@ export default function AchievementsView({ categories }: { categories: Achieveme
           </Card>
           <Card className="flex flex-col gap-3 text-sm">
             <div>
-              <h2 className="mb-1 flex items-center gap-1.5 font-semibold"><Sparkles size={15} className="text-accent" /> Presque terminés</h2>
+              <h2 className="mb-1 flex items-center gap-1.5 font-semibold"><Hourglass size={15} className="text-accent" aria-hidden /> Presque terminés</h2>
               {almost.length ? almost.map(([id, p]) => (
                 <button key={id} onClick={() => goTo(id)} className="flex w-full items-center gap-2 rounded-md px-1.5 py-1 text-left hover:bg-surface-2">
                   <span className="min-w-0 flex-1 truncate">{name(`ach:${id}`)}</span>
@@ -173,7 +171,7 @@ export default function AchievementsView({ categories }: { categories: Achieveme
               <div className="flex flex-wrap gap-1" role="group" aria-label="Filtrer par état">
                 {FILTERS.map((f) => (
                   <button key={f.id} onClick={() => setFilter(f.id)} aria-pressed={filter === f.id}
-                    className={`rounded-full border px-2.5 py-1 text-xs ${filter === f.id ? 'border-brand bg-brand/15 text-text' : 'border-line text-muted hover:text-text'}`}>{f.label}</button>
+                    className={`rounded-sm border px-2.5 py-1 text-xs ${filter === f.id ? 'border-brand bg-brand/15 text-text' : 'border-line text-muted hover:text-text'}`}>{f.label}</button>
                 ))}
               </div>
               <label className="relative ml-auto w-full sm:w-64">
@@ -193,14 +191,14 @@ export default function AchievementsView({ categories }: { categories: Achieveme
             </div>
 
             {list === null ? <p className="text-sm text-muted">Chargement…</p> : shown.length === 0 ? <EmptyState title="Aucun succès ici avec ce filtre" /> : (
-              <ul className="flex flex-col gap-2">
+              <ul className="parchment divide-y divide-line overflow-hidden rounded-md border border-[#c4a46e]">
                 {shown.map((a) => {
                   const p = progress.get(a.id) ?? achievementProgress(a.id, [], ch.progress);
                   const expanded = open === a.id;
                   const src = provenance.get(`ach:${a.id}`);
                   return (
                     <li key={a.id} id={`ach-${a.id}`}>
-                      <Card paper className={`p-0 transition ${expanded ? '' : 'hover:-translate-y-px'} ${p.state === 'obtained' ? 'outline outline-2 -outline-offset-2 outline-done/50' : ''}`}>
+                      <div className={`border-l-[3px] ${p.state === 'obtained' ? 'border-done' : 'border-transparent'} ${expanded ? 'bg-surface-2/60' : 'hover:bg-surface-2/40'}`}>
                         <button onClick={() => setOpen(expanded ? null : a.id)} aria-expanded={expanded} className="flex w-full items-center gap-3 p-3 text-left">
                           <div className="min-w-0 flex-1">
                             <p className="truncate font-medium">{a.name}</p>
@@ -212,7 +210,7 @@ export default function AchievementsView({ categories }: { categories: Achieveme
                               <ProgressBar value={p.met} max={p.total} className="mt-0.5 !h-1" label={`${p.met} objectifs sur ${p.total}`} />
                             </span>
                           )}
-                          <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium ${STATE_TONE[p.state]}`}>{ACHIEVEMENT_STATE[p.state]}</span>
+                          <span className={`shrink-0 rounded-sm border px-2 py-0.5 text-[11px] font-medium ${STATE_TONE[p.state]}`}>{ACHIEVEMENT_STATE[p.state]}</span>
                           <ChevronDown size={15} className={`shrink-0 text-faint transition ${expanded ? 'rotate-180' : ''}`} />
                         </button>
                         {expanded && (
@@ -254,13 +252,13 @@ export default function AchievementsView({ categories }: { categories: Achieveme
                               <div>
                                 <h3 className="mb-1 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-faint"><Gift size={13} /> Récompenses</h3>
                                 <ul className="flex flex-wrap gap-1.5 text-xs">
-                                  {a.rewards.xp && <li className="rounded-full bg-surface-2 px-2.5 py-1">Expérience</li>}
-                                  {a.rewards.kamas && <li className="rounded-full bg-surface-2 px-2.5 py-1">Kamas</li>}
-                                  {a.rewards.items.map((it) => <li key={it.id} className="rounded-full bg-surface-2 px-2.5 py-1">{it.qty > 1 ? `${it.qty} × ` : ''}{it.name ?? `objet n°${it.id}`}</li>)}
-                                  {a.rewards.titles > 0 && <li className="rounded-full bg-surface-2 px-2.5 py-1">Titre</li>}
-                                  {a.rewards.ornaments > 0 && <li className="rounded-full bg-surface-2 px-2.5 py-1">Ornement</li>}
-                                  {a.rewards.emotes > 0 && <li className="rounded-full bg-surface-2 px-2.5 py-1">Attitude</li>}
-                                  {a.rewards.spells > 0 && <li className="rounded-full bg-surface-2 px-2.5 py-1">Sort</li>}
+                                  {a.rewards.xp && <li className="rounded-sm bg-surface-2 px-2 py-0.5">Expérience</li>}
+                                  {a.rewards.kamas && <li className="rounded-sm bg-surface-2 px-2 py-0.5">Kamas</li>}
+                                  {a.rewards.items.map((it) => <li key={it.id} className="rounded-sm bg-surface-2 px-2 py-0.5">{it.qty > 1 ? `${it.qty} × ` : ''}{it.name ?? `objet n°${it.id}`}</li>)}
+                                  {a.rewards.titles > 0 && <li className="rounded-sm bg-surface-2 px-2 py-0.5">Titre</li>}
+                                  {a.rewards.ornaments > 0 && <li className="rounded-sm bg-surface-2 px-2 py-0.5">Ornement</li>}
+                                  {a.rewards.emotes > 0 && <li className="rounded-sm bg-surface-2 px-2 py-0.5">Attitude</li>}
+                                  {a.rewards.spells > 0 && <li className="rounded-sm bg-surface-2 px-2 py-0.5">Sort</li>}
                                 </ul>
                               </div>
                             )}
@@ -283,7 +281,7 @@ export default function AchievementsView({ categories }: { categories: Achieveme
                             </div>
                           </div>
                         )}
-                      </Card>
+                      </div>
                     </li>
                   );
                 })}

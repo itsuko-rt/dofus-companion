@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { BookOpen, Check, CheckCheck, ExternalLink, Gift, GitBranch, MapPin, RotateCcw, Sparkles, Timer, Trophy } from 'lucide-react';
+import { BookOpen, Check, CheckCheck, ExternalLink, Gift, GitBranch, MapPin, RotateCcw, Timer, Trophy, Unlock } from 'lucide-react';
 import type { QuestDetails } from '../../src/load.ts';
 import { reference, type Atom } from '../../src/criteria.ts';
 import { describe } from '../../src/codes.ts';
@@ -91,7 +91,7 @@ export default function QuestDrawer({ node, graph, status, ch, region, givesDofu
         <p className="text-xs uppercase tracking-wide text-muted">{kind}{region ? ` · ${region}` : ''}{node.level ? ` · niv. ${node.level}` : ''}</p>
         <h2 className="font-display text-lg font-semibold leading-snug">{node.label}</h2>
         <div className="mt-1.5 flex flex-wrap gap-1.5"><StatusPill status={st} />
-          {givesDofus && <span className="inline-flex items-center rounded-full border border-accent/60 bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">Donne un Dofus</span>}
+          {givesDofus && <span className="inline-flex items-center rounded-sm border border-accent/60 bg-accent/10 px-2 py-0.5 text-xs font-medium text-accent">Donne un Dofus</span>}
         </div>
       </>
     }>
@@ -113,7 +113,7 @@ export default function QuestDrawer({ node, graph, status, ch, region, givesDofu
 
       {unlocked.length > 0 && (
         <div role="status" className="mt-4 rounded-xl border border-accent/50 bg-accent/10 p-3">
-          <p className="flex items-center gap-1.5 text-sm font-semibold text-accent"><Sparkles size={15} /> Nouvelles quêtes débloquées</p>
+          <p className="flex items-center gap-1.5 text-sm font-semibold text-accent"><Unlock size={15} aria-hidden /> Nouvelles quêtes débloquées</p>
           <div className="mt-1 flex flex-col">{unlocked.slice(0, 12).map(row)}</div>
         </div>
       )}
@@ -163,12 +163,12 @@ export default function QuestDrawer({ node, graph, status, ch, region, givesDofu
         <section className="mt-5">
           <h3 className="mb-1 flex items-center gap-1.5 text-sm font-semibold"><Gift size={15} className="text-accent" /> Récompenses</h3>
           <ul className="flex flex-wrap gap-1.5 text-sm">
-            {rewards.some((r) => r.xp) && <li className="rounded-full bg-surface-2 px-2.5 py-1">Expérience</li>}
-            {rewards.some((r) => r.kamas) && <li className="rounded-full bg-surface-2 px-2.5 py-1">Kamas</li>}
-            {rewardItems.map((it, i) => <li key={i} className="rounded-full bg-surface-2 px-2.5 py-1">{it.qty > 1 ? `${it.qty} × ` : ''}{it.name ?? `objet n°${it.id}`}</li>)}
-            {rewards.flatMap((r) => r.spells).map((sp, i) => <li key={`s${i}`} className="rounded-full bg-check/15 px-2.5 py-1 text-check">Sort : {sp}</li>)}
-            {rewards.reduce((n, r) => n + r.titles, 0) > 0 && <li className="rounded-full bg-surface-2 px-2.5 py-1">Titre</li>}
-            {rewards.reduce((n, r) => n + r.emotes, 0) > 0 && <li className="rounded-full bg-surface-2 px-2.5 py-1">Attitude</li>}
+            {rewards.some((r) => r.xp) && <li className="rounded-sm bg-surface-2 px-2.5 py-1">Expérience</li>}
+            {rewards.some((r) => r.kamas) && <li className="rounded-sm bg-surface-2 px-2.5 py-1">Kamas</li>}
+            {rewardItems.map((it, i) => <li key={i} className="rounded-sm bg-surface-2 px-2.5 py-1">{it.qty > 1 ? `${it.qty} × ` : ''}{it.name ?? `objet n°${it.id}`}</li>)}
+            {rewards.flatMap((r) => r.spells).map((sp, i) => <li key={`s${i}`} className="rounded-sm bg-check/15 px-2.5 py-1 text-check">Sort : {sp}</li>)}
+            {rewards.reduce((n, r) => n + r.titles, 0) > 0 && <li className="rounded-sm bg-surface-2 px-2.5 py-1">Titre</li>}
+            {rewards.reduce((n, r) => n + r.emotes, 0) > 0 && <li className="rounded-sm bg-surface-2 px-2.5 py-1">Attitude</li>}
           </ul>
           <p className="mt-1 text-xs text-faint">Les montants d’expérience et de kamas dépendent de votre niveau.</p>
         </section>
