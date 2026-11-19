@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { SUPPORTED_BREEDS } from '../../../components/breeds';
 
-export const metadata: Metadata = { title: 'Sorts · Atlas des Douze' };
+export const metadata: Metadata = { title: 'Sorts' };
 
 export default function Page() {
   return (

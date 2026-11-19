@@ -10,6 +10,7 @@ const config: NextConfig = {
       { source: '/classes', destination: '/personnage/sorts', permanent: true },
       { source: '/classes/:id', destination: '/personnage/sorts/:id', permanent: true },
       { source: '/progression', destination: '/progression/quetes', permanent: false },
+      { source: '/personnage/builds', destination: '/builds', permanent: true },
     ];
   },
 };

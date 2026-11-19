@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useMemo } from 'react';
 import { BookOpen, Compass, Shirt, Sparkles } from 'lucide-react';
 import { regionSummaries, isRecommended } from '../src/regions.ts';
+import { BRAND } from '../src/brand.ts';
 import { SUPPORTED_BREEDS } from './breeds';
 import Onboarding from './character/Onboarding';
 import NextSteps from './quests/NextSteps';
@@ -23,7 +24,7 @@ export default function Home() {
           <p className="text-sm font-medium text-accent">Bienvenue</p>
           <h1 className="mt-1 font-display text-3xl font-semibold leading-tight">Votre aventure dans le Monde des Douze, étape par étape.</h1>
           <p className="mt-3 text-muted">
-            Atlas des Douze vous dit quelles quêtes faire, comment les débloquer et quel équipement porter, à partir des données officielles du jeu.
+            {BRAND.name} vous dit quelles quêtes faire, comment les débloquer et quel équipement porter, à partir des données officielles du jeu.
             Commencez par décrire votre personnage : cela prend 30 secondes.
           </p>
           <div className="mt-6"><Onboarding /></div>
@@ -80,7 +81,7 @@ export default function Home() {
           </Card>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <Link href="/personnage/builds" className="rounded-xl border border-line bg-surface p-4 hover:border-faint">
+            <Link href="/builds" className="rounded-xl border border-line bg-surface p-4 hover:border-faint">
               <Shirt size={18} className="text-accent" />
               <h2 className="mt-2 font-display font-semibold">Équipement conseillé</h2>
               <p className="text-sm text-muted">Des builds réels pour votre classe et votre niveau.</p>

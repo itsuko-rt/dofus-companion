@@ -12,7 +12,7 @@ export function generateStaticParams() {
 
 export async function generateMetadata({ params }: { params: Promise<{ region: string }> }): Promise<Metadata> {
   const { region } = await params;
-  return { title: `${categories().find((c) => String(c.id) === region)?.name ?? 'Région'} · Quêtes · Atlas des Douze` };
+  return { title: `${categories().find((c) => String(c.id) === region)?.name ?? 'Région'} · Quêtes` };
 }
 
 export default async function Page({ params }: { params: Promise<{ region: string }> }) {
