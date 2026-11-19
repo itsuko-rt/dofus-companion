@@ -6,6 +6,7 @@ const TABS = [
   { href: '/progression/quetes', label: 'Quêtes' },
   { href: '/progression/succes', label: 'Succès' },
   { href: '/progression/dofus', label: 'Dofus' },
+  { href: '/progression/scan', label: 'Scanner' },
 ];
 
 export default function ProgressionTabs() {

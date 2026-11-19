@@ -10,7 +10,7 @@ async function check(name: string, fn: () => Promise<void>) {
 const get = (path: string, init?: RequestInit) => fetch(`${BASE}${path}`, { redirect: 'manual', ...init });
 
 const PAGES = ['/', '/progression/quetes', '/progression/quetes/19', '/progression/succes', '/progression/dofus',
-  '/builds', '/equipement', '/personnage', '/personnage/sorts', '/personnage/sorts/9', '/personnage/sorts/12', '/compte'];
+  '/progression/scan', '/builds', '/equipement', '/personnage', '/personnage/sorts', '/personnage/sorts/9', '/personnage/sorts/12', '/compte'];
 for (const p of PAGES) await check(`page ${p}`, async () => assert.equal((await get(p)).status, 200));
 
 await check('redirects keep old URLs', async () => {
@@ -38,7 +38,13 @@ await check('items search API', async () => {
   const d = await (await get('/api/items/search?q=coiffe&max=60')).json();
   assert.ok(d.items.length > 0 && d.items.every((i: { level: number }) => i.level <= 60));
 });
-await check('achievements API', async () => assert.ok((await (await get('/api/achievements?categories=2')).json()).achievements.length >= 0));
+await check('achievements API with objectives, rewards and guides', async () => {
+  const d = await (await get('/api/achievements?categories=59')).json();
+  assert.ok(d.achievements.length > 0 && d.achievements.some((a: { guide: unknown }) => a.guide));
+  assert.ok(d.achievements[0].objectives.every((o: { id: number }) => Number.isInteger(o.id)));
+  const idx = await (await get('/api/achievements/objectives')).json();
+  assert.ok(Object.keys(idx).length > 2000);
+});
 
 // account flow
 const email = `smoke${Date.now()}@example.com`;

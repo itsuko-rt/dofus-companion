@@ -3,9 +3,9 @@
 // One shared store so every component on the page (nav, map, guide) sees the same character instantly.
 import { useMemo, useSyncExternalStore } from 'react';
 import type { Profile, Progress } from '../src/criteria.ts';
-import { newCharacterId, sanitizeCharacter, type Character, type Playstyle, type SavedBuild } from '../src/character.ts';
+import { newCharacterId, sanitizeCharacter, type ChangeSource, type Character, type HistoryEntry, type Playstyle, type SavedBuild } from '../src/character.ts';
 
-export type { Character, Playstyle, SavedBuild };
+export type { ChangeSource, Character, HistoryEntry, Playstyle, SavedBuild };
 export type Mark = 'done' | 'active' | null;
 export type SyncState = 'local' | 'syncing' | 'synced' | 'error';
 
@@ -126,6 +126,15 @@ export async function connectAccount(userId: number | null) {
   try { await pull(); } catch { emit({ ...store, sync: 'error' }); }
 }
 
+/** Appends what changed between two versions of a character to its history. */
+function withHistory(before: Character, after: Character, source: ChangeSource, label: string): Character {
+  const was = new Set(before.done), now = new Set(after.done);
+  const added = after.done.filter((d) => !was.has(d)), removed = before.done.filter((d) => !now.has(d));
+  if (!added.length && !removed.length) return after;
+  const entry: HistoryEntry = { at: new Date().toISOString(), source, added, removed, label: label.slice(0, 160) };
+  return { ...after, history: [...before.history, entry].slice(-200) };
+}
+
 // ---------- backups (same format for every profile, independent of the account)
 const BACKUP_APP = 'atlas-des-douze';
 
@@ -183,18 +192,25 @@ export function useCharacter() {
     setLevel: (level: number) => update((c) => ({ ...c, level: Math.min(200, Math.max(1, Math.round(level) || 1)) })),
     setProfile: (patch: Partial<Profile>) => update((c) => ({ ...c, profile: { ...c.profile, ...patch } })),
     setInfo: (patch: Partial<Pick<Character, 'name' | 'element' | 'playstyle' | 'notes'>>) => update((c) => ({ ...c, ...patch })),
-    setMark: (id: string, mark: Mark) => update((c) => ({
+    setMark: (id: string, mark: Mark, source: ChangeSource = 'manual', label = '') => update((c) => withHistory(c, {
       ...c,
       done: mark === 'done' ? [...c.done.filter((d) => d !== id), id] : c.done.filter((d) => d !== id),
       active: mark === 'active' ? [...c.active.filter((d) => d !== id), id] : c.active.filter((d) => d !== id),
-    })),
-    /** Marks several nodes done at once (a quest and its prerequisites). */
-    markDone: (ids: string[]) => update((c) => {
+    }, source, label)),
+    /** Marks several nodes done at once (a quest and its prerequisites, a confirmed scan). */
+    markDone: (ids: string[], source: ChangeSource = 'manual', label = '') => update((c) => {
       const add = new Set(ids);
-      return { ...c, done: [...c.done.filter((d) => !add.has(d)), ...add], active: c.active.filter((d) => !add.has(d)) };
+      return withHistory(c, { ...c, done: [...c.done.filter((d) => !add.has(d)), ...add], active: c.active.filter((d) => !add.has(d)) }, source, label);
     }),
     /** Puts back a previous progress snapshot (undo). */
-    restoreProgress: (done: string[], active: string[]) => update((c) => ({ ...c, done, active })),
+    restoreProgress: (done: string[], active: string[]) => update((c) => withHistory(c, { ...c, done, active }, 'manual', 'Annulation')),
+    /** Undoes one history entry: what it added is removed, what it removed comes back. */
+    revertEntry: (index: number) => update((c) => {
+      const h = c.history[index];
+      if (!h) return c;
+      const added = new Set(h.added);
+      return withHistory(c, { ...c, done: [...c.done.filter((d) => !added.has(d)), ...h.removed.filter((d) => !c.done.includes(d))] }, 'manual', `Annulation : ${h.label}`);
+    }),
     saveBuild: (b: Omit<SavedBuild, 'savedAt'>, wear = false) => update((c) => ({
       ...c,
       builds: [...c.builds.filter((x) => x.id !== b.id), { ...b, savedAt: new Date().toISOString() }],
@@ -213,6 +229,6 @@ export function useCharacter() {
       set({ activeId: store.activeId === id ? characters[0]?.id ?? null : store.activeId, characters });
     },
     /** Clears the active character's progress (keeps the character). */
-    reset: () => update((c) => ({ ...c, done: [], active: [] })),
+    reset: () => update((c) => withHistory(c, { ...c, done: [], active: [] }, 'manual', 'Progression réinitialisée')),
   };
 }

@@ -101,7 +101,9 @@ async function main() {
     CREATE TABLE dofus(item_id INTEGER PRIMARY KEY, name TEXT, level INTEGER, quest_ids TEXT, achievement_ids TEXT);
     CREATE TABLE achievement_category(id INTEGER PRIMARY KEY, name TEXT, parent_id INTEGER);
     CREATE TABLE achievement(id INTEGER PRIMARY KEY, name TEXT, description TEXT, category_id INTEGER,
-      level INTEGER, points INTEGER, account_linked INTEGER);
+      level INTEGER, points INTEGER, account_linked INTEGER, rewards TEXT);
+    CREATE TABLE achievement_guide(achievement_id INTEGER NOT NULL, site TEXT NOT NULL, url TEXT NOT NULL, language TEXT,
+      status TEXT NOT NULL, checked_at TEXT NOT NULL);
     CREATE TABLE achievement_objective(id INTEGER PRIMARY KEY, achievement_id INTEGER NOT NULL, ordinal INTEGER,
       name TEXT, criterion_raw TEXT);
     CREATE TABLE dungeon(id INTEGER PRIMARY KEY, name TEXT, min_level INTEGER, optimal_level INTEGER,
@@ -287,9 +289,21 @@ async function main() {
     if (q != null) rewardQuests.set(id, (rewardQuests.get(id) ?? new Set()).add(q));
   }
   const achRewardItems = new Map<number, number[]>();
+  const achRewardRows = new Map<number, Row>();
   for (const r of rows('achievementrewardsdata')) {
     const ids = (arr(r.itemsReward) as unknown[]).map((x) => (typeof x === 'number' ? x : (arr((x as Row).values)[0] as number))).filter(Number.isInteger);
     achRewardItems.set(r.id, ids);
+    achRewardRows.set(r.id, r);
+  }
+  // achievement rewards, same shape as quest rewards (amounts of xp/kamas scale with level: only flagged)
+  const setRewards = db.prepare('UPDATE achievement SET rewards = ? WHERE id = ?');
+  for (const a of achievements) {
+    const rs = (arr(a.rewardIds) as number[]).map((id) => achRewardRows.get(id)).filter((r): r is Row => !!r).map((r) => ({
+      xp: r.experienceRatio > 0, kamas: r.kamasRatio > 0,
+      items: (achRewardItems.get(r.id) ?? []).map((id, i) => ({ id, name: itemName.get(id) ?? null, qty: (arr(r.itemsQuantityReward)[i] as number) ?? 1 })),
+      titles: arr(r.titlesReward).length, emotes: arr(r.emotesReward).length, ornaments: arr(r.ornamentsReward).length, spells: arr(r.spellsReward).length,
+    }));
+    if (rs.length) setRewards.run(JSON.stringify(rs), a.id);
   }
   const rewardAchievements = new Map<number, Set<number>>();
   for (const a of achievements) for (const rid of arr(a.rewardIds) as number[]) for (const id of achRewardItems.get(rid) ?? []) {
@@ -313,6 +327,9 @@ async function main() {
     insert('external_guide', ['quest_id', 'site', 'url', 'language', 'status', 'checked_at'],
       guides.map((g) => [g.questId, 'Dofus Pour Les Noobs', g.url, 'fr', 'auto_title_match', checked]));
     guideCount = guides.length;
+    const achGuides = matchGuides(achievements.map((a) => ({ id: a.id as number, name: t(a.nameId) ?? '' })).filter((a) => a.name), urls);
+    insert('achievement_guide', ['achievement_id', 'site', 'url', 'language', 'status', 'checked_at'],
+      achGuides.map((g) => [g.questId, 'Dofus Pour Les Noobs', g.url, 'fr', 'auto_title_match', checked]));
   } catch (e) {
     console.warn(`DPLN sitemap unavailable, no guide links this time: ${(e as Error).message}`);
   }

@@ -178,11 +178,13 @@ export default function QuestTracker({ region: regionParam }: { region?: number 
     const name = graph.nodes.get(id)?.label ?? id;
     if (m === 'with-prerequisites') {
       const ids = [...prerequisitesToComplete(graph, id, ch.progress.done), id];
-      ch.markDone(ids);
-      setUndo({ label: `« ${name} » et ${ids.length - 1} prérequis marqués terminés`, ...before });
+      const label = `« ${name} » et ${ids.length - 1} prérequis marqués terminés`;
+      ch.markDone(ids, 'prerequisites', label);
+      setUndo({ label, ...before });
     } else {
-      ch.setMark(id, m);
-      setUndo({ label: m === 'done' ? `« ${name} » marquée terminée` : m === 'active' ? `« ${name} » marquée en cours` : `« ${name} » n’est plus marquée`, ...before });
+      const label = m === 'done' ? `« ${name} » marquée terminée` : m === 'active' ? `« ${name} » marquée en cours` : `« ${name} » n’est plus marquée`;
+      ch.setMark(id, m, 'manual', label);
+      setUndo({ label, ...before });
     }
   };
   const toggleDone = (id: string, withPrerequisites: boolean) =>

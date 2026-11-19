@@ -160,14 +160,58 @@ export const loadAchievementCategories = (path: string) => withDb(path, (db) => 
   FROM achievement_category c LEFT JOIN achievement a ON a.category_id = c.id
   GROUP BY c.id ORDER BY c.parent_id, c.id`).all()));
 
-export interface AchievementInfo { id: number; name: string; description: string | null; level: number; points: number; objectives: string[] }
+export interface AchievementReward { xp: boolean; kamas: boolean; items: { id: number; name: string | null; qty: number }[]; titles: number; emotes: number; ornaments: number; spells: number }
+export interface AchievementInfo {
+  id: number; name: string; description: string | null; level: number; points: number; categoryId: number;
+  objectives: { id: number; name: string | null; criterion: string }[];
+  /** merged over the game's reward rows (some depend on level or class) */
+  rewards: AchievementReward | null;
+  guide: { site: string; url: string; checkedAt: string } | null;
+  dofus: string[];
+}
+const mergeRewards = (json: string | null): AchievementReward | null => {
+  const rs = JSON.parse(json ?? '[]') as AchievementReward[];
+  if (!rs.length) return null;
+  const items = new Map<number, AchievementReward['items'][number]>();
+  for (const r of rs) for (const it of r.items) items.set(it.id, it);
+  const r: AchievementReward = {
+    xp: rs.some((x) => x.xp), kamas: rs.some((x) => x.kamas), items: [...items.values()],
+    titles: Math.max(...rs.map((x) => x.titles)), emotes: Math.max(...rs.map((x) => x.emotes)),
+    ornaments: Math.max(...rs.map((x) => x.ornaments)), spells: Math.max(...rs.map((x) => x.spells)),
+  };
+  return r.xp || r.kamas || r.items.length || r.titles || r.emotes || r.ornaments || r.spells ? r : null;
+};
 export const loadAchievements = (path: string, categoryIds: number[]) => withDb(path, (db) => {
   const ids = categoryIds.filter(Number.isInteger).slice(0, 50);
   if (!ids.length) return [];
-  const rows = plainRows<{ id: number; name: string; description: string | null; level: number; points: number }>(db.prepare(
-    `SELECT id, name, description, level, points FROM achievement WHERE category_id IN (${ids.map(() => '?').join(',')}) ORDER BY level, name`).all(...ids));
-  const obj = db.prepare('SELECT name FROM achievement_objective WHERE achievement_id = ? ORDER BY ordinal');
-  return rows.map((a) => ({ ...a, objectives: (obj.all(a.id) as { name: string | null }[]).map((o) => o.name).filter((n): n is string => !!n) }));
+  const rows = db.prepare(
+    `SELECT id, name, description, level, points, category_id, rewards FROM achievement WHERE category_id IN (${ids.map(() => '?').join(',')}) ORDER BY level, name`).all(...ids) as Record<string, any>[];
+  const obj = db.prepare('SELECT id, name, criterion_raw AS criterion FROM achievement_objective WHERE achievement_id = ? ORDER BY ordinal');
+  const guide = db.prepare('SELECT site, url, checked_at FROM achievement_guide WHERE achievement_id = ? LIMIT 1');
+  const dofusByAch = new Map<number, string[]>();
+  for (const d of db.prepare('SELECT name, achievement_ids FROM dofus').all() as Record<string, any>[]) {
+    for (const a of JSON.parse(d.achievement_ids) as number[]) dofusByAch.set(a, [...(dofusByAch.get(a) ?? []), d.name]);
+  }
+  return rows.map((a): AchievementInfo => {
+    const g = guide.get(a.id) as Record<string, any> | undefined;
+    return {
+      id: a.id, name: a.name, description: cleanGameText(a.description)?.replace(/\s*\[challenge,\d+\]/g, '') ?? null,
+      level: a.level, points: a.points, categoryId: a.category_id,
+      objectives: plainRows(obj.all(a.id)),
+      rewards: mergeRewards(a.rewards),
+      guide: g ? { site: g.site, url: g.url, checkedAt: g.checked_at } : null,
+      dofus: dofusByAch.get(a.id) ?? [],
+    };
+  });
+});
+
+/** Every achievement's objectives with their official condition, for progress across all categories. */
+export const loadObjectiveIndex = (path: string) => withDb(path, (db) => {
+  const out: Record<number, [number, string][]> = {};
+  for (const o of db.prepare('SELECT id, achievement_id, criterion_raw FROM achievement_objective ORDER BY achievement_id, ordinal').all() as Record<string, any>[]) {
+    (out[o.achievement_id] ??= []).push([o.id, o.criterion_raw ?? '']);
+  }
+  return out;
 });
 
 export interface DofusInfo { itemId: number; name: string; level: number; quests: { id: number; name: string; category: number }[]; achievements: { id: number; name: string; categoryId: number }[] }

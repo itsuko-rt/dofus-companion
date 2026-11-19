@@ -20,13 +20,26 @@ export interface Character {
   builds: SavedBuild[];  // saved community builds
   currentBuild?: string; // id of the build worn now
   notes: string;
+  /** audit trail of progress changes, newest last (undo, provenance, "recently completed") */
+  history: HistoryEntry[];
   updatedAt: string;
 }
 
+/** Where a change came from. 'inferred' state is never stored: it is recomputed from game conditions. */
+export type ChangeSource = 'manual' | 'import' | 'scan' | 'prerequisites';
+export const CHANGE_SOURCES: Record<ChangeSource, string> = {
+  manual: 'Coché à la main',
+  import: 'Importé (sauvegarde)',
+  scan: 'Capture d’écran, confirmé',
+  prerequisites: 'Prérequis, confirmé',
+};
+export interface HistoryEntry { at: string; source: ChangeSource; added: string[]; removed: string[]; label: string }
+
 const MAX_IDS = 20_000;
 const MAX_BUILDS = 50;
+const MAX_HISTORY = 200;
 const ID_RE = /^[a-z][a-z0-9]{1,40}$/;
-const NODE_RE = /^(quest|ach|dungeon):\d{1,9}$/;
+const NODE_RE = /^(quest|ach|dungeon|obj):\d{1,9}$/;
 
 export function sanitizeCharacter(raw: unknown, fallbackId: string): Character | null {
   if (!raw || typeof raw !== 'object') return null;
@@ -58,6 +71,13 @@ export function sanitizeCharacter(raw: unknown, fallbackId: string): Character |
     builds,
     currentBuild: typeof r.currentBuild === 'string' && builds.some((b) => b.id === r.currentBuild) ? r.currentBuild : undefined,
     notes: str(r.notes, 4000),
+    history: (Array.isArray(r.history) ? r.history : []).flatMap((h): HistoryEntry[] => {
+      if (!h || typeof h !== 'object') return [];
+      const x = h as Record<string, unknown>;
+      const source = x.source as ChangeSource;
+      if (!(source in CHANGE_SOURCES)) return [];
+      return [{ at: str(x.at, 40), source, added: ids(x.added).slice(0, 2000), removed: ids(x.removed).slice(0, 2000), label: str(x.label, 160) }];
+    }).slice(-MAX_HISTORY),
     updatedAt: str(r.updatedAt, 40) || new Date(0).toISOString(),
   };
 }

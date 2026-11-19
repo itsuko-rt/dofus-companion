@@ -16,13 +16,15 @@ npm run dev          # http://localhost:3000
 | `/personnage` | Plusieurs personnages : profil, alignement, abonnement, sauvegarde (export / import JSON) |
 | `/builds` | Builds communautaires de Dofus Fashionista (top + récents) : filtres, tris, équipement par emplacement, stats recalculées, sorts conseillés, comparaison, enregistrement dans le personnage |
 | `/personnage/sorts/[classe]` | Les 44 sorts de la classe et leurs effets en français |
-| `/progression/succes` · `/progression/dofus` | Succès par catégorie (à cocher) · les 34 Dofus et la quête ou le succès qui les donne |
+| `/progression/succes` | Suivi des succès : tableau de bord, objectifs un par un (déduits des conditions officielles ou cochés), récompenses, guides, confirmation, provenance |
+| `/progression/scan` | Scan de progression : capture d'une fenêtre Dofus, OCR dans le navigateur, vérification puis enregistrement, historique avec annulation |
+| `/progression/dofus` | Les 34 Dofus et la quête ou le succès qui les donne |
 | `/equipement` | Encyclopédie des objets équipables |
 | `/compte` | Compte du site (pas un compte Ankama) : personnages et progression synchronisés |
 
 Les anciennes adresses (`/quetes`, `/classes/…`) redirigent vers les nouvelles. Sans compte, la progression reste dans le navigateur. Avec un compte, elle est enregistrée dans `data/app.sqlite`, une base séparée de celle du jeu : l'import ne la touche jamais. Le lien de réinitialisation du mot de passe est écrit dans le journal du serveur tant qu'aucun fournisseur d'e-mail n'est configuré.
 
-Documents : [docs/RAPPORT_SUIVI_QUETES.md](docs/RAPPORT_SUIVI_QUETES.md) (refonte du suivi des quêtes) · [docs/RAPPORT_DEVELOPPEMENT.md](docs/RAPPORT_DEVELOPPEMENT.md) · [docs/RAPPORT_ARCHITECTURE.md](docs/RAPPORT_ARCHITECTURE.md) (sources, architecture) · [docs/AUDIT_UX.md](docs/AUDIT_UX.md) (audit et direction de la refonte).
+Documents : [docs/RAPPORT_SUCCES_SCAN.md](docs/RAPPORT_SUCCES_SCAN.md) (succès, scan, API) · [docs/RAPPORT_SUIVI_QUETES.md](docs/RAPPORT_SUIVI_QUETES.md) (refonte du suivi des quêtes) · [docs/RAPPORT_DEVELOPPEMENT.md](docs/RAPPORT_DEVELOPPEMENT.md) · [docs/RAPPORT_ARCHITECTURE.md](docs/RAPPORT_ARCHITECTURE.md) (sources, architecture) · [docs/AUDIT_UX.md](docs/AUDIT_UX.md) (audit et direction de la refonte).
 
 ## Sources de données
 
