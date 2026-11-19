@@ -38,7 +38,15 @@ export default function Home() {
   const { data, graph, status, categoryName, ch, progress, recent, almost } = useAchievementProgress();
   const regions = useMemo(() => (graph && data ? regionSummaries(graph, data.categories, status) : []), [graph, data, status]);
 
-  if (!ch.ready) return null;
+  // before the browser storage is read: the site's title, so the server HTML has a heading and content
+  if (!ch.ready) return (
+    <section className="border-b-2 border-sec-characters bg-surface px-4 py-12">
+      <div className="mx-auto max-w-5xl">
+        <h1 className="title-hero text-3xl text-white">{BRAND.name}</h1>
+        <p className="mt-2 max-w-xl text-muted">{BRAND.tagline}</p>
+      </div>
+    </section>
+  );
 
   if (!ch.hasCharacter) {
     return (

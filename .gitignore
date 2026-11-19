@@ -6,3 +6,5 @@ next-env.d.ts
 public/ankama/
 .env
 .env*.local
+test-results/
+playwright-report/

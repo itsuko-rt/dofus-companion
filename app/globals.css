@@ -17,10 +17,10 @@
   --color-line: #3d3328;
   --color-text: #f4ecdc;
   --color-muted: #c2b296;
-  --color-faint: #8f7f66;
+  --color-faint: #a08f74;    /* ≥ 4.5:1 on every surface (WCAG AA) */
 
   /* actions and states */
-  --color-cta: #5a840c;      /* primary buttons (white text ≥ 4.5:1) */
+  --color-cta: #567f0b;      /* primary buttons (white text 4.7:1) */
   --color-cta-hi: #77a816;
   --color-accent: #f0b23a;   /* available, highlights */
   --color-accent-ink: #2a1a04;
@@ -79,7 +79,7 @@ body {
 .parchment {
   --color-text: #3a230b;
   --color-muted: #6b4d2a;
-  --color-faint: #8a6d47;
+  --color-faint: #735836;
   --color-surface: #f1e4c6;
   --color-surface-2: #e7d5ad;
   --color-line: #cbb185;

@@ -1,0 +1,128 @@
+import { expect, test } from '@playwright/test';
+import { collectErrors, expectNoErrors, localStore, seedLocal } from './helpers';
+
+test('every sitemap page loads with one h1, no script error and no CSP violation', async ({ page, request }) => {
+  test.setTimeout(240_000);
+  const xml = await (await request.get('/sitemap.xml')).text();
+  const paths = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => new URL(m[1]).pathname);
+  expect(paths.length).toBeGreaterThan(100);
+  await seedLocal(page);
+  const errors = collectErrors(page);
+  const bad: string[] = [];
+  for (const p of paths) {
+    const r = await page.goto(p, { waitUntil: 'domcontentloaded' });
+    if (r?.status() !== 200) bad.push(`${p}: ${r?.status()}`);
+    const h1 = await page.locator('h1').count();
+    if (h1 !== 1 && !/^\/(progression\/quetes|progression\/scan)/.test(p)) bad.push(`${p}: ${h1} h1`);
+  }
+  expect(bad, bad.join('\n')).toEqual([]);
+  expectNoErrors(errors);
+});
+
+test('navigation bar reaches every section; skip link works from the keyboard', async ({ page, isMobile }) => {
+  await seedLocal(page);
+  const errors = collectErrors(page);
+  await page.goto('/');
+  await page.keyboard.press('Tab');
+  const skip = page.getByRole('link', { name: 'Aller au contenu' });
+  await expect(skip).toBeFocused();
+  await expect(skip).toBeVisible();
+  await skip.evaluate((el) => (el as HTMLElement).blur()); // a focused skip link sits over the logo
+  const nav = page.getByRole('navigation', { name: 'Navigation principale' });
+  for (const [label, url] of [['Progression', /\/progression\/quetes/], ['Builds', /\/builds/], ['Équipement', /\/equipement/], ['Personnages', /\/personnage/], ['Mon compte', /\/compte/], ['Accueil', /\/$/]] as const) {
+    await nav.getByRole('link', { name: label }).click();
+    await expect(page).toHaveURL(url);
+    await expect(page.locator('main#contenu')).toBeVisible();
+  }
+  // the bar fits the phone width (no horizontal page scroll)
+  if (isMobile) expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
+  expectNoErrors(errors);
+});
+
+test('quest tracker: search, right-click to complete, undo, persistence', async ({ page }) => {
+  await seedLocal(page);
+  const errors = collectErrors(page);
+  await page.goto('/progression/quetes/tutoriel-guide');
+  const node = page.locator('.react-flow__node-quest', { hasText: 'Bien débuter' }).first();
+  await expect(node).toBeVisible({ timeout: 20_000 });
+  await node.click({ button: 'right' });
+  await expect.poll(async () => (await localStore(page)).characters[0].done.length).toBeGreaterThan(0);
+  const doneIds = (await localStore(page)).characters[0].done;
+  await page.getByRole('button', { name: 'Annuler' }).click();
+  await expect.poll(async () => (await localStore(page)).characters[0].done.length).toBe(0);
+  await node.click({ button: 'right' });
+  await expect.poll(async () => (await localStore(page)).characters[0].done).toEqual(doneIds);
+  await page.reload();
+  await expect.poll(async () => (await localStore(page)).characters[0].done).toEqual(doneIds);
+  // search suggests matching quests
+  await page.getByPlaceholder('Rechercher une quête…').fill('Premiers pas');
+  await expect(page.locator('ul.absolute li', { hasText: 'Premiers pas' }).first()).toBeVisible();
+  await page.getByPlaceholder('Rechercher une quête…').fill('');
+  // status filter
+  await page.locator('select', { has: page.locator('option', { hasText: 'Tous les statuts' }) }).selectOption('available');
+  expectNoErrors(errors);
+});
+
+test('achievements: categories, filters, search, objectives and manual completion', async ({ page }) => {
+  await seedLocal(page);
+  const errors = collectErrors(page);
+  await page.goto('/progression/succes');
+  const list = page.locator('ul.parchment');
+  await expect(list).toBeVisible({ timeout: 20_000 });
+  // search across categories suggests matches
+  await page.getByPlaceholder('Rechercher dans tous les succès…').fill('Kardorim');
+  await expect(page.locator('ul.absolute li', { hasText: 'Kardorim' }).first()).toBeVisible();
+  await page.getByPlaceholder('Rechercher dans tous les succès…').fill('');
+  const row = list.locator('li', { hasText: 'Crypte de Kardorim' }).first();
+  await expect(row).toContainText('Kardorim');
+  await row.getByRole('button').first().click();
+  await expect(row).toContainText('Objectifs');
+  await row.getByRole('button', { name: 'Je l’ai obtenu' }).click();
+  await expect(row).toContainText('Obtenu');
+  await page.getByRole('button', { name: 'Obtenus', exact: true }).click();
+  await expect(list.locator('li').first()).toContainText('Kardorim');
+  expect((await localStore(page)).characters[0].done.some((d) => d.startsWith('ach:'))).toBe(true);
+  expectNoErrors(errors);
+});
+
+test('characters: create, switch, independent progression, delete', async ({ page }) => {
+  await seedLocal(page, 'Premier');
+  const errors = collectErrors(page);
+  await page.addInitScript(() => { window.confirm = () => true; });
+  await page.goto('/personnage');
+  await page.getByRole('button', { name: 'Nouveau personnage' }).click();
+  await page.locator('main#contenu button[aria-pressed]').first().click(); // class
+  await page.getByPlaceholder('ex. Arkhane').fill('Second');
+  for (let i = 0; i < 6; i++) {
+    const create = page.getByRole('button', { name: 'Créer mon personnage' });
+    if (await create.isVisible()) { await create.click(); break; }
+    const next = page.getByRole('button', { name: 'Continuer' });
+    if (await next.isDisabled()) await page.locator('main#contenu button[aria-pressed="false"]').first().click(); // e.g. play style
+    await next.click();
+  }
+  await expect.poll(async () => (await localStore(page)).characters.map((c) => c.name)).toEqual(['Premier', 'Second']);
+  const store = await localStore(page);
+  expect(store.characters[1].done).toEqual([]); // the new one starts empty, the first one keeps its own
+  await page.getByRole('button', { name: /Supprimer ce personnage/ }).click();
+  await expect.poll(async () => (await localStore(page)).characters.map((c) => c.name)).toEqual(['Premier']);
+  expectNoErrors(errors);
+});
+
+test('scanner refuses invalid files with a readable message', async ({ page }) => {
+  await seedLocal(page);
+  const errors = collectErrors(page);
+  await page.goto('/progression/scan');
+  await page.locator('input[type=file]').setInputFiles([
+    { name: 'virus.exe.png', mimeType: 'image/png', buffer: Buffer.from([0x4d, 0x5a, 0x90, 0]) },
+    { name: '<img src=x onerror=alert(1)>.txt', mimeType: 'text/plain', buffer: Buffer.from('hello') },
+  ]);
+  await expect(page.getByText('Image illisible : utilisez une capture PNG, JPEG ou WebP.')).toHaveCount(2);
+  await expect(page.getByText('<img src=x onerror=alert(1)>.txt')).toBeVisible(); // shown as text, not markup
+  expectNoErrors(errors);
+});
+
+test('builds page shows community builds or an explicit error, never a blank page', async ({ page }) => {
+  await seedLocal(page);
+  await page.goto('/builds');
+  await expect(page.getByText(/Voir l’équipement|Fashionista ne répond pas|Aucun build/i).first()).toBeVisible({ timeout: 45_000 });
+});

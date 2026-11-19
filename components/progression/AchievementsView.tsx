@@ -18,6 +18,7 @@ const FILTERS: { id: Filter; label: string }[] = [
   { id: 'all', label: 'Tous' }, { id: 'ready', label: 'À confirmer' }, { id: 'in_progress', label: 'En cours' },
   { id: 'not_started', label: 'Non commencés' }, { id: 'obtained', label: 'Obtenus' },
 ];
+const PAGE = 100;
 const STATE_TONE: Record<AchievementState, string> = {
   obtained: 'text-done border-done/60 bg-done/10', ready: 'text-accent border-accent bg-accent/10',
   in_progress: 'text-info border-info/60 bg-info/10', not_started: 'text-muted border-line bg-surface-2',
@@ -44,6 +45,8 @@ export default function AchievementsView({ categories }: { categories: Achieveme
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState<number | null>(null);
   const [list, setList] = useState<AchievementInfo[] | null>(null);
+  const [limit, setLimit] = useState(PAGE);
+  useEffect(() => setLimit(PAGE), [root, sub, filter]);
 
   const totals = useMemo(() => {
     const t = { all: 0, obtained: 0, ready: 0, in_progress: 0, not_started: 0, points: 0 };
@@ -87,10 +90,25 @@ export default function AchievementsView({ categories }: { categories: Achieveme
   };
   useEffect(() => { if (open != null && list) document.getElementById(`ach-${open}`)?.scrollIntoView({ block: 'center' }); }, [open, list]);
 
-  if (error) return <p className="p-8 text-sm text-muted">Impossible de charger les succès : {error}</p>;
-  if (!graph || !index) return <p className="p-8 text-sm text-muted">Chargement des succès…</p>;
+  // the title is server-rendered even while the data loads (search engines, screen readers)
+  const hero = (
+        <PageHero color={SECTION.achievements} kicker="Journal de l’aventurier" title={<span className="inline-flex items-center gap-3"><Trophy size={26} className="text-[#ffe2a6]" /> Succès</span>}>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-white/80">{ch.hasCharacter ? `${ch.character.name} · niv. ${ch.character.level}` : 'Aucun personnage : la progression reste dans ce navigateur.'}</p>
+            <ButtonLink href="/progression/scan" variant="primary"><ScanLine size={16} /> Scanner ma progression</ButtonLink>
+          </div>
+        </PageHero>
+  );
+  if (error || !graph || !index) return (
+    <div className="h-full overflow-y-auto">
+      {hero}
+      <p className="p-8 text-sm text-muted">{error ? `Impossible de charger les succès : ${error}` : 'Chargement des succès…'}</p>
+    </div>
+  );
 
   const shown = (list ?? []).filter((a) => filter === 'all' || progress.get(a.id)?.state === filter);
+  // big categories (Donjons: 743) are rendered by pages of 100: all at once cost ~0.9 s of main thread on mobile
+  const visible = shown.slice(0, Math.max(limit, shown.findIndex((a) => a.id === open) + 1));
   const pct = totals.all ? Math.round((totals.obtained / totals.all) * 100) : 0;
   const name = (id: string) => graph.nodes.get(id)?.label ?? id;
 
@@ -99,12 +117,7 @@ export default function AchievementsView({ categories }: { categories: Achieveme
 
   return (
     <div className="h-full overflow-y-auto">
-      <PageHero color={SECTION.achievements} kicker="Journal de l’aventurier" title={<span className="inline-flex items-center gap-3"><Trophy size={26} className="text-[#ffe2a6]" /> Succès</span>}>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-white/80">{ch.hasCharacter ? `${ch.character.name} · niv. ${ch.character.level}` : 'Aucun personnage : la progression reste dans ce navigateur.'}</p>
-          <ButtonLink href="/progression/scan" variant="primary"><ScanLine size={16} /> Scanner ma progression</ButtonLink>
-        </div>
-      </PageHero>
+      {hero}
       <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-6">
         <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
           <Card className="flex flex-col gap-4">
@@ -192,7 +205,7 @@ export default function AchievementsView({ categories }: { categories: Achieveme
 
             {list === null ? <p className="text-sm text-muted">Chargement…</p> : shown.length === 0 ? <EmptyState title="Aucun succès ici avec ce filtre" /> : (
               <ul className="parchment divide-y divide-line overflow-hidden rounded-md border border-[#c4a46e]">
-                {shown.map((a) => {
+                {visible.map((a) => {
                   const p = progress.get(a.id) ?? achievementProgress(a.id, [], ch.progress);
                   const expanded = open === a.id;
                   const src = provenance.get(`ach:${a.id}`);
@@ -286,6 +299,11 @@ export default function AchievementsView({ categories }: { categories: Achieveme
                   );
                 })}
               </ul>
+            )}
+            {visible.length < shown.length && (
+              <Button className="mt-3 w-full" onClick={() => setLimit((n) => n + PAGE)}>
+                Afficher les {Math.min(PAGE, shown.length - visible.length)} suivants ({shown.length - visible.length} restants)
+              </Button>
             )}
           </div>
         </div>

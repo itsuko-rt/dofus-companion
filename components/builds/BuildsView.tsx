@@ -92,7 +92,8 @@ export default function BuildsView() {
     };
   }, [data, element, lvl, sort]);
 
-  if (!ch.ready) return null;
+  // server HTML and first paint: the page title, before the character is read from the browser
+  if (!ch.ready) return <div className="h-full overflow-y-auto"><PageHero color={SECTION.builds} kicker="Forge et équipement" title="Builds de la communauté" /></div>;
   const compared = data?.builds.filter((b) => compare.includes(b.id)) ?? [];
   const toggleCompare = (id: string) => setCompare((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c.slice(-1), id]));
   const saved = (id: string) => ch.character.builds.some((b) => b.id === id);

@@ -308,7 +308,7 @@ export default function QuestTracker({ region: regionParam }: { region?: number 
           </button>
         </div>
 
-        <main className="relative min-h-[60vh] flex-1">
+        <section aria-label="Carte des quêtes" className="relative min-h-[60vh] flex-1">
           {help && (
             <div className="absolute right-3 top-3 z-20 w-80 rounded-md border border-line bg-surface-2 p-3 text-sm shadow-xl">
               <p className="mb-2 flex items-center gap-1.5 font-semibold"><MousePointerClick size={15} className="text-brand" /> Commandes</p>
@@ -353,7 +353,7 @@ export default function QuestTracker({ region: regionParam }: { region?: number 
               <button aria-label="Fermer" onClick={() => setUndo(null)} className="shrink-0 text-faint hover:text-text"><X size={14} /></button>
             </div>
           )}
-        </main>
+        </section>
       </div>
     </div>
   );
