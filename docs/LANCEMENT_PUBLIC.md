@@ -4,15 +4,16 @@
 
 ## 1. Marque et icônes ✅
 
-- **Logo original** (`public/brand/logo.svg`) : un œuf doré et, au centre, un soleil crème et orange à **douze rayons**, un par Dieu des Douze. ⚠️ **Ce n'est pas le logo de Claude.** Le symbole de Claude est une marque d'Anthropic, et l'intégrer suggérerait un partenariat ou une approbation. Je ne l'ai donc pas reproduit.
-- **Version simplifiée** (`logo-small.svg`) pour 16 à 48 px : six rayons épais et un contour renforcé, pour rester lisible en tout petit.
+- **Logo : l'œuf d'émeraude** fourni (`brand/emerald-egg-master.png`, 1254 px) : un œuf d'émeraude facetté, un soleil crème au centre, un anneau doré sur un fond vert profond. Il a remplacé l'œuf doré du premier jet (comparaison : `docs/comparaison-favicon.png`).
+- **Version simplifiée** (`brand/emerald-egg-small.svg`) pour **16 px seulement** : même anneau, même œuf, même soleil, sans rochers, feuilles ni facettes, qui deviennent du bruit à cette taille. À partir de 32 px, c'est l'illustration fournie, réduite.
 - **Fichiers générés** par `node scripts/make-icons.ts`, avec sharp, déjà installé avec Next :
-  - `favicon.ico` (16, 32 et 48 px réunis dans un seul fichier) ;
-  - `favicon-16x16`, `32`, `48`, `96`, `180` et `192`, `favicon-512x512.png`, `apple-touch-icon.png` (180 px) ;
+  - `favicon.ico` (16, 32 et 48 px réunis dans un seul fichier, 5,6 Ko contre 157 Ko pour celui du paquet, qui en contenait six) ;
+  - `favicon-16x16`, `32`, `48`, `96` et `192`, `favicon-512x512.png` ;
+  - `apple-touch-icon.png` (180 px, sur fond opaque pour qu'iOS n'affiche pas de coins noirs) ;
   - `icon-maskable-512.png` : version adaptée aux icônes d'applications Android ;
   - `og-image.png` (1200 × 630) : l'image affichée quand on partage un lien sur les réseaux sociaux.
 - **Intégration** : les icônes et le partage social sont déclarés dans les métadonnées de la page, avec un manifeste (`/manifest.webmanifest`) et la couleur d'interface `#15110d`.
-- ⛔ L'image de référence annoncée n'est pas arrivée. Dès que tu l'envoies, j'adapte le dessin et je relance `make-icons`.
+- **Déclarations** : seulement `favicon.ico`, les PNG de 16 et 32 px et l'icône Apple. Les tailles 192 et 512 sont dans le manifeste. L'ancien SVG doré a été supprimé.
 
 ## 2. Audit SEO et corrections
 

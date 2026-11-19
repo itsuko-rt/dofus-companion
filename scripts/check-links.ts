@@ -2,6 +2,7 @@
 // on those pages. node scripts/check-links.ts http://localhost:3000
 // The sitemap holds absolute public URLs (NEXT_PUBLIC_SITE_URL); they are re-rooted on the tested server.
 const BASE = process.argv[2] ?? 'http://localhost:3000';
+export {}; // a module: top-level await, and no clash with DOM globals such as `status`
 const sitemap = await (await fetch(`${BASE}/sitemap.xml`)).text();
 const pages = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => new URL(m[1]).pathname);
 const problems: string[] = [];

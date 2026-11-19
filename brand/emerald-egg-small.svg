@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- 16 px version of the Emerald Egg (brand/emerald-egg-master.png): same gold ring, dark green field,
+       emerald egg and cream sun, without rocks, leaves and facets that turn to noise at this size.
+       Shapes snapped to a 4-unit grid (= 1 px at 16 px); colours sampled from the supplied master. -->
+  <defs>
+    <linearGradient id="egg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#9ad40a"/>
+      <stop offset="1" stop-color="#2f7d05"/>
+    </linearGradient>
+  </defs>
+  <circle cx="32" cy="32" r="30" fill="#213911" stroke="#e3b23c" stroke-width="4"/>
+  <path d="M32 6C21 6 13 22 13 35c0 13 8.5 22 19 22s19-9 19-22C51 22 43 6 32 6Z" fill="url(#egg)"/>
+  <g transform="translate(32 34)" stroke="#fdf5cb" stroke-width="6" stroke-linecap="round">
+    <path d="M0-13V13M-13 0H13M-9-9 9 9M-9 9 9-9"/>
+  </g>
+</svg>

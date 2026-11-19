@@ -40,7 +40,7 @@ export default function Page() {
           <h2 className="mb-1 font-display text-base text-text">Gratuit</h2>
           <p>Le suivi des quêtes, des succès, les builds et les personnages restent gratuits. Le site pourra afficher de la publicité sur les pages de lecture, jamais au milieu des outils.</p>
         </section>
-        <p className="text-xs text-faint">{BRAND.disclaimer} Le logo (un œuf doré et un soleil à douze rayons) est une création originale.</p>
+        <p className="text-xs text-faint">{BRAND.disclaimer} Le logo (un œuf d’émeraude et un soleil crème dans un anneau doré) est propre au site.</p>
       </article>
     </div>
   );
