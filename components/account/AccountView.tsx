@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useEffect, useState, type FormEvent } from 'react';
-import { CheckCircle2, CloudOff, Loader2, LogOut, RefreshCw } from 'lucide-react';
+import { CheckCircle2, CloudOff, Loader2, LogOut, RefreshCw, Trash2 } from 'lucide-react';
 import { BRAND } from '../../src/brand.ts';
 import { Button, Card, SectionTitle, PageHero, SECTION } from '../ui';
 import { useCharacter } from '../useCharacter';
@@ -109,7 +109,46 @@ function Dashboard() {
         </ul>
         <Link href="/personnage" className="mt-3 inline-block text-sm text-accent underline">Gérer mes personnages</Link>
       </Card>
+      <DeleteAccount />
     </div>
+  );
+}
+
+/** Right to erasure: the account, its sessions and its characters are deleted on the server at once. */
+function DeleteAccount() {
+  const s = useSession();
+  const [open, setOpen] = useState(false);
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy(true); setError(null);
+    setError(await s.deleteAccount(password));
+    setBusy(false);
+  };
+  return (
+    <Card>
+      <SectionTitle>Supprimer mon compte</SectionTitle>
+      {!open ? (
+        <>
+          <p className="text-sm text-muted">Supprime définitivement votre adresse e-mail, vos sessions et tous les personnages enregistrés sur le compte. Pensez à <Link href="/personnage" className="underline">exporter vos personnages</Link> avant.</p>
+          <Button className="mt-3" onClick={() => setOpen(true)}><Trash2 size={15} aria-hidden /> Supprimer mon compte…</Button>
+        </>
+      ) : (
+        <form onSubmit={submit} className="flex flex-col gap-3">
+          <p className="text-sm text-muted">Cette action est définitive. Confirmez avec votre mot de passe.</p>
+          <label className="text-sm text-muted">Mot de passe
+            <input type="password" required autoComplete="current-password" className={field} value={password} onChange={(e) => setPassword(e.target.value)} />
+          </label>
+          {error && <p role="alert" className="rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">{error}</p>}
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" disabled={busy} className="!border-red-500/60 !text-red-200 hover:!bg-red-500/15"><Trash2 size={15} aria-hidden /> Supprimer définitivement</Button>
+            <Button type="button" variant="ghost" onClick={() => { setOpen(false); setPassword(''); setError(null); }}>Annuler</Button>
+          </div>
+        </form>
+      )}
+    </Card>
   );
 }
 

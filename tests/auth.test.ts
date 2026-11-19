@@ -4,7 +4,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { migrate } from '../src/server/appdb.ts';
 import {
   register, login, logout, me, forgot, reset, listCharacters, saveCharacter, deleteCharacter,
-  hashPassword, verifyPassword, SESSION_COOKIE,
+  hashPassword, verifyPassword, SESSION_COOKIE, deleteAccount,
 } from '../src/server/auth.ts';
 
 const ORIGIN = 'http://localhost:3000';
@@ -106,4 +106,75 @@ test('migrations are idempotent', () => {
   // migration 2: accounts default to the free plan
   db.prepare("INSERT INTO users(email, password_hash, created_at) VALUES ('p@example.com', 'x', 'now')").run();
   assert.equal((db.prepare("SELECT plan FROM users WHERE email = 'p@example.com'").get() as { plan: string }).plan, 'free');
+});
+
+// ---------- audit 2026-11-19 (docs/AUDIT_SECURITE.md)
+const withHeaders = (path: string, method: string, body: unknown, extra: Record<string, string>) =>
+  new Request(`${ORIGIN}${path}`, { method, headers: { host: 'localhost:3000', origin: ORIGIN, 'content-type': 'application/json', ...extra }, body: JSON.stringify(body) });
+
+test('a forged X-Forwarded-For does not reset the login throttle', async () => {
+  const db = fresh();
+  await register(db, req('/x', 'POST', { email: 'e@example.com', password: 'motdepasse-solide' }));
+  const codes: number[] = [];
+  for (let i = 0; i < 10; i++) codes.push((await login(db, withHeaders('/x', 'POST', { email: 'e@example.com', password: 'mauvais-mot-de-passe' }, { 'x-forwarded-for': `10.0.0.${i}` }))).status);
+  assert.deepEqual(codes.slice(8), [429, 429]);
+  // the throttle table holds hashes only, never the e-mail or an address
+  const keys = (db.prepare('SELECT key FROM login_failures').all() as { key: string }[]).map((r) => r.key).join(' ');
+  assert.ok(!keys.includes('e@example.com') && !keys.includes('10.0.0'));
+});
+
+test('oversized bodies are refused with 413 before parsing', async () => {
+  const db = fresh();
+  const a = sessionOf(await register(db, req('/x', 'POST', { email: 'f@example.com', password: 'motdepasse-solide' })));
+  assert.equal((await login(db, req('/x', 'POST', { email: 'f@example.com', password: 'x'.repeat(20_000) }))).status, 413);
+  assert.equal((await saveCharacter(db, req('/x', 'PUT', char('cbig', { notes: 'x'.repeat(2_200_000) }), a), 'cbig')).status, 413);
+  assert.equal((await saveCharacter(db, req('/x', 'PUT', char('cok'), a), 'cok')).status, 200);
+  assert.equal((await register(db, req('/x', 'POST', ['array', 'body']))).status, 400);
+});
+
+test('reset links use the public address, not the Host header, and one reset voids the others', async () => {
+  const db = fresh();
+  await register(db, req('/x', 'POST', { email: 'g@example.com', password: 'ancien-mot-de-passe' }));
+  const links: string[] = [];
+  // a script (not a browser) can forge Host and Origin together: the link must still point to SITE_URL
+  await forgot(db, withHeaders('/x', 'POST', { email: 'g@example.com' }, { host: 'evil.example', origin: 'http://evil.example' }), (_e, l) => links.push(l));
+  await forgot(db, req('/x', 'POST', { email: 'g@example.com' }), (_e, l) => links.push(l));
+  assert.equal(links.length, 2);
+  for (const l of links) assert.equal(new URL(l).origin, 'http://localhost:3000'); // SITE_URL default
+  const [t1, t2] = links.map((l) => new URL(l).searchParams.get('token')!);
+  assert.equal((await reset(db, req('/x', 'POST', { token: t1, password: 'nouveau-mot-de-passe' }))).status, 200);
+  assert.equal((await reset(db, req('/x', 'POST', { token: t2, password: 'autre-nouveau-mdp' }))).status, 400);
+  // third request in the hour gets a link, the fourth the same answer and none
+  await forgot(db, req('/x', 'POST', { email: 'g@example.com' }), () => {});
+  const r = await forgot(db, req('/x', 'POST', { email: 'g@example.com' }), () => assert.fail('throttled: 3 links per hour'));
+  assert.equal(r.status, 200);
+});
+
+test('account deletion: password required, removes sessions and characters, leaves other users intact', async () => {
+  const db = fresh();
+  const a = sessionOf(await register(db, req('/x', 'POST', { email: 'h@example.com', password: 'motdepasse-solide' })));
+  const b = sessionOf(await register(db, req('/x', 'POST', { email: 'i@example.com', password: 'motdepasse-solide' })));
+  await saveCharacter(db, req('/x', 'PUT', char('cone'), a), 'cone');
+  await saveCharacter(db, req('/x', 'PUT', char('cone'), b), 'cone');
+  assert.equal((await deleteAccount(db, req('/x', 'POST', { password: 'motdepasse-solide' }))).status, 401); // no session
+  assert.equal((await deleteAccount(db, req('/x', 'POST', { password: 'motdepasse-solide' }, a, 'https://evil.example'))).status, 403);
+  assert.equal((await deleteAccount(db, req('/x', 'POST', { password: 'pas-le-bon-mdp' }, a))).status, 401);
+  const r = await deleteAccount(db, req('/x', 'POST', { password: 'motdepasse-solide' }, a));
+  assert.equal(r.status, 200);
+  assert.match(r.headers.get('set-cookie')!, /Max-Age=0/);
+  const n = (sql: string) => (db.prepare(sql).get() as { n: number }).n;
+  assert.equal(n("SELECT COUNT(*) n FROM users WHERE email = 'h@example.com'"), 0);
+  assert.equal(n('SELECT COUNT(*) n FROM sessions'), 1); // B's only
+  assert.equal(n('SELECT COUNT(*) n FROM characters'), 1); // B's only
+  assert.equal((await me(db, req('/x', 'GET', undefined, a)).json()).user, null);
+  assert.equal((await (listCharacters(db, req('/x', 'GET', undefined, b))).json()).characters.length, 1);
+});
+
+test('register is throttled site-wide when the client address is unknown', async () => {
+  const db = fresh();
+  assert.equal((await register(db, req('/x', 'POST', { email: 'j0@example.com', password: 'motdepasse-solide' }))).status, 201);
+  // fill the counter up to the limit directly (100 scrypt hashes would make the test slow)
+  const key = (db.prepare('SELECT key FROM login_failures LIMIT 1').get() as { key: string }).key;
+  for (let i = 0; i < 99; i++) db.prepare('INSERT INTO login_failures(key, at) VALUES (?, ?)').run(key, new Date().toISOString());
+  assert.equal((await register(db, req('/x', 'POST', { email: 'j1@example.com', password: 'motdepasse-solide' }))).status, 429);
 });

@@ -36,9 +36,12 @@ export default function Page() {
             <li><b className="text-text">Adresse e-mail</b> : identifiant de connexion et envoi du lien de réinitialisation du mot de passe.</li>
             <li><b className="text-text">Mot de passe</b> : seule une empreinte (scrypt) est conservée.</li>
             <li><b className="text-text">Personnages</b> : nom, classe, niveau, quêtes et succès cochés, builds enregistrés, notes, historique des modifications.</li>
-            <li><b className="text-text">Sécurité</b> : tentatives de connexion échouées (adresse e-mail et adresse IP), conservées 15 minutes, pour bloquer les attaques par essais successifs.</li>
+            <li><b className="text-text">Sessions</b> : une empreinte du jeton de connexion et ses dates de création et d’expiration, 30 jours au plus ; supprimée à la déconnexion.</li>
+            <li><b className="text-text">Réinitialisation du mot de passe</b> : une empreinte du lien, valable 60 minutes, supprimée dès qu’il a servi ou expiré.</li>
+            <li><b className="text-text">Sécurité</b> : pour bloquer les essais successifs, chaque tentative de connexion échouée, création de compte ou demande de lien est enregistrée sous forme d’empreinte (adresse e-mail et/ou adresse IP rendues illisibles), avec sa date ; supprimée au bout d’une heure.</li>
           </ul>
-          <p className="mt-2">Base légale : exécution du service que vous demandez. Vous pouvez supprimer vos personnages à tout moment ; pour supprimer votre compte, écrivez-nous (voir les mentions légales).</p>
+          <p className="mt-2">Base légale : exécution du service que vous demandez. Vous pouvez supprimer vos personnages à tout moment, et votre compte entier depuis la page <a className="underline" href="/compte">Mon compte</a> : l’adresse e-mail, les sessions et les personnages sont alors effacés de la base immédiatement (les sauvegardes éventuelles de l’hébergeur suivent leur propre cycle).</p>
+          <p className="mt-2"><b className="text-text">Hébergement</b> : comme tout serveur web, l’hébergeur indiqué dans les <a className="underline" href="/mentions-legales">mentions légales</a> reçoit l’adresse IP et la page demandée à chaque visite, pour acheminer la requête et protéger le site.</p>
         </section>
 
         <section>
@@ -75,7 +78,7 @@ export default function Page() {
 
         <section>
           <h2 className="mb-1 font-display text-base text-text">Vos droits</h2>
-          <p>Conformément au RGPD, vous pouvez accéder à vos données, les rectifier, les exporter (bouton « Exporter » de la page Personnages) ou en demander la suppression. Vous pouvez aussi adresser une réclamation à la CNIL (cnil.fr).</p>
+          <p>Conformément au RGPD, vous pouvez accéder à vos données et les rectifier (page Personnages), les exporter (bouton « Exporter » de la page Personnages) et supprimer votre compte (page Mon compte). Pour toute autre demande, écrivez-nous (voir les mentions légales). Vous pouvez aussi adresser une réclamation à l’autorité de protection des données de votre pays : l’AEPD en Espagne (aepd.es), la CNIL en France (cnil.fr).</p>
         </section>
       </article>
     </div>

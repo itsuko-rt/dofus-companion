@@ -10,6 +10,13 @@ import { useGame } from '../quests/useGame';
 import { Button, Card, PageHero, SECTION, SectionTitle } from '../ui';
 import { captureFrame, readLines } from './ocr';
 
+const MAX_PIXELS = 40e6;
+const MAX_BYTES = 25 * 1024 * 1024;
+/** Decodes a picked or pasted file in the browser; nothing is uploaded. */
+const decode = (f: File) => (f.size > MAX_BYTES
+  ? Promise.reject(new Error('Fichier trop lourd : 25 Mo au plus.'))
+  : createImageBitmap(f));
+
 type Mode = 'quests_done' | 'quests_active' | 'achievements';
 const MODES: { id: Mode; label: string; help: string }[] = [
   { id: 'quests_done', label: 'Quêtes terminées', help: 'Fenêtre des quêtes, liste des quêtes terminées.' },
@@ -48,7 +55,10 @@ export default function ScanView() {
     setShots((s) => [...s, { id, name, status: 'reading', lines: 0 }]);
     setSaved(null);
     try {
-      const lines = await readLines(await image, (p) => setProgress(p));
+      const img = await image.catch(() => { throw new Error('Image illisible : utilisez une capture PNG, JPEG ou WebP.'); });
+      // a giant image would allocate gigabytes of canvas and freeze the tab
+      if (img.width * img.height > MAX_PIXELS) throw new Error('Image trop grande : 40 mégapixels au plus.');
+      const lines = await readLines(img, (p) => setProgress(p));
       const found = matchLines(lines, catalog);
       setShots((s) => s.map((x) => (x.id === id ? { ...x, status: 'done', lines: lines.length } : x)));
       setMatches((prev) => {
@@ -70,7 +80,7 @@ export default function ScanView() {
   useEffect(() => {
     const onPaste = (e: ClipboardEvent) => {
       const f = [...(e.clipboardData?.files ?? [])].find((x) => x.type.startsWith('image/'));
-      if (f) { e.preventDefault(); void add(createImageBitmap(f), 'Image collée'); }
+      if (f) { e.preventDefault(); void add(decode(f), 'Image collée'); }
     };
     window.addEventListener('paste', onPaste);
     return () => window.removeEventListener('paste', onPaste);
@@ -139,7 +149,7 @@ export default function ScanView() {
             </Button>
             <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-line bg-surface-2 px-3.5 py-2 text-sm hover:border-faint">
               <ImagePlus size={15} /> Choisir des images
-              <input type="file" accept="image/*" multiple className="sr-only" onChange={(e) => { for (const f of e.target.files ?? []) void add(createImageBitmap(f), f.name); e.target.value = ''; }} />
+              <input type="file" accept="image/*" multiple className="sr-only" onChange={(e) => { for (const f of e.target.files ?? []) void add(decode(f), f.name); e.target.value = ''; }} />
             </label>
             <span className="inline-flex items-center gap-1.5 text-sm text-muted"><ClipboardPaste size={15} /> ou collez une capture (Ctrl+V)</span>
           </div>

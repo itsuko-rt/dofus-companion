@@ -1,7 +1,7 @@
 'use client';
 // Signed-in user, shared by every component; drives the character sync.
 import { useEffect, useSyncExternalStore } from 'react';
-import { connectAccount } from '../useCharacter';
+import { connectAccount, flushAndForget, forgetLocal } from '../useCharacter';
 
 import type { Plan } from '../../src/plans.ts';
 
@@ -45,7 +45,15 @@ export function useSession() {
     ...s,
     login: (email: string, password: string) => auth('login', email, password),
     register: (email: string, password: string) => auth('register', email, password),
-    logout: async () => { await call('logout', {}); setState({ ready: true, user: null }); },
+    logout: () => flushAndForget(async () => { await call('logout', {}); setState({ ready: true, user: null }); }),
+    /** Deletes the account on the server; local copies go too. Returns an error message or null. */
+    deleteAccount: async (password: string) => {
+      const { ok, data } = await call('delete', { password });
+      if (!ok) return (data.error as string) ?? 'Erreur inattendue.';
+      setState({ ready: true, user: null });
+      forgetLocal();
+      return null;
+    },
     forgot: async (email: string) => (await call('forgot', { email })).data.message as string,
     reset: async (token: string, password: string) => {
       const { ok, data } = await call('reset', { token, password });

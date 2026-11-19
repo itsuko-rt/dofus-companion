@@ -1,5 +1,5 @@
 import { appDb } from '../../../../src/server/appdb.ts';
-import { forgot, login, logout, me, register, reset } from '../../../../src/server/auth.ts';
+import { deleteAccount, forgot, login, logout, me, register, reset } from '../../../../src/server/auth.ts';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,6 +14,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ action:
     case 'logout': return logout(db, req);
     case 'forgot': return forgot(db, req, deliver);
     case 'reset': return reset(db, req);
+    case 'delete': return deleteAccount(db, req);
     default: return Response.json({ error: 'not found' }, { status: 404 });
   }
 }

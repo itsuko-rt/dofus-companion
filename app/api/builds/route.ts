@@ -49,7 +49,9 @@ export async function GET(req: Request) {
     get<{ results: ApiBuild[] }>(`${API}/shared-builds/?game_version=dofus3&page=${i + 1}&page_size=100`).then((r) => r.results, () => [] as ApiBuild[])));
   const seen = new Set(top.map((b) => b.id));
   const recent = recentPages.flat().filter((b) => b.char_class === breed.fashionista && !seen.has(b.id) && (seen.add(b.id), true));
-  const pool = [...top.map((b) => ({ b, origin: 'top' as const })), ...recent.map((b) => ({ b, origin: 'recent' as const }))].slice(0, MAX_DETAILS);
+  // the link is rendered as an href: only Fashionista's own https pages, never a javascript: or foreign URL
+  const pool = [...top.map((b) => ({ b, origin: 'top' as const })), ...recent.map((b) => ({ b, origin: 'recent' as const }))]
+    .filter(({ b }) => typeof b.url === 'string' && /^https:\/\/dofusfashionista\.gg\//.test(b.url)).slice(0, MAX_DETAILS);
 
   const details = await Promise.all(pool.map(({ b }) =>
     get<FashionistaBuild>(`${API}/shared-builds/${encodeURIComponent(b.id)}/fashionista-build/`).catch(() => null)));

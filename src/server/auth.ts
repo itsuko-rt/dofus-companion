@@ -5,14 +5,21 @@ import { asPlan, type Plan } from '../plans.ts';
 import { promisify } from 'node:util';
 import type { DatabaseSync } from 'node:sqlite';
 import { sanitizeCharacter, type Character } from '../character.ts';
+import { SITE_URL } from '../site.ts';
 
 const scrypt = promisify(scryptCb) as (pw: string, salt: Buffer, len: number, opts: object) => Promise<Buffer>;
 const SCRYPT = { N: 16384, r: 8, p: 1, maxmem: 64 * 1024 * 1024 };
 export const SESSION_COOKIE = 'adz_session';
 const SESSION_DAYS = 30;
 const RESET_MINUTES = 60;
-const MAX_FAILURES = 8; // per email + IP, per 15 minutes
+const MAX_FAILURES = 8;        // per e-mail + IP, per 15 minutes
+const MAX_EMAIL_FAILURES = 30; // per e-mail from any address (spread-out guessing), per 15 minutes
 const MAX_CHARACTERS = 20;
+const AUTH_BODY = 16 * 1024;            // e-mail + password
+const CHARACTER_BODY = 2 * 1024 * 1024; // a full character with history is ~100 KB
+// Client address, only from the header the reverse proxy sets (cf-connecting-ip behind Cloudflare).
+// Any other header is chosen by the client and would let it reset its own throttle on every request.
+const IP_HEADER = process.env.TRUSTED_IP_HEADER?.toLowerCase();
 
 // ---------- primitives
 export async function hashPassword(password: string): Promise<string> {
@@ -51,7 +58,8 @@ const json = (body: unknown, status = 200, headers: Record<string, string> = {})
 function cookie(value: string, maxAge: number, secure: boolean) {
   return `${SESSION_COOKIE}=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure ? '; Secure' : ''}`;
 }
-const isSecure = (req: Request) => new URL(req.url).protocol === 'https:';
+// Behind a TLS-terminating proxy the request reaches Node over http: production always sets Secure.
+const isSecure = (req: Request) => process.env.NODE_ENV === 'production' || new URL(req.url).protocol === 'https:';
 
 function readCookie(req: Request, name: string): string | null {
   for (const part of (req.headers.get('cookie') ?? '').split(';')) {
@@ -65,21 +73,45 @@ function readCookie(req: Request, name: string): string | null {
 function sameOrigin(req: Request): boolean {
   const origin = req.headers.get('origin');
   if (!origin) return req.headers.get('sec-fetch-site') === 'same-origin';
-  const host = req.headers.get('x-forwarded-host') ?? req.headers.get('host') ?? new URL(req.url).host;
-  try { return new URL(origin).host === host; } catch { return false; }
+  try {
+    const o = new URL(origin).host;
+    return o === (req.headers.get('host') ?? new URL(req.url).host) || o === new URL(SITE_URL).host;
+  } catch { return false; }
 }
 
-async function body(req: Request): Promise<Record<string, unknown> | null> {
+const TOO_LARGE = Symbol('too large');
+/** JSON object body, read up to `max` bytes (a bigger body is refused before it is buffered). */
+async function body(req: Request, max = AUTH_BODY): Promise<Record<string, unknown> | null | typeof TOO_LARGE> {
+  if (Number(req.headers.get('content-length') ?? 0) > max) return TOO_LARGE;
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  if (req.body) {
+    const reader = req.body.getReader();
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.length;
+      if (size > max) { await reader.cancel(); return TOO_LARGE; }
+      chunks.push(value);
+    }
+  }
   try {
-    const b = await req.json();
-    return b && typeof b === 'object' ? (b as Record<string, unknown>) : null;
+    const b = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    return b && typeof b === 'object' && !Array.isArray(b) ? (b as Record<string, unknown>) : null;
   } catch { return null; }
 }
+const tooLarge = () => json({ error: 'Requête trop volumineuse.' }, 413);
 
-function clientKey(req: Request, email: string) {
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || req.headers.get('x-real-ip') || 'local';
-  return sha256(`${email.toLowerCase()}|${ip}`);
+const clientIp = (req: Request) => (IP_HEADER && req.headers.get(IP_HEADER)?.split(',')[0].trim()) || 'unknown';
+
+// ---------- throttling: one row per event, keyed by a hash (no raw e-mail or IP stored)
+const throttleKey = (...parts: string[]) => sha256(parts.join('|').toLowerCase());
+function count(db: DatabaseSync, key: string, minutes: number): number {
+  return (db.prepare('SELECT COUNT(*) n FROM login_failures WHERE key = ? AND at > ?').get(key, iso(new Date(Date.now() - minutes * 60_000))) as { n: number }).n;
 }
+const hit = (db: DatabaseSync, key: string) => db.prepare('INSERT INTO login_failures(key, at) VALUES (?, ?)').run(key, iso(now()));
+/** Events older than the longest window (1 hour) no longer matter: deleted (privacy policy). */
+const purgeEvents = (db: DatabaseSync) => db.prepare('DELETE FROM login_failures WHERE at <= ?').run(iso(new Date(Date.now() - 60 * 60_000)));
 
 // ---------- sessions
 export function userFromRequest(db: DatabaseSync, req: Request): { id: number; email: string; plan: Plan } | null {
@@ -102,12 +134,20 @@ function startSession(db: DatabaseSync, userId: number, req: Request) {
 export async function register(db: DatabaseSync, req: Request): Promise<Response> {
   if (!sameOrigin(req)) return json({ error: 'Origine refusée.' }, 403);
   const b = await body(req);
+  if (b === TOO_LARGE) return tooLarge();
   if (!b || !validEmail(b.email)) return json({ error: 'Adresse e-mail invalide.' }, 400);
+  // account creation costs a scrypt hash: 10 per address per hour, or 100 per hour site-wide when the
+  // proxy does not tell us the address
+  const ip = clientIp(req);
+  const regKey = throttleKey('register', ip);
+  purgeEvents(db);
+  if (count(db, regKey, 60) >= (ip === 'unknown' ? 100 : 10)) return json({ error: 'Trop de comptes créés. Réessayez dans une heure.' }, 429);
   const problem = passwordProblem(b.password);
   if (problem) return json({ error: problem }, 400);
   const email = b.email.trim();
   if (db.prepare('SELECT 1 FROM users WHERE email = ?').get(email)) return json({ error: 'Un compte existe déjà avec cette adresse.' }, 409);
   const hash = await hashPassword(b.password as string);
+  hit(db, regKey);
   const res = db.prepare('INSERT INTO users(email, password_hash, created_at) VALUES (?, ?, ?)').run(email, hash, iso(now()));
   const id = Number(res.lastInsertRowid);
   return json({ user: { id, email, plan: 'free' } }, 201, { 'set-cookie': startSession(db, id, req) });
@@ -116,18 +156,18 @@ export async function register(db: DatabaseSync, req: Request): Promise<Response
 export async function login(db: DatabaseSync, req: Request): Promise<Response> {
   if (!sameOrigin(req)) return json({ error: 'Origine refusée.' }, 403);
   const b = await body(req);
+  if (b === TOO_LARGE) return tooLarge();
   if (!b || !validEmail(b.email) || typeof b.password !== 'string') return json({ error: 'E-mail ou mot de passe incorrect.' }, 400);
-  const key = clientKey(req, b.email);
-  const since = iso(new Date(Date.now() - 15 * 60_000));
-  db.prepare('DELETE FROM login_failures WHERE at <= ?').run(since); // kept only as long as they matter (privacy policy)
-  const failures = (db.prepare('SELECT COUNT(*) n FROM login_failures WHERE key = ? AND at > ?').get(key, since) as { n: number }).n;
-  if (failures >= MAX_FAILURES) return json({ error: 'Trop de tentatives. Réessayez dans 15 minutes.' }, 429);
+  const key = throttleKey('login', b.email.trim(), clientIp(req));
+  const emailKey = throttleKey('login-any', b.email.trim());
+  purgeEvents(db);
+  if (count(db, key, 15) >= MAX_FAILURES || count(db, emailKey, 15) >= MAX_EMAIL_FAILURES) return json({ error: 'Trop de tentatives. Réessayez dans 15 minutes.' }, 429);
   const user = db.prepare('SELECT id, email, password_hash FROM users WHERE email = ?').get(b.email.trim()) as
     { id: number; email: string; password_hash: string } | undefined;
   // verify against a dummy hash when the user does not exist, so timing does not reveal accounts
   const ok = await verifyPassword(b.password, user?.password_hash ?? DUMMY_HASH);
   if (!user || !ok) {
-    db.prepare('INSERT INTO login_failures(key, at) VALUES (?, ?)').run(key, iso(now()));
+    hit(db, key); hit(db, emailKey);
     return json({ error: 'E-mail ou mot de passe incorrect.' }, 401);
   }
   db.prepare('DELETE FROM login_failures WHERE key = ?').run(key);
@@ -153,13 +193,20 @@ export function me(db: DatabaseSync, req: Request): Response {
 export async function forgot(db: DatabaseSync, req: Request, deliver: (email: string, link: string) => void): Promise<Response> {
   if (!sameOrigin(req)) return json({ error: 'Origine refusée.' }, 403);
   const b = await body(req);
-  if (b && validEmail(b.email)) {
-    const user = db.prepare('SELECT id, email FROM users WHERE email = ?').get(b.email.trim()) as { id: number; email: string } | undefined;
+  if (b === TOO_LARGE) return tooLarge();
+  db.prepare('DELETE FROM password_resets WHERE expires_at <= ? OR used_at IS NOT NULL').run(iso(now()));
+  purgeEvents(db);
+  // at most 3 links per address per hour (mail bombing); the answer stays the same either way
+  const key = b && validEmail(b.email) ? throttleKey('forgot', b.email.trim()) : null;
+  if (b && key && count(db, key, 60) < 3) {
+    hit(db, key);
+    const user = db.prepare('SELECT id, email FROM users WHERE email = ?').get((b.email as string).trim()) as { id: number; email: string } | undefined;
     if (user) {
       const t = token();
       db.prepare('INSERT INTO password_resets(token_hash, user_id, expires_at) VALUES (?, ?, ?)')
         .run(sha256(t), user.id, iso(new Date(Date.now() + RESET_MINUTES * 60_000)));
-      deliver(user.email, `${new URL(req.url).origin}/compte/reinitialiser?token=${t}`);
+      // the public address, never the request's Host header (a forged Host would send the token elsewhere)
+      deliver(user.email, `${SITE_URL}/compte/reinitialiser?token=${t}`);
     }
   }
   return json({ ok: true, message: 'Si un compte existe pour cette adresse, un lien de réinitialisation a été envoyé.' });
@@ -168,6 +215,7 @@ export async function forgot(db: DatabaseSync, req: Request, deliver: (email: st
 export async function reset(db: DatabaseSync, req: Request): Promise<Response> {
   if (!sameOrigin(req)) return json({ error: 'Origine refusée.' }, 403);
   const b = await body(req);
+  if (b === TOO_LARGE) return tooLarge();
   if (!b || typeof b.token !== 'string') return json({ error: 'Lien invalide.' }, 400);
   const problem = passwordProblem(b.password);
   if (problem) return json({ error: problem }, 400);
@@ -177,10 +225,32 @@ export async function reset(db: DatabaseSync, req: Request): Promise<Response> {
   const hash = await hashPassword(b.password as string);
   db.exec('BEGIN');
   db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hash, row.user_id);
-  db.prepare('UPDATE password_resets SET used_at = ? WHERE token_hash = ?').run(iso(now()), sha256(b.token));
+  db.prepare('DELETE FROM password_resets WHERE user_id = ?').run(row.user_id); // this link and any other one still pending
   db.prepare('DELETE FROM sessions WHERE user_id = ?').run(row.user_id); // log out everywhere
   db.exec('COMMIT');
   return json({ ok: true });
+}
+
+/**
+ * Deletes the account and everything attached to it (sessions, reset links, characters: ON DELETE CASCADE).
+ * Asks for the password again, so a forgotten open session is not enough.
+ */
+export async function deleteAccount(db: DatabaseSync, req: Request): Promise<Response> {
+  if (!sameOrigin(req)) return json({ error: 'Origine refusée.' }, 403);
+  const user = userFromRequest(db, req);
+  if (!user) return json({ error: 'Connexion requise.' }, 401);
+  const b = await body(req);
+  if (b === TOO_LARGE) return tooLarge();
+  const key = throttleKey('login', user.email, clientIp(req));
+  purgeEvents(db);
+  if (count(db, key, 15) >= MAX_FAILURES) return json({ error: 'Trop de tentatives. Réessayez dans 15 minutes.' }, 429);
+  const row = db.prepare('SELECT password_hash FROM users WHERE id = ?').get(user.id) as { password_hash: string };
+  if (!b || typeof b.password !== 'string' || !(await verifyPassword(b.password, row.password_hash))) {
+    hit(db, key);
+    return json({ error: 'Mot de passe incorrect.' }, 401);
+  }
+  db.prepare('DELETE FROM users WHERE id = ?').run(user.id);
+  return json({ ok: true }, 200, { 'set-cookie': cookie('', 0, isSecure(req)) });
 }
 
 // ---------- characters (owner-scoped: every query filters on the session's user id)
@@ -195,7 +265,8 @@ export async function saveCharacter(db: DatabaseSync, req: Request, id: string):
   if (!sameOrigin(req)) return json({ error: 'Origine refusée.' }, 403);
   const user = userFromRequest(db, req);
   if (!user) return json({ error: 'Connexion requise.' }, 401);
-  const b = await body(req);
+  const b = await body(req, CHARACTER_BODY);
+  if (b === TOO_LARGE) return tooLarge();
   const c: Character | null = sanitizeCharacter(b, id);
   if (!c || c.id !== id) return json({ error: 'Personnage invalide.' }, 400);
   const exists = db.prepare('SELECT updated_at FROM characters WHERE user_id = ? AND id = ?').get(user.id, id) as { updated_at: string } | undefined;

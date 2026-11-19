@@ -15,27 +15,31 @@ export const PLAYSTYLES: { id: Playstyle; label: string; help: string }[] = [
   { id: 'pvp', label: 'PvP', help: 'Affronter d’autres joueurs (Kolizéum, percepteurs…).' },
 ];
 
-interface Store { activeId: string | null; characters: Character[]; sync: SyncState }
+/**
+ * `owner`: the account these characters were last synced with. On a shared browser, characters of
+ * account A must never be merged into account B when B signs in (they stay on A's server copy).
+ */
+interface Store { activeId: string | null; characters: Character[]; sync: SyncState; owner: number | null }
 
 const KEY = 'dofus-companion:characters:v2';
 const OLD_KEY = 'dofus-companion:character:v1';
-const EMPTY_STORE: Store = { activeId: null, characters: [], sync: 'local' };
+const EMPTY_STORE: Store = { activeId: null, characters: [], sync: 'local', owner: null };
 export const DEFAULT_CHARACTER: Character = sanitizeCharacter({}, 'c0')!;
 
 function load(): Store {
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) {
-      const s = JSON.parse(raw) as { activeId?: unknown; characters?: unknown };
+      const s = JSON.parse(raw) as { activeId?: unknown; characters?: unknown; owner?: unknown };
       const characters = (Array.isArray(s.characters) ? s.characters : [])
         .map((c, i) => sanitizeCharacter(c, `c${i}`)).filter((c): c is Character => c !== null);
       const activeId = characters.some((c) => c.id === s.activeId) ? (s.activeId as string) : characters[0]?.id ?? null;
-      return { activeId, characters, sync: 'local' };
+      return { activeId, characters, sync: 'local', owner: Number.isInteger(s.owner) ? (s.owner as number) : null };
     }
     // migrate the single character saved by the first version of the quest map
     const old = localStorage.getItem(OLD_KEY);
     const c = old ? sanitizeCharacter({ ...JSON.parse(old), name: 'Mon personnage' }, 'c0') : null;
-    if (c) return { activeId: c.id, characters: [c], sync: 'local' };
+    if (c) return { activeId: c.id, characters: [c], sync: 'local', owner: null };
   } catch { /* private mode or corrupt value: start empty */ }
   return EMPTY_STORE;
 }
@@ -46,11 +50,11 @@ const listeners = new Set<() => void>();
 
 function emit(next: Store) {
   store = next;
-  try { localStorage.setItem(KEY, JSON.stringify({ activeId: store.activeId, characters: store.characters })); } catch { /* storage unavailable */ }
+  try { localStorage.setItem(KEY, JSON.stringify({ activeId: store.activeId, characters: store.characters, owner: store.owner })); } catch { /* storage unavailable */ }
   listeners.forEach((l) => l());
 }
-function set(next: Omit<Store, 'sync'>) {
-  emit({ ...next, sync: account ? 'syncing' : 'local' });
+function set(next: Omit<Store, 'sync' | 'owner'>) {
+  emit({ ...next, owner: store.owner, sync: account ? 'syncing' : 'local' });
   schedulePush();
 }
 function subscribe(l: () => void) {
@@ -112,9 +116,24 @@ async function pull() {
   }
   const characters = [...byId.values()];
   const activeId = characters.some((c) => c.id === store.activeId) ? store.activeId : characters[0]?.id ?? null;
-  emit({ activeId, characters, sync: 'syncing' });
+  emit({ activeId, characters, sync: 'syncing', owner: account });
   await push();
 }
+
+/**
+ * Explicit sign-out: sends pending changes, then removes the account's characters from this browser
+ * (shared computers). If they could not be sent, they are kept, still marked with their owner.
+ */
+export async function flushAndForget(after: () => Promise<void>) {
+  if (timer) { clearTimeout(timer); timer = null; }
+  await push();
+  const saved = store.sync !== 'error';
+  await after();
+  if (saved) emit({ ...EMPTY_STORE });
+}
+
+/** After account deletion: the server copy is gone, the local one goes too. */
+export const forgetLocal = () => emit({ ...EMPTY_STORE });
 
 /** Called by the session hook when the signed-in user changes. */
 export async function connectAccount(userId: number | null) {
@@ -123,6 +142,8 @@ export async function connectAccount(userId: number | null) {
   pushed.clear();
   if (!userId) { emit({ ...store, sync: 'local' }); return; }
   if (!loaded) { store = load(); loaded = true; }
+  // characters synced with another account on this browser are that account's: not merged into this one
+  if (store.owner !== null && store.owner !== userId) emit({ ...EMPTY_STORE });
   try { await pull(); } catch { emit({ ...store, sync: 'error' }); }
 }
 
