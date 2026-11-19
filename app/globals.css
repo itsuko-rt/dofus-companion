@@ -1,0 +1,13 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+}
+
+:root { color-scheme: dark; }
+body { background: #0b0d10; color: #e4e4e7; }
+
+/* React Flow chrome in the dark theme */
+.react-flow__controls button { background: #18181b; border-color: #27272a; fill: #e4e4e7; }
+.react-flow__controls button:hover { background: #27272a; }
+.react-flow__attribution { display: none; }
