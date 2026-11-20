@@ -1,7 +1,9 @@
 // Achievement progress from objectives. An objective counts as met when the player ticked it
 // (obj:<id>) or when its official condition is provably true for the character (inferred).
 // An achievement is only "obtained" once the player confirms it (ach:<id> in done).
-import { evaluate, parse, type Crit, type Progress } from './criteria.ts';
+import { atoms, evaluate, parse, type Crit, type Progress } from './criteria.ts';
+
+const SERVER_ONLY = new Set(['Sc', 'Sv']);
 
 export type ObjectiveState = 'confirmed' | 'inferred' | 'todo' | 'unknown';
 export type AchievementState = 'obtained' | 'ready' | 'in_progress' | 'not_started';
@@ -18,6 +20,8 @@ export function objectiveState(id: number, criterion: string, p: Progress): Obje
   if (p.done.has(`obj:${id}`)) return 'confirmed';
   const c = criterion ? crit(criterion) : null;
   if (!c) return 'unknown'; // no or unreadable condition: only the player can tell
+  // Sc/Sv are "true" for the client but the server tracks the real objective: alone they prove nothing (232 objectives, e.g. "Sc=4012")
+  if (atoms(c).every((a) => SERVER_ONLY.has(a.code))) return 'unknown';
   const r = evaluate(c, p);
   return r === true ? 'inferred' : r === false ? 'todo' : 'unknown';
 }

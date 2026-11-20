@@ -32,14 +32,15 @@ const SLOT_ORDER = [2, 7, 10, 11, 1, 3, 4, 5, 12, 13];
 export async function GET(req: Request) {
   const breedId = Number(new URL(req.url).searchParams.get('breed'));
   const breed = SUPPORTED_BREEDS.find((b) => b.id === breedId);
-  if (!breed) return Response.json({ error: 'classe non prise en charge' }, { status: 400 });
+  if (!breed?.fashionista) return Response.json({ error: 'classe non prise en charge' }, { status: 400 });
+  const fashionista = breed.fashionista;
   const db = latestDb();
   if (!db) return Response.json({ error: 'base de jeu absente, lancez `npm run import`' }, { status: 503 });
   const patch = db.match(/game-(\d+\.\d+)/)?.[1] ?? null; // "3.7" from game-3.7.14.18.sqlite
 
   let top: ApiBuild[];
   try {
-    const tier = await get<{ sections: { top: ApiBuild[] }[] }>(`${API}/tier-list/?game_version=dofus3&char_class=${encodeURIComponent(breed.fashionista)}&top=20`);
+    const tier = await get<{ sections: { top: ApiBuild[] }[] }>(`${API}/tier-list/?game_version=dofus3&char_class=${encodeURIComponent(fashionista)}&top=20`);
     top = tier.sections[0]?.top ?? [];
   } catch (e) {
     return Response.json({ error: `Fashionista ne répond pas (${(e as Error).message})` }, { status: 502 });
@@ -48,7 +49,7 @@ export async function GET(req: Request) {
   const recentPages = await Promise.all(Array.from({ length: RECENT_PAGES }, (_, i) =>
     get<{ results: ApiBuild[] }>(`${API}/shared-builds/?game_version=dofus3&page=${i + 1}&page_size=100`).then((r) => r.results, () => [] as ApiBuild[])));
   const seen = new Set(top.map((b) => b.id));
-  const recent = recentPages.flat().filter((b) => b.char_class === breed.fashionista && !seen.has(b.id) && (seen.add(b.id), true));
+  const recent = recentPages.flat().filter((b) => b.char_class === fashionista && !seen.has(b.id) && (seen.add(b.id), true));
   // the link is rendered as an href: only Fashionista's own https pages, never a javascript: or foreign URL
   const pool = [...top.map((b) => ({ b, origin: 'top' as const })), ...recent.map((b) => ({ b, origin: 'recent' as const }))]
     .filter(({ b }) => typeof b.url === 'string' && /^https:\/\/dofusfashionista\.gg\//.test(b.url)).slice(0, MAX_DETAILS);

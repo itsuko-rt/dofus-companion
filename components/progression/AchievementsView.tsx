@@ -1,5 +1,7 @@
 'use client';
 // Achievement tracker: progress per category and per objective, for the selected character.
+import { SUPPORTED_BREEDS } from '../breeds';
+import { classAchievements } from '../../src/class-quests.ts';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { BookOpen, Check, ChevronDown, CircleHelp, ExternalLink, Gift, Hourglass, History, ScanLine, Search, Trophy } from 'lucide-react';
@@ -36,6 +38,11 @@ function Stat({ label, value, tone }: { label: string; value: number | string; t
 
 export default function AchievementsView({ categories }: { categories: AchievementCategory[] }) {
   const { graph, ch, index, error, progress, recent, almost } = useAchievementProgress();
+  // achievements tied to the character's class by the data (class quests in their objectives), and those named after it
+  const mine = useMemo(() => {
+    const breed = SUPPORTED_BREEDS.find((b) => b.id === ch.character.profile.breed);
+    return breed && graph && index ? { breed, ...classAchievements(graph, index, breed.id, breed.name) } : null;
+  }, [graph, index, ch.character.profile.breed]);
 
   const roots = useMemo(() => categories.filter((c) => c.parentId == null && c.count + categories.filter((x) => x.parentId === c.id).reduce((s, x) => s + x.count, 0) > 0), [categories]);
   const rootOf = useMemo(() => new Map(categories.map((c) => [c.id, c.parentId ?? c.id])), [categories]);
@@ -119,7 +126,7 @@ export default function AchievementsView({ categories }: { categories: Achieveme
     <div className="h-full overflow-y-auto">
       {hero}
       <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-6">
-        <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
+        <div className="grid items-start gap-4 lg:grid-cols-[1fr_340px]">
           <Card className="flex flex-col gap-4">
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
               <Stat label={`obtenus sur ${totals.all}`} value={totals.obtained} tone="text-done" />
@@ -127,19 +134,6 @@ export default function AchievementsView({ categories }: { categories: Achieveme
               <Stat label="En cours" value={totals.in_progress} tone="text-info" />
               <Stat label={`${totals.points} points`} value={`${pct} %`} />
             </div>
-            <ul className="grid gap-x-5 gap-y-2 sm:grid-cols-2 xl:grid-cols-3" aria-label="Progression par catégorie">
-              {roots.map((c) => {
-                const b = totals.byRoot.get(c.id) ?? { done: 0, total: 0 };
-                return (
-                  <li key={c.id}>
-                    <button onClick={() => { setRoot(c.id); setSub(null); }} className={`w-full rounded-md px-1.5 py-1 text-left hover:bg-surface-2 ${root === c.id ? 'bg-surface-2' : ''}`}>
-                      <span className="flex justify-between text-xs"><span className={root === c.id ? 'text-text' : 'text-muted'}>{c.name}</span><span className="tabular-nums text-faint">{b.done}/{b.total}</span></span>
-                      <ProgressBar value={b.done} max={b.total} className="mt-1 !h-1" label={`${c.name} : ${b.done} sur ${b.total}`} />
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
           </Card>
           <Card className="flex flex-col gap-3 text-sm">
             <div>
@@ -151,6 +145,17 @@ export default function AchievementsView({ categories }: { categories: Achieveme
                 </button>
               )) : <p className="text-xs text-muted">Rien en cours. Les objectifs se remplissent quand vous terminez des quêtes ou cochez des objectifs.</p>}
             </div>
+            {mine && (
+              <div>
+                <h2 className="mb-1 font-semibold">Pour votre classe · {mine.breed.name}</h2>
+                {[...mine.linked.map((n) => ({ n, why: 'demande vos quêtes de classe' })), ...mine.named.map((n) => ({ n, why: 'porte le nom de votre classe' }))].map(({ n, why }) => (
+                  <button key={n.id} onClick={() => goTo(n.refId)} className="flex w-full items-center gap-2 rounded-md px-1.5 py-1 text-left hover:bg-surface-2">
+                    <span className="min-w-0 flex-1 truncate">{n.label}</span>
+                    <span className="shrink-0 text-xs text-faint">{progress.get(n.refId)?.state === 'obtained' ? 'obtenu' : why}</span>
+                  </button>
+                ))}
+              </div>
+            )}
             <div>
               <h2 className="mb-1 flex items-center gap-1.5 font-semibold"><History size={15} className="text-muted" /> Derniers obtenus</h2>
               {recent.length ? recent.map((r) => (
@@ -165,12 +170,17 @@ export default function AchievementsView({ categories }: { categories: Achieveme
         {/* list */}
         <div className="grid gap-5 md:grid-cols-[220px_1fr]">
           <nav aria-label="Catégories de succès" className="flex flex-col gap-0.5 md:sticky md:top-0 md:self-start">
-            {roots.map((c) => (
-              <button key={c.id} onClick={() => { setRoot(c.id); setSub(null); }} aria-current={root === c.id}
-                className={`rounded-lg px-3 py-1.5 text-left text-sm ${root === c.id ? 'bg-surface-2 text-text' : 'text-muted hover:bg-surface hover:text-text'}`}>
-                {c.name}
-              </button>
-            ))}
+            {/* the only category navigation (it used to be repeated as a grid above): name, progress, bar */}
+            {roots.map((c) => {
+              const b = totals.byRoot.get(c.id) ?? { done: 0, total: 0 };
+              return (
+                <button key={c.id} onClick={() => { setRoot(c.id); setSub(null); }} aria-current={root === c.id}
+                  className={`rounded-lg px-3 py-1.5 text-left text-sm ${root === c.id ? 'bg-surface-2 text-text' : 'text-muted hover:bg-surface hover:text-text'}`}>
+                  <span className="flex justify-between gap-2"><span>{c.name}</span><span className="tabular-nums text-xs text-faint">{b.done}/{b.total}</span></span>
+                  <ProgressBar value={b.done} max={b.total} className="mt-1 !h-1" label={`${c.name} : ${b.done} sur ${b.total}`} />
+                </button>
+              );
+            })}
           </nav>
           <div className="min-w-0">
             <div className="mb-3 flex flex-wrap items-center gap-2">

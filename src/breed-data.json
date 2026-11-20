@@ -1,0 +1,230 @@
+[
+  {
+    "id": 8,
+    "name": "Iop",
+    "title": "Guerrier téméraire",
+    "complexity": 1,
+    "roles": [
+      "Dégâts",
+      "Amélioration",
+      "Placement"
+    ],
+    "summary": "Les Iops sont des guerriers fonceurs et sans reproche !"
+  },
+  {
+    "id": 9,
+    "name": "Crâ",
+    "title": "Archer",
+    "complexity": 1,
+    "roles": [
+      "Dégâts",
+      "Entrave",
+      "Amélioration"
+    ],
+    "summary": "Les Crâs sont des archers aussi fiers que précis !"
+  },
+  {
+    "id": 11,
+    "name": "Sacrieur",
+    "title": "Berserker",
+    "complexity": 1,
+    "roles": [
+      "Tank",
+      "Dégâts",
+      "Placement"
+    ],
+    "summary": "Les Sacrieurs sont des berserkers qui décuplent leurs forces dès qu'ils sont frappés !"
+  },
+  {
+    "id": 7,
+    "name": "Eniripsa",
+    "title": "Guérisseur",
+    "complexity": 1,
+    "roles": [
+      "Soins",
+      "Amélioration",
+      "Entrave"
+    ],
+    "summary": "Les Eniripsas sont des guérisseurs qui soignent d'un simple Mot."
+  },
+  {
+    "id": 18,
+    "name": "Ouginak",
+    "title": "Barbare",
+    "complexity": 2,
+    "roles": [
+      "Dégâts",
+      "Tank",
+      "Entrave"
+    ],
+    "summary": "Quand on est un barbare avec un caractère de chienchien, il faut savoir montrer les crocs pour se faire respecter."
+  },
+  {
+    "id": 1,
+    "name": "Féca",
+    "title": "Protecteur",
+    "complexity": 2,
+    "roles": [
+      "Protection",
+      "Tank",
+      "Dégâts"
+    ],
+    "summary": "Les Fécas sont de loyaux protecteurs toujours sur la défensive."
+  },
+  {
+    "id": 3,
+    "name": "Enutrof",
+    "title": "Chasseur de trésors",
+    "complexity": 2,
+    "roles": [
+      "Entrave",
+      "Invocation",
+      "Amélioration"
+    ],
+    "summary": "Les Enutrofs sont des chasseurs de trésor avides de kamas, qui malgré leur grand âge courent comme des dragodindes à la vue d'un coffre bien rempli."
+  },
+  {
+    "id": 4,
+    "name": "Sram",
+    "title": "Assassin",
+    "complexity": 2,
+    "roles": [
+      "Dégâts",
+      "Placement",
+      "Entrave"
+    ],
+    "summary": "Les Srams sont des assassins qui aiment les bourses, rebondies de préférence."
+  },
+  {
+    "id": 20,
+    "name": "Forgelance",
+    "title": "Champion immortel",
+    "complexity": 3,
+    "roles": [
+      "Dégâts",
+      "Placement",
+      "Protection"
+    ],
+    "summary": "Les Forgelances sont des lanciers qui ne croient qu'en eux-mêmes !"
+  },
+  {
+    "id": 14,
+    "name": "Zobal",
+    "title": "Guerrier lunatique",
+    "complexity": 3,
+    "roles": [
+      "Tank",
+      "Dégâts",
+      "Protection"
+    ],
+    "summary": "Les Zobals portent des masques magiques qui leur permettent de changer de tête comme de chemise."
+  },
+  {
+    "id": 12,
+    "name": "Pandawa",
+    "title": "Bagarreur assoiffé",
+    "complexity": 3,
+    "roles": [
+      "Placement",
+      "Dégâts",
+      "Tank"
+    ],
+    "summary": "Les Pandawas sont des guerriers adeptes des arts martiaux qui savent faire des folies de leurs corps !"
+  },
+  {
+    "id": 10,
+    "name": "Sadida",
+    "title": "Sorcier sylvestre",
+    "complexity": 3,
+    "roles": [
+      "Invocation",
+      "Entrave",
+      "Soins"
+    ],
+    "summary": "Les Sadidas sont des invocateurs qui empoisonnent la vie de leurs ennemis !"
+  },
+  {
+    "id": 2,
+    "name": "Osamodas",
+    "title": "Invocateur de créatures",
+    "complexity": 4,
+    "roles": [
+      "Invocation",
+      "Amélioration",
+      "Soins"
+    ],
+    "summary": "Les Osamodas sont des dompteurs nés !"
+  },
+  {
+    "id": 15,
+    "name": "Steamer",
+    "title": "Technomage",
+    "complexity": 4,
+    "roles": [
+      "Placement",
+      "Soins",
+      "Dégâts"
+    ],
+    "summary": "Les Steamers ont plus d'une tourelle dans leur boîte à outils."
+  },
+  {
+    "id": 17,
+    "name": "Huppermage",
+    "title": "Mage élémentaliste",
+    "complexity": 4,
+    "roles": [
+      "Dégâts",
+      "Placement",
+      "Amélioration"
+    ],
+    "summary": "Les Huppermages sont capables de combiner le Feu, l'Air, l'Eau et la Terre pour lancer des sortilèges aux multiples effets."
+  },
+  {
+    "id": 6,
+    "name": "Ecaflip",
+    "title": "Combattant imprévisible",
+    "complexity": 4,
+    "roles": [
+      "Dégâts",
+      "Amélioration",
+      "Soins"
+    ],
+    "summary": "Les Ecaflips sont des guerriers joueurs qui se fourrent dans les endroits où l'on peut gagner gros, et perdre beaucoup..."
+  },
+  {
+    "id": 13,
+    "name": "Roublard",
+    "title": "Expert en explosifs",
+    "complexity": 5,
+    "roles": [
+      "Dégâts",
+      "Placement",
+      "Entrave"
+    ],
+    "summary": "Membres d'un clan créé à l'origine par Raval et la famille Smisse, les Roublards ont finalement prêté allégeance au dieu Dralbour, qui n'est autre que Sram."
+  },
+  {
+    "id": 16,
+    "name": "Eliotrope",
+    "title": "Créateur de portails",
+    "complexity": 5,
+    "roles": [
+      "Placement",
+      "Dégâts",
+      "Soins"
+    ],
+    "summary": "Apparus par accident, les Eliotropes sont des reflets de leur créateur, le Roi-Dieu."
+  },
+  {
+    "id": 5,
+    "name": "Xélor",
+    "title": "Maître du temps",
+    "complexity": 5,
+    "roles": [
+      "Placement",
+      "Entrave",
+      "Dégâts"
+    ],
+    "summary": "Les Xélors sont des mages qui maîtrisent le temps et toutes les mécaniques qui donnent l'heure : carillons, horloges, et pendules leur obéissent au doigt et à l'œil."
+  }
+]

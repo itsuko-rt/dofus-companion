@@ -6,6 +6,8 @@ import { BRAND } from '../src/brand.ts';
 import { SUPPORTED_BREEDS } from './breeds';
 import { useCharacter } from './useCharacter';
 import { useSession } from './account/useSession';
+import { useEffect } from 'react';
+import { warmGame } from './quests/useGame';
 
 // Quests, achievements and Dofus live under "Progression" (sub-tabs) to keep the bar short.
 const LINKS = [
@@ -18,8 +20,23 @@ const LINKS = [
   { href: '/personnage', label: 'Personnages', icon: UserRound, match: (p: string) => p.startsWith('/personnage') },
 ];
 
+// Once a page is loaded and the browser is idle, fetch and build the quest graph and load the graph view's code
+// (~130 KB of data and the flow-graph chunk, both compressed): the first visit to Quêtes was mostly spent there.
+// Skipped with data saver on, and on the pages that load them anyway.
+function useWarmQuests(path: string) {
+  useEffect(() => {
+    if (path.startsWith('/progression/quetes') || path.startsWith('/progression/succes')) return;
+    if ((navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData) return;
+    const run = () => { warmGame(); void import('./FlowCanvas'); };
+    const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number };
+    const id = w.requestIdleCallback ? w.requestIdleCallback(run, { timeout: 5000 }) : window.setTimeout(run, 2500);
+    return () => { if (!w.requestIdleCallback) window.clearTimeout(id); };
+  }, [path]);
+}
+
 export default function Nav() {
   const path = usePathname();
+  useWarmQuests(path);
   const ch = useCharacter();
   const session = useSession();
   const breed = SUPPORTED_BREEDS.find((b) => b.id === ch.character.profile.breed)?.name;

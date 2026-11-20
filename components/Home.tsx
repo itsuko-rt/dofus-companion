@@ -7,6 +7,7 @@ import { BRAND } from '../src/brand.ts';
 import { SUPPORTED_BREEDS } from './breeds';
 import AdSlot from './AdSlot';
 import Onboarding from './character/Onboarding';
+import AlmanaxCard from './AlmanaxCard';
 import NextSteps, { regionPath } from './quests/NextSteps';
 import { useAchievementProgress } from './progression/useAchievementProgress';
 import { ButtonLink, Card, Diamond, ElementTag, ProgressBar, SectionTitle } from './ui';
@@ -36,7 +37,7 @@ const SHORTCUTS = [
 
 export default function Home() {
   const { data, graph, status, categoryName, ch, progress, recent, almost } = useAchievementProgress();
-  const regions = useMemo(() => (graph && data ? regionSummaries(graph, data.categories, status) : []), [graph, data, status]);
+  const regions = useMemo(() => (graph && data ? regionSummaries(graph, data.categories, status, ch.character.profile.breed) : []), [graph, data, status, ch.character.profile.breed]);
 
   // before the browser storage is read: the site's title, so the server HTML has a heading and content
   if (!ch.ready) return (
@@ -52,7 +53,7 @@ export default function Home() {
     return (
       <div className="h-full overflow-y-auto">
         <section className="relative isolate overflow-hidden border-b border-black/40 bg-sec-characters"
-          style={{ backgroundImage: `url(${SUPPORTED_BREEDS[0].art.scene})`, backgroundSize: 'cover', backgroundPosition: 'right center' }}>
+          style={{ backgroundImage: `url(${SUPPORTED_BREEDS.find((b) => b.id === 9)!.art.scene})`, backgroundSize: 'cover', backgroundPosition: 'right center' }}>
           <div className="absolute inset-0 -z-10 bg-gradient-to-r from-bg via-bg/70 to-transparent" aria-hidden />
           <div className="mx-auto max-w-5xl px-4 py-12 sm:py-16">
             <p className="text-xs font-medium uppercase tracking-[0.16em] text-[#ffe2a6]">Bienvenue, aventurier</p>
@@ -65,6 +66,7 @@ export default function Home() {
         <div className="mx-auto max-w-3xl px-4 py-8">
           <h2 className="mb-3 font-display text-lg">Créez votre personnage <span className="text-sm text-muted">· 30 secondes</span></h2>
           <Onboarding />
+          <div className="mt-6"><AlmanaxCard /></div>
         </div>
       </div>
     );
@@ -156,6 +158,7 @@ export default function Home() {
         </div>
 
         <aside className="flex flex-col gap-5 lg:sticky lg:top-6 lg:self-start">
+          <AlmanaxCard />
           <Card paper>
             <SectionTitle hint={<Link href="/progression/succes" className="underline">Journal</Link>}>Succès presque terminés</SectionTitle>
             {almost.length ? (

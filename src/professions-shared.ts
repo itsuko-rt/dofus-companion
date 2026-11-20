@@ -11,7 +11,9 @@ export interface RecipeInfo {
   ingredients: { id: number; name: string; iconId: number | null; qty: number; source: IngredientSource }[];
 }
 /** Where an ingredient comes from, as far as the game data tells: harvested, crafted, or neither (loot, shop…). */
-export type IngredientSource = { kind: 'gathered'; jobId: number; jobName: string; levelMin: number } | { kind: 'crafted'; jobId: number; jobName: string; level: number } | { kind: 'other' };
+export type IngredientSource = { kind: 'gathered'; jobId: number; jobName: string; levelMin: number } | { kind: 'crafted'; jobId: number; jobName: string; level: number } | { kind: 'other'; drops: DropSource[] };
+/** A monster that drops the item: chance in % before prospection (lowest and highest grade), conditional = the game sets a drop condition. */
+export interface DropSource { monster: string; min: number; max: number; conditional: boolean }
 export interface JobDetails { job: JobSummary; tiers: GatherTier[]; recipes: RecipeInfo[]; version: string }
 
 
@@ -30,3 +32,9 @@ export function currentBracket<T extends { levelMin: number }>(tiers: T[], level
   return { index: i, current: b[i] ?? null, next: b[i + 1] ?? null };
 }
 
+
+/** True when every ingredient can be harvested or crafted with the character's own profession levels (jobId → level).
+ *  Loot and shop items ('other') never qualify: the game data cannot say the character owns them. */
+export const selfSufficient = (r: RecipeInfo, jobs: Record<string, number>) => r.ingredients.every((g) =>
+  g.source.kind === 'gathered' ? (jobs[g.source.jobId] ?? 0) >= g.source.levelMin
+    : g.source.kind === 'crafted' ? (jobs[g.source.jobId] ?? 0) >= g.source.level : false);

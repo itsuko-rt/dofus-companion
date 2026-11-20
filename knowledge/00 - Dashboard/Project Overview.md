@@ -10,7 +10,7 @@
 | Dofus | `/progression/dofus` | The 34 Dofus and the quest or achievement that gives each |
 | Scanner | `/progression/scan` | Read a screenshot of a Dofus window in the browser (OCR), confirm, record. See [[Character Sync OCR]] |
 | Characters | `/personnage` | Several characters: profile, alignment, notes, saved builds, profession levels, JSON export/import |
-| Spells | `/personnage/sorts/[classe]` | The 44 spells (22 slots × 2 variants) of Crâ and Pandawa with effects in French |
+| Spells | `/personnage/sorts/[classe]` | The 44 spells (22 slots × 2 variants) of all 19 classes with effects in French (since 2026-11-20) |
 | Builds | `/builds` | Community builds from Dofus Fashionista, stats recomputed from our item data |
 | Equipment | `/equipement` | Encyclopedia of equippable items |
 | Professions | `/metiers`, `/metiers/[slug]` | Gathering tiers by level, zones, recipes with ingredient origin |
@@ -21,7 +21,7 @@
 Without an account, progress stays in the browser. With one, it is stored in `data/app.sqlite`.
 
 ## Who it is for
-Players who want to know what to do next, and why, using the game's own data rather than guesswork. The current focus is on two classes, Crâ and Pandawa (see [[Vision and Goals]]).
+Players who want to know what to do next, and why, using the game's own data rather than guesswork. All 19 classes are supported since 2026-11-20 (before: Crâ and Pandawa (see [[Vision and Goals]]).
 
 ## Technology
 Next.js 16, React 19, TypeScript 7, Tailwind 4, `node:sqlite` (two SQLite files), Playwright for E2E, tesseract.js for OCR. Details: [[Architecture]].

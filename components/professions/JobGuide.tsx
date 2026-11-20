@@ -4,7 +4,9 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { Check, Lock, Map as MapIcon, Search } from 'lucide-react';
-import { brackets, currentBracket, MAX_JOB_LEVEL, type JobDetails, type RecipeInfo } from '../../src/professions-shared.ts';
+import { brackets, currentBracket, MAX_JOB_LEVEL, selfSufficient, type IngredientSource, type JobDetails, type RecipeInfo } from '../../src/professions-shared.ts';
+import { checkInput, plan } from '../../src/craft-calc.ts';
+import SourceLabel from './SourceLabel';
 import { jobSlug } from '../../src/professions-shared.ts';
 import { useCharacter } from '../useCharacter';
 import { Button, ButtonLink, Card, ProgressBar, SectionTitle } from '../ui';
@@ -99,21 +101,27 @@ export default function JobGuide({ details, recipeTotal }: { details: JobDetails
         </section>
       )}
 
-      {recipes.length > 0 && <Recipes recipes={recipes} total={recipeTotal ?? recipes.length} level={level} />}
+      <Calculator recipes={recipes} level={level} jobName={job.name} />
+
+      {recipes.length > 0 && <Recipes recipes={recipes} total={recipeTotal ?? recipes.length} level={level} jobs={ch.hasCharacter ? { ...ch.character.jobs, [job.id]: level } : null} />}
     </div>
   );
 }
 
-function Recipes({ recipes, total, level }: { recipes: RecipeInfo[]; total: number; level: number }) {
+function Recipes({ recipes, total, level, jobs }: { recipes: RecipeInfo[]; total: number; level: number; jobs: Record<string, number> | null }) {
   const [q, setQ] = useState('');
   const [mine, setMine] = useState(false);
+  const [own, setOwn] = useState(false);
   const [limit, setLimit] = useState(PAGE);
-  const shown = recipes.filter((r) => (!mine || r.level <= level) && (!q || r.name.toLowerCase().includes(q.toLowerCase())));
+  const shown = recipes.filter((r) => (!mine || r.level <= level) && (!own || (jobs != null && selfSufficient(r, jobs))) && (!q || r.name.toLowerCase().includes(q.toLowerCase())));
   return (
     <section>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-display text-base text-text">Recettes ({total})</h2>
-        <label className="flex items-center gap-2 text-sm text-muted"><input type="checkbox" checked={mine} onChange={(e) => { setMine(e.target.checked); setLimit(PAGE); }} className="accent-[var(--color-brand)]" /> Jusqu’à mon niveau ({level})</label>
+        <div className="flex flex-wrap gap-x-4 gap-y-1">
+          <label className="flex items-center gap-2 text-sm text-muted"><input type="checkbox" checked={mine} onChange={(e) => { setMine(e.target.checked); setLimit(PAGE); }} className="accent-[var(--color-brand)]" /> Jusqu’à mon niveau ({level})</label>
+          {jobs && <label className="flex items-center gap-2 text-sm text-muted" title="Tous les ingrédients se récoltent ou se fabriquent avec les niveaux de métier enregistrés sur votre personnage"><input type="checkbox" checked={own} onChange={(e) => { setOwn(e.target.checked); setLimit(PAGE); }} className="accent-[var(--color-brand)]" /> Avec vos métiers</label>}
+        </div>
       </div>
       <label className="relative mb-3 block">
         <Search size={15} className="pointer-events-none absolute left-2.5 top-2.5 text-faint" aria-hidden />
@@ -127,9 +135,7 @@ function Recipes({ recipes, total, level }: { recipes: RecipeInfo[]; total: numb
               {r.ingredients.map((g) => (
                 <li key={g.id} className="rounded-sm border border-line bg-surface-2/60 px-2 py-0.5 text-xs">
                   <span className="text-text">{g.qty} × {g.name}</span>{' '}
-                  {g.source.kind === 'gathered' ? <Link className="text-accent hover:underline" href={`/metiers/${jobSlug(g.source.jobName)}`}>{g.source.jobName} niv. {g.source.levelMin}</Link>
-                    : g.source.kind === 'crafted' ? <Link className="text-accent hover:underline" href={`/metiers/${jobSlug(g.source.jobName)}`}>{g.source.jobName} niv. {g.source.level}</Link>
-                    : <span className="text-faint">butin ou achat</span>}
+                  <SourceLabel source={g.source} />
                 </li>
               ))}
             </ul>
@@ -138,7 +144,67 @@ function Recipes({ recipes, total, level }: { recipes: RecipeInfo[]; total: numb
       </ul>
       {shown.length === 0 && <p className="mt-2 text-sm text-muted">Aucune recette ne correspond.</p>}
       {limit < shown.length && <Button className="mt-3 w-full" onClick={() => setLimit((n) => n + PAGE)}>Afficher les {Math.min(PAGE, shown.length - limit)} suivantes ({shown.length - limit} restantes)</Button>}
-      <p className="mt-2 text-xs text-faint">« Butin ou achat » : ni récolté ni fabriqué d’après les données du jeu (butin de monstre, boutique, quête…). L’expérience de fabrication et le coût n’y figurent pas.</p>
+      <p className="mt-2 text-xs text-faint">« Butin » : ni récolté ni fabriqué ; jusqu’à 3 monstres qui le lâchent, avec leur chance de base avant prospection (données du jeu). « Butin ou achat » : aucun monstre ne le lâche dans les données (boutique, quête…). L’expérience de fabrication et le coût n’y figurent pas.</p>
     </section>
+  );
+}
+
+/** XP calculator: the XP numbers come from the game's own display (no XP table in the game files), the recipe from the game data. */
+function Calculator({ recipes, level, jobName }: { recipes: RecipeInfo[]; level: number; jobName: string }) {
+  const [xp, setXp] = useState({ xpNow: '', xpNext: '', xpPerAction: '' });
+  const [recipeId, setRecipeId] = useState<number | ''>('');
+  const usable = useMemo(() => recipes.filter((r) => r.level <= level).sort((a, b) => b.level - a.level || a.name.localeCompare(b.name, 'fr')), [recipes, level]);
+  const recipe = usable.find((r) => r.resultId === recipeId);
+  const filled = xp.xpNow !== '' && xp.xpNext !== '' && xp.xpPerAction !== '';
+  const input = { xpNow: Number(xp.xpNow), xpNext: Number(xp.xpNext), xpPerAction: Number(xp.xpPerAction) };
+  const error = filled ? checkInput(input) : null;
+  const result = filled && !error ? plan(input, recipe?.ingredients ?? []) : null;
+  const field = 'mt-1 block w-full rounded-md border border-line bg-bg px-2 py-1.5 text-text';
+  const num = (k: keyof typeof xp, label: string, hint: string) => (
+    <label className="text-sm text-muted">{label}
+      <input inputMode="numeric" value={xp[k]} onChange={(e) => setXp({ ...xp, [k]: e.target.value.replace(/[^0-9]/g, '') })} className={field} aria-describedby={`calc-${k}`} />
+      <span id={`calc-${k}`} className="mt-0.5 block text-[11px] text-faint">{hint}</span>
+    </label>
+  );
+  const sourceById = new Map(recipe?.ingredients.map((g) => [g.id, g.source]) ?? []);
+  return (
+    <Card>
+      <SectionTitle hint="Les nombres viennent de votre écran de jeu">Calculateur d’XP · {jobName}</SectionTitle>
+      <p className="mb-3 text-xs text-faint">Les fichiers du jeu ne contiennent ni la table d’XP des métiers ni l’XP gagnée par fabrication : saisissez ce que le jeu affiche (fenêtre du métier, et le gain après une fabrication ou une récolte).</p>
+      <div className="grid gap-3 sm:grid-cols-3">
+        {num('xpNow', 'XP actuelle', 'Premier nombre de la barre d’XP du métier')}
+        {num('xpNext', 'XP du niveau suivant', 'Second nombre de la même barre')}
+        {num('xpPerAction', 'XP par fabrication', 'Gain affiché après une fabrication ou une récolte')}
+      </div>
+      <label className="mt-3 block text-sm text-muted">Recette (facultatif, jusqu’à votre niveau {level})
+        <select value={recipeId} onChange={(e) => setRecipeId(e.target.value ? Number(e.target.value) : '')} className={field}>
+          <option value="">Aucune : compter seulement les fabrications ou récoltes</option>
+          {usable.map((r) => <option key={r.resultId} value={r.resultId}>{r.name} (niv. {r.level})</option>)}
+        </select>
+      </label>
+      {error && <p role="alert" className="mt-3 rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">{error}</p>}
+      {result && (
+        <div className="appear mt-4" aria-live="polite">
+          <ProgressBar value={input.xpNow} max={input.xpNext} label={`Niveau en cours : ${Math.round(result.progress * 100)} %`} />
+          <p className="mt-2 text-sm text-text">
+            Il reste <b>{result.remaining.toLocaleString('fr-FR')} XP</b> : <b>{result.actions.toLocaleString('fr-FR')}</b> {recipe ? `fabrication${result.actions > 1 ? 's' : ''} de ${recipe.name}` : `action${result.actions > 1 ? 's' : ''}`} pour passer au niveau suivant.
+          </p>
+          {result.resources.length > 0 && (
+            <>
+              <h3 className="mt-3 text-xs font-semibold uppercase tracking-wide text-muted">Ressources à réunir</h3>
+              <ul className="mt-1 flex flex-col divide-y divide-line text-sm">
+                {result.resources.map((g) => (
+                  <li key={g.id} className="flex flex-wrap items-baseline justify-between gap-2 py-1.5">
+                    <span className="text-text"><b>{g.total.toLocaleString('fr-FR')}</b> × {g.name} <span className="text-xs text-faint">({g.qty} par fabrication)</span></span>
+                    <span className="text-xs">{sourceById.get(g.id) && <SourceLabel source={sourceById.get(g.id)!} />}</span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          <p className="mt-2 text-[11px] text-faint">Valable jusqu’au niveau suivant seulement : l’XP par fabrication change avec le niveau, et la table d’XP n’est pas dans les données du jeu.</p>
+        </div>
+      )}
+    </Card>
   );
 }

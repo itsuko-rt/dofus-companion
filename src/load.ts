@@ -3,6 +3,12 @@ import { readdirSync } from 'node:fs';
 import { Graph, type GEdge, type NodeInput } from './graph.ts';
 import type { RenderedEffect } from './effects.ts';
 import type { Item, ItemSet } from './stats.ts';
+import { objectiveTargets } from './objective-targets.ts';
+import { classAchievements, classQuests } from './class-quests.ts';
+import { regionSlugMap } from './regions.ts';
+import type { AlmanaxEntry } from './almanax-shared.ts';
+import { itemSources } from './professions.ts';
+import type { IngredientSource } from './professions-shared.ts';
 
 /** Latest data/game-<version>.sqlite, or null if the import has not run. */
 export function latestDb(dir = 'data'): string | null {
@@ -130,6 +136,8 @@ export interface QuestDetails {
   start: { npc: string | null; zone: string | null };
   steps: { name: string | null; description: string | null; objectives: string[]; rewards: QuestReward[] }[];
   guides: { site: string; url: string; language: string; status: string; checkedAt: string }[];
+  /** monsters and items named by the objectives (exact game names): where the monsters live, where the items come from */
+  targets: { monsters: { name: string; zones: string[] }[]; items: { name: string; source: IngredientSource }[] };
 }
 
 export function loadQuestDetails(path: string, questId: number): QuestDetails | null {
@@ -142,10 +150,36 @@ export function loadQuestDetails(path: string, questId: number): QuestDetails | 
       .map((s) => ({ name: s.name, description: cleanGameText(s.description), objectives: JSON.parse(s.objectives ?? '[]'), rewards: JSON.parse(s.rewards ?? '[]') }));
     const guides = (db.prepare('SELECT site, url, language, status, checked_at FROM external_guide WHERE quest_id = ?').all(questId) as Record<string, any>[])
       .map((g) => ({ site: g.site, url: g.url, language: g.language, status: g.status, checkedAt: g.checked_at }));
-    return { id: questId, start: { npc: start?.npc_name ?? null, zone: start?.subarea_name ?? null }, steps, guides };
+    return { id: questId, start: { npc: start?.npc_name ?? null, zone: start?.subarea_name ?? null }, steps, guides, targets: questTargets(db, steps.flatMap((s) => s.objectives as string[])) };
   } finally {
     db.close();
   }
+}
+
+function questTargets(db: DatabaseSync, objectives: string[]): QuestDetails['targets'] {
+  const monsters: QuestDetails['targets']['monsters'] = [], items: QuestDetails['targets']['items'] = [];
+  if (!db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'monster_subarea'").get()) return { monsters, items }; // creatures import not run
+  const zonesOf = db.prepare(`SELECT DISTINCT s.name FROM monster m JOIN monster_subarea ms ON ms.monster_id = m.id
+    JOIN world_subarea s ON s.id = ms.subarea_id WHERE m.name = ? ORDER BY s.name`);
+  const itemId = db.prepare('SELECT id FROM item WHERE name = ? ORDER BY id LIMIT 1');
+  const source = itemSources(db);
+  const seen = new Set<string>();
+  for (const o of objectives) {
+    const t = objectiveTargets(o);
+    const key = t.monster ? `m:${t.monster}` : t.item ? `i:${t.item}` : null;
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    if (t.monster) {
+      const zones = (zonesOf.all(t.monster) as { name: string }[]).map((z) => z.name);
+      if (zones.length) monsters.push({ name: t.monster, zones });
+    } else if (t.item) {
+      const id = (itemId.get(t.item) as { id: number } | undefined)?.id;
+      if (id == null) continue;
+      const s = source(id);
+      if (s.kind !== 'other' || s.drops.length) items.push({ name: t.item, source: s });
+    }
+  }
+  return { monsters, items };
 }
 
 export function withDb<T>(path: string, fn: (db: DatabaseSync) => T): T {
@@ -186,18 +220,28 @@ export const loadAchievements = (path: string, categoryIds: number[]) => withDb(
   if (!ids.length) return [];
   const rows = db.prepare(
     `SELECT id, name, description, level, points, category_id, rewards FROM achievement WHERE category_id IN (${ids.map(() => '?').join(',')}) ORDER BY level, name`).all(...ids) as Record<string, any>[];
-  const obj = db.prepare('SELECT id, name, criterion_raw AS criterion FROM achievement_objective WHERE achievement_id = ? ORDER BY ordinal');
-  const guide = db.prepare('SELECT site, url, checked_at FROM achievement_guide WHERE achievement_id = ? LIMIT 1');
+  // one query per table for the whole page (not one per achievement: Donjons has 743)
+  const inCats = `IN (SELECT id FROM achievement WHERE category_id IN (${ids.map(() => '?').join(',')}))`;
+  const objectives = new Map<number, { id: number; name: string; criterion: string }[]>();
+  for (const o of db.prepare(`SELECT achievement_id, id, name, criterion_raw AS criterion FROM achievement_objective WHERE achievement_id ${inCats} ORDER BY achievement_id, ordinal`).all(...ids) as Record<string, any>[]) {
+    const list = objectives.get(o.achievement_id) ?? [];
+    list.push({ id: o.id, name: o.name, criterion: o.criterion });
+    objectives.set(o.achievement_id, list);
+  }
+  const guides = new Map<number, Record<string, any>>();
+  for (const g of db.prepare(`SELECT achievement_id, site, url, checked_at FROM achievement_guide WHERE achievement_id ${inCats}`).all(...ids) as Record<string, any>[]) {
+    if (!guides.has(g.achievement_id)) guides.set(g.achievement_id, g); // first row, like the former LIMIT 1
+  }
   const dofusByAch = new Map<number, string[]>();
   for (const d of db.prepare('SELECT name, achievement_ids FROM dofus').all() as Record<string, any>[]) {
     for (const a of JSON.parse(d.achievement_ids) as number[]) dofusByAch.set(a, [...(dofusByAch.get(a) ?? []), d.name]);
   }
   return rows.map((a): AchievementInfo => {
-    const g = guide.get(a.id) as Record<string, any> | undefined;
+    const g = guides.get(a.id);
     return {
       id: a.id, name: a.name, description: cleanGameText(a.description)?.replace(/\s*\[challenge,\d+\]/g, '') ?? null,
       level: a.level, points: a.points, categoryId: a.category_id,
-      objectives: plainRows(obj.all(a.id)),
+      objectives: objectives.get(a.id) ?? [],
       rewards: mergeRewards(a.rewards),
       guide: g ? { site: g.site, url: g.url, checkedAt: g.checked_at } : null,
       dofus: dofusByAch.get(a.id) ?? [],
@@ -242,11 +286,49 @@ export const searchItems = (path: string, s: ItemSearch) => withDb(path, (db) =>
   const rows = db.prepare(`SELECT i.id, i.name, t.name AS type, i.level, s.name AS setName, i.effects
     FROM item i JOIN item_type t ON t.id = i.type_id LEFT JOIN item_set s ON s.id = i.set_id
     WHERE ${where.join(' AND ')} ORDER BY i.level DESC, i.name LIMIT ?`).all(...args, Math.min(s.limit ?? 60, 120)) as Record<string, any>[];
-  return rows.map((r) => ({ id: r.id, name: r.name, type: r.type, level: r.level, setName: r.setName,
-    effects: (JSON.parse(r.effects) as { text: string | null; characteristic: number | null }[]).filter((e) => e.text && !/^(Échangeable|Attitude|Effet non documenté)/.test(e.text)).map((e) => e.text!) }));
+  // how to obtain it, from the game data: the recipe (profession, level, ingredients) or the monsters that drop it
+  const source = itemSources(db);
+  const recipe = db.prepare('SELECT r.ingredients FROM recipe r WHERE r.result_id = ? ORDER BY r.level LIMIT 1');
+  const itemName = db.prepare('SELECT name FROM item WHERE id = ?');
+  return rows.map((r) => {
+    const rec = recipe.get(r.id) as { ingredients: string } | undefined;
+    return { id: r.id, name: r.name, type: r.type, level: r.level, setName: r.setName,
+      effects: (JSON.parse(r.effects) as { text: string | null; characteristic: number | null }[]).filter((e) => e.text && !/^(Échangeable|Attitude|Effet non documenté)/.test(e.text)).map((e) => e.text!),
+      obtain: source(r.id) as IngredientSource,
+      ingredients: rec ? (JSON.parse(rec.ingredients) as [number, number][]).map(([id, qty]) => ({ qty, name: (itemName.get(id) as { name: string } | undefined)?.name ?? `objet n°${id}` })) : [],
+    };
+  });
 });
 
 export function loadGraph(path: string): Graph {
   const d = loadGraphData(path);
   return new Graph(d.nodes, d.extraEdges);
 }
+
+export interface ClassExtras {
+  description: string | null; complexity: number | null;
+  quests: { id: string; name: string; level: number | null; href: string }[];
+  achievements: { name: string; why: 'quests' | 'name' }[];
+}
+/** Game data tied to a class, for its class page: official description, class quests (PG condition), linked achievements. */
+export function loadClassExtras(path: string, breedId: number, breedName: string): ClassExtras {
+  const g = loadGraph(path);
+  const data = loadGraphData(path);
+  const slugs = regionSlugMap(data.categories);
+  const info = withDb(path, (db) => db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'breed_info'").get()
+    ? db.prepare('SELECT description, complexity FROM breed_info WHERE breed_id = ?').get(breedId) as { description: string | null; complexity: number | null } | undefined : undefined);
+  const ach = classAchievements(g, loadObjectiveIndex(path), breedId, breedName);
+  return {
+    description: info?.description ?? null, complexity: info?.complexity ?? null,
+    quests: classQuests(g, breedId).map((n) => ({ id: n.id, name: n.label, level: n.level ?? null, href: `/progression/quetes/${slugs.get(n.category ?? -1) ?? n.category}#${n.id}` })),
+    achievements: [...ach.linked.map((n) => ({ name: n.label, why: 'quests' as const })), ...ach.named.map((n) => ({ name: n.label, why: 'name' as const }))],
+  };
+}
+
+/** The game's Almanax calendar with each offering's item name and where it comes from (null before the creatures import). */
+export const loadAlmanax = (path: string) => withDb(path, (db): AlmanaxEntry[] | null => {
+  if (!db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'almanax'").get()) return null;
+  const source = itemSources(db);
+  return (db.prepare('SELECT a.id, a.dates, a.name, a.description, a.item_id, a.qty, i.name item FROM almanax a JOIN item i ON i.id = a.item_id ORDER BY a.id').all() as Record<string, any>[])
+    .map((r) => ({ id: r.id, dates: JSON.parse(r.dates), name: r.name, description: r.description, item: r.item, qty: r.qty, source: source(r.item_id) }));
+});

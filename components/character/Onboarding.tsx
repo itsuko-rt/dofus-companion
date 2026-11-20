@@ -47,11 +47,11 @@ export default function Onboarding({ onDone }: { onDone?: () => void }) {
       {step === 0 && (
         <fieldset>
           <legend className="font-display text-lg font-semibold">Quelle est votre classe ?</legend>
-          <p className="mb-4 text-sm text-muted">La classe définit vos sorts. D’autres classes arriveront ensuite.</p>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <p className="mb-4 text-sm text-muted">La classe définit vos sorts. Titre, rôles et complexité viennent des fichiers du jeu.</p>
+          <div className="grid max-h-[28rem] gap-2 overflow-y-auto pr-1 sm:grid-cols-2 lg:grid-cols-3">
             {SUPPORTED_BREEDS.map((b) => (
               <button key={b.id} type="button" aria-pressed={breed === b.id} onClick={() => setBreed(b.id)} className="rounded-xl text-left">
-                <ClassCard breed={b} selected={breed === b.id} />
+                <ClassCard breed={b} selected={breed === b.id} compact />
               </button>
             ))}
           </div>

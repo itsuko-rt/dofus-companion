@@ -22,6 +22,7 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       // one entry per size: .ico for older browsers, PNG for the tab; 192/512 live in the manifest
+      { url: '/favicon.svg', type: 'image/svg+xml' }, // small-size emblem, sharp at any tab size (scripts/make-icons.ts)
       { url: '/favicon.ico', sizes: '16x16 32x32 48x48' },
       { url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
       { url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },

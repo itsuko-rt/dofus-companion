@@ -4,6 +4,8 @@ Status values: **planned** (agreed, not started), **idea** (not agreed), **block
 
 | Feature | Status | Notes / source |
 |---|---|---|
+| Fix first-visit blank pages, Succès query indexes, quest graph cache | **implemented** 2026-11-20 (unit + E2E tests, measured) | `docs/GAME_DATA_AND_PRODUCT_AUDIT.md` §4 |
+| All 19 classes and a class hub page | planned (phases 1–2, awaiting approval) | same audit §2–3 |
 | E-mail provider for password reset and verification | blocked (choice of provider) | `docs/RELEASE_READINESS.md` |
 | "Log out other devices", idle session timeout | planned | `docs/SECURITY_AUDIT.md` F10 |
 | E-mail verification at sign-up | planned | needs the e-mail provider; also stops registration enumeration |
@@ -16,7 +18,7 @@ Status values: **planned** (agreed, not started), **idea** (not agreed), **block
 | N1ark progress import | idea | export format UNVERIFIED |
 | Class guides with sourced advice (layer B) | planned | needs sources; see [[Cra]], [[Pandawa]] |
 | Recommended routes, XP and kamas routes (layer C) | blocked (no verified data) | [[XP Routes]], [[Kamas Routes]] |
-| Almanax calendar | blocked | the data doesn't link quests to dates (`docs/RAPPORT_SUIVI_QUETES.md` §4) |
+| Almanax calendar | **implemented** 2026-11-20 (home card: today's offering, bonus, next 6 days; unit, data and E2E tests) | from `almanaxcalendarsdata`, which the import did not read before (`docs/RAPPORT_SUIVI_QUETES.md` §4 said blocked) |
 | Keyboard navigation of the quest graph | idea | search, sheet and prerequisite list work with the keyboard |
 | Terms of service page | planned | [[GDPR and Privacy]] |
 | tesseract.js 7 | idea | needs a scanner retest |

@@ -9,6 +9,8 @@
 | E2E (needs a production server on 3100) | `npm run build`, `npm start -- -p 3100`, then `npx playwright test` |
 | Import game data (≈ 8 GB RAM) | `npm run import` |
 | Rebuild profession tables only | `node --max-old-space-size=8192 scripts/professions-import.ts` |
+| Rebuild classes, monsters, XP, activities, Almanax only | `node --max-old-space-size=8192 scripts/creatures-import.ts` |
+| Rebuild favicons and app icons from `brand/` | `node scripts/make-icons.ts` |
 | Official icons (local only, not in Git) | `npm run assets` |
 | Security probe (local or staging only) | `node scripts/security-probe.mjs http://127.0.0.1:3100` |
 | Broken links | `node scripts/check-links.ts http://localhost:3000` |
@@ -30,6 +32,8 @@
 | `docs/AUDIT_SECURITE.md` · `docs/SECURITY_AUDIT.md` · `docs/SECURITY_FIXES.md` | Security audits |
 | `docs/PRIVACY_GDPR_REVIEW.md` · `docs/RELEASE_READINESS.md` | Privacy review, release readiness |
 | `docs/MAP_REMOVAL_REPORT.md` | Map removal |
+| `docs/GAME_DATA_INVENTORY.md` | Every game dataset, coverage, relationships, what is missing (2026-11-20) |
+| `docs/GAME_DATA_AND_PRODUCT_AUDIT.md` | Game data, all classes, performance, UX, roadmap (2026-11-20) |
 
 ## External
 Repository: https://github.com/itsuko-rt/dofus-companion · Game data: https://github.com/ledouxm/dofus-sqlite/releases · Builds: https://dofusfashionista.gg

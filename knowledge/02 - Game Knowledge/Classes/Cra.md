@@ -13,7 +13,7 @@ verification: VERIFIED
 
 # Crâ (breed id 9)
 
-**Role in the site:** one of the two classes the site focuses on (`components/breeds.ts`: `SUPPORTED_BREEDS`). Class colour: green.
+**Role in the site:** one of the 19 classes (`components/breeds.ts`, built from `src/breed-data.json`); it was one of the first two supported. Class colour: green.
 
 ## From the game files (VERIFIED, 3.7.14.18)
 - 44 spells: 22 slots, each with two variants. The unlock level is the lowest grade's `min_player_level`; AP is the lowest grade's cost.

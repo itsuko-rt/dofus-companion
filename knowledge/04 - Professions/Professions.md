@@ -15,6 +15,9 @@ verification: VERIFIED
 
 - **Site:** `/metiers` (all professions) and `/metiers/[slug]` (one profession): gathering tiers, zones, recipes with ingredient origin, and the character's level. System description: `docs/PROFESSIONS_SYSTEM.md`.
 - **Data:** `job`, `gather_skill`, `recipe`, `world_subarea` in the game database, imported by `scripts/professions-import.ts`.
+- **XP calculator (2026-11-20):** on every profession page. The player enters current XP, next-level XP and XP per craft, as the game shows them. The site computes the crafts and the total ingredients for a chosen recipe. There is no XP table in the game files ([[ADR-0007 Profession XP comes from the player's screen]]).
+- **« Avec vos métiers » (2026-11-20):** recipe filter keeping recipes whose every ingredient the character can harvest or craft at its saved profession levels (`selfSufficient` in `src/professions-shared.ts`). Loot and shop items never qualify.
+- **Loot ingredients:** up to 3 monsters that drop them, with the base chance before prospection (`monster_drop`). About 91% of the Tailleur loot ingredients have one.
 
 | Profession | French | Kind | Note |
 |---|---|---|---|

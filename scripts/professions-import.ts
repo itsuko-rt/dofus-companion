@@ -13,7 +13,8 @@ const arr = (x: any): any[] => x?.Array ?? [];
 export const PROFESSION_FILES = ['mapsinformationdata', 'areasdata', 'superareasdata', 'waypointsdata', 'jobsdata', 'skillsdata', 'recipesdata'] as const;
 
 /** Tables of the former in-site world map (removed): dropped on import so old databases are cleaned. */
-const RETIRED = ['world_map', 'world_cell', 'world_map_alt', 'world_hint', 'world_zaap', 'world_dungeon', 'world_npc', 'monster'];
+// ('monster' was retired too; it is now rebuilt with another schema by scripts/creatures-import.ts, which drops the old one)
+const RETIRED = ['world_map', 'world_cell', 'world_map_alt', 'world_hint', 'world_zaap', 'world_dungeon', 'world_npc'];
 
 export function importProfessions(db: DatabaseSync, rawDir: string, sourceUrl: string) {
   const read = (f: string): Row[] => JSON.parse(readFileSync(`${rawDir}/${f}.json`, 'utf8')).references.RefIds.map((r: Row) => r.data).filter(Boolean);
