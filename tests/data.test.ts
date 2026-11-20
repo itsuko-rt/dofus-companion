@@ -112,3 +112,11 @@ test('real data: level suggestions, zones and dungeons for a level come only fro
   assert.ok(r.dungeons.every((d) => Math.abs(d.optimalLevel - 50) <= 10 || (d.minLevel <= 50 && 50 <= d.optimalLevel)));
   assert.ok(r.dungeons.length > 0);
 });
+
+test('real data: quest objectives link to where monsters live and where items come from', { skip }, async () => {
+  const { loadQuestDetails } = await import('../src/load.ts');
+  const t = loadQuestDetails(db!, 64)!.targets;
+  assert.deepEqual(t.monsters, [{ name: 'Sanglier agressif', zones: ['Champs de Cania'] }]);
+  assert.equal(t.items[0].name, 'Défense de sanglier agressif');
+  assert.equal(t.items[0].source.kind, 'other');
+});

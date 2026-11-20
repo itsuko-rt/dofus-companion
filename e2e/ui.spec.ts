@@ -165,3 +165,13 @@ test('level page: the game suggestions, zones and dungeons follow the chosen lev
   await expect(page.getByText('Donjon des Forgerons', { exact: true })).toHaveCount(0); // ("Expédition - Donjon des Forgerons" is a 190–200 dungeon)
   expectNoErrors(errors);
 });
+
+test('quest drawer shows where objective monsters live and where items come from', async ({ page }) => {
+  await seedLocal(page);
+  const errors = collectErrors(page);
+  await page.goto('/progression/quetes/9#quest:64'); // Alignement Bonta
+  await expect(page.getByRole('heading', { name: 'Où trouver' })).toBeVisible();
+  await expect(page.getByText(/vit en Champs de Cania/)).toBeVisible();
+  await expect(page.getByText(/butin : Sanglier agressif/)).toBeVisible();
+  expectNoErrors(errors);
+});

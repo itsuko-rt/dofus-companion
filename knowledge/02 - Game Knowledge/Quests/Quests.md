@@ -34,6 +34,8 @@ Two more quests have a per-class branch: "Ça sent le gaz" (1960) and "La colèr
 
 Data quirk: quest 775 is named "Dévotion à Sadida" but is the Zobal one (`PG=14`). It is shown as in the game files. The game data does not say which *general* quests suit a class; that would be COMMUNITY advice. Details: `docs/GAME_DATA_AND_PRODUCT_AUDIT.md` §3.
 
+**Objective links (2026-11-20, `src/objective-targets.ts`):** the quest drawer's « Où trouver » section reads the monsters and items named by the game's objective templates (kill, bring back, show, use, craft). It matches them by exact game name: about 99% resolve (1,369 of 1,382 monster objectives, 2,567 of 2,579 item ones). It shows the zones where each monster lives and where each item comes from (profession, recipe, or dropping monsters). Free-text objectives are not parsed.
+
 **Known limits** (`docs/RAPPORT_SUIVI_QUETES.md` §4):
 - Frigost and Vulkania chains are very wide;
 - the 390 Almanax quests aren't linked to dates;

@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Check, Lock, Map as MapIcon, Search } from 'lucide-react';
 import { brackets, currentBracket, MAX_JOB_LEVEL, type IngredientSource, type JobDetails, type RecipeInfo } from '../../src/professions-shared.ts';
 import { checkInput, plan } from '../../src/craft-calc.ts';
+import SourceLabel from './SourceLabel';
 import { jobSlug } from '../../src/professions-shared.ts';
 import { useCharacter } from '../useCharacter';
 import { Button, ButtonLink, Card, ProgressBar, SectionTitle } from '../ui';
@@ -104,19 +105,6 @@ export default function JobGuide({ details, recipeTotal }: { details: JobDetails
 
       {recipes.length > 0 && <Recipes recipes={recipes} total={recipeTotal ?? recipes.length} level={level} />}
     </div>
-  );
-}
-
-/** Where an ingredient comes from, from the game data: a profession, or the monsters that drop it. */
-function SourceLabel({ source }: { source: IngredientSource }) {
-  if (source.kind === 'gathered') return <Link className="text-accent hover:underline" href={`/metiers/${jobSlug(source.jobName)}`}>{source.jobName} niv. {source.levelMin}</Link>;
-  if (source.kind === 'crafted') return <Link className="text-accent hover:underline" href={`/metiers/${jobSlug(source.jobName)}`}>{source.jobName} niv. {source.level}</Link>;
-  if (!source.drops?.length) return <span className="text-faint">butin ou achat</span>;
-  const pct = (n: number) => `${n.toLocaleString('fr-FR', { maximumFractionDigits: 2 })} %`;
-  return (
-    <span className="text-muted" title="Chance de base avant prospection, selon le grade du monstre">
-      butin : {source.drops.map((d) => `${d.monster} (${d.min === d.max ? pct(d.max) : `${pct(d.min)}–${pct(d.max)}`}${d.conditional ? ', sous condition' : ''})`).join(', ')}
-    </span>
   );
 }
 

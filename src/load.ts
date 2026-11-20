@@ -3,6 +3,9 @@ import { readdirSync } from 'node:fs';
 import { Graph, type GEdge, type NodeInput } from './graph.ts';
 import type { RenderedEffect } from './effects.ts';
 import type { Item, ItemSet } from './stats.ts';
+import { objectiveTargets } from './objective-targets.ts';
+import { itemSources } from './professions.ts';
+import type { IngredientSource } from './professions-shared.ts';
 
 /** Latest data/game-<version>.sqlite, or null if the import has not run. */
 export function latestDb(dir = 'data'): string | null {
@@ -130,6 +133,8 @@ export interface QuestDetails {
   start: { npc: string | null; zone: string | null };
   steps: { name: string | null; description: string | null; objectives: string[]; rewards: QuestReward[] }[];
   guides: { site: string; url: string; language: string; status: string; checkedAt: string }[];
+  /** monsters and items named by the objectives (exact game names): where the monsters live, where the items come from */
+  targets: { monsters: { name: string; zones: string[] }[]; items: { name: string; source: IngredientSource }[] };
 }
 
 export function loadQuestDetails(path: string, questId: number): QuestDetails | null {
@@ -142,10 +147,36 @@ export function loadQuestDetails(path: string, questId: number): QuestDetails | 
       .map((s) => ({ name: s.name, description: cleanGameText(s.description), objectives: JSON.parse(s.objectives ?? '[]'), rewards: JSON.parse(s.rewards ?? '[]') }));
     const guides = (db.prepare('SELECT site, url, language, status, checked_at FROM external_guide WHERE quest_id = ?').all(questId) as Record<string, any>[])
       .map((g) => ({ site: g.site, url: g.url, language: g.language, status: g.status, checkedAt: g.checked_at }));
-    return { id: questId, start: { npc: start?.npc_name ?? null, zone: start?.subarea_name ?? null }, steps, guides };
+    return { id: questId, start: { npc: start?.npc_name ?? null, zone: start?.subarea_name ?? null }, steps, guides, targets: questTargets(db, steps.flatMap((s) => s.objectives as string[])) };
   } finally {
     db.close();
   }
+}
+
+function questTargets(db: DatabaseSync, objectives: string[]): QuestDetails['targets'] {
+  const monsters: QuestDetails['targets']['monsters'] = [], items: QuestDetails['targets']['items'] = [];
+  if (!db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'monster_subarea'").get()) return { monsters, items }; // creatures import not run
+  const zonesOf = db.prepare(`SELECT DISTINCT s.name FROM monster m JOIN monster_subarea ms ON ms.monster_id = m.id
+    JOIN world_subarea s ON s.id = ms.subarea_id WHERE m.name = ? ORDER BY s.name`);
+  const itemId = db.prepare('SELECT id FROM item WHERE name = ? ORDER BY id LIMIT 1');
+  const source = itemSources(db);
+  const seen = new Set<string>();
+  for (const o of objectives) {
+    const t = objectiveTargets(o);
+    const key = t.monster ? `m:${t.monster}` : t.item ? `i:${t.item}` : null;
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    if (t.monster) {
+      const zones = (zonesOf.all(t.monster) as { name: string }[]).map((z) => z.name);
+      if (zones.length) monsters.push({ name: t.monster, zones });
+    } else if (t.item) {
+      const id = (itemId.get(t.item) as { id: number } | undefined)?.id;
+      if (id == null) continue;
+      const s = source(id);
+      if (s.kind !== 'other' || s.drops.length) items.push({ name: t.item, source: s });
+    }
+  }
+  return { monsters, items };
 }
 
 export function withDb<T>(path: string, fn: (db: DatabaseSync) => T): T {

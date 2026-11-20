@@ -1,4 +1,5 @@
 'use client';
+import SourceLabel from '../professions/SourceLabel';
 import { useEffect, useState } from 'react';
 import { BookOpen, Check, CheckCheck, ExternalLink, Gift, GitBranch, MapPin, RotateCcw, Timer, Trophy, Unlock } from 'lucide-react';
 import type { QuestDetails } from '../../src/load.ts';
@@ -156,6 +157,21 @@ export default function QuestDrawer({ node, graph, status, ch, region, givesDofu
               </li>
             ))}
           </ol>
+        </section>
+      )}
+
+      {details && (details.targets.monsters.length > 0 || details.targets.items.length > 0) && (
+        <section className="mt-5">
+          <h3 className="mb-1 text-sm font-semibold">Où trouver</h3>
+          <ul className="flex flex-col gap-1 text-sm">
+            {details.targets.monsters.map((m) => (
+              <li key={`m${m.name}`}><span className="text-text">{m.name}</span> <span className="text-xs text-muted">· vit en {m.zones.slice(0, 4).join(', ')}{m.zones.length > 4 ? ` et ${m.zones.length - 4} autres zones` : ''}</span></li>
+            ))}
+            {details.targets.items.map((it) => (
+              <li key={`i${it.name}`}><span className="text-text">{it.name}</span> <span className="text-xs">· <SourceLabel source={it.source} /></span></li>
+            ))}
+          </ul>
+          <p className="mt-1 text-[11px] text-faint">Zones et sources d’après les fichiers du jeu ; chances de base avant prospection.</p>
         </section>
       )}
 
