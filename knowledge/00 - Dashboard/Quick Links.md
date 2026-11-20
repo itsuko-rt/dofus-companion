@@ -9,6 +9,8 @@
 | E2E (needs a production server on 3100) | `npm run build`, `npm start -- -p 3100`, then `npx playwright test` |
 | Import game data (≈ 8 GB RAM) | `npm run import` |
 | Rebuild profession tables only | `node --max-old-space-size=8192 scripts/professions-import.ts` |
+| Rebuild classes, monsters, XP, activities, Almanax only | `node --max-old-space-size=8192 scripts/creatures-import.ts` |
+| Rebuild favicons and app icons from `brand/` | `node scripts/make-icons.ts` |
 | Official icons (local only, not in Git) | `npm run assets` |
 | Security probe (local or staging only) | `node scripts/security-probe.mjs http://127.0.0.1:3100` |
 | Broken links | `node scripts/check-links.ts http://localhost:3000` |

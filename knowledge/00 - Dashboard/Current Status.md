@@ -3,7 +3,7 @@
 *Last updated: 2026-11-20 by Claude Code. Update this note after each significant session.*
 
 ## Where we are
-**Pre-launch.** The site runs locally. All checks pass: typecheck, 72 unit tests, 22 E2E tests, production build, `npm audit` with 0 vulnerabilities.
+**Pre-launch.** The site runs locally. On branch `develop` (2026-11-20): typecheck clean, 88 unit tests, 37 E2E tests passed (1 skipped by design), production build OK. Not deployed.
 
 ## Latest changes (2026-11-20, pushed to `main`)
 - **In-site map removed:** `/carte` is now a directory of DofusDB and Dofus Maps ([[ADR-0005 Remove the in-site map]]).
@@ -11,7 +11,7 @@
 - **This knowledge base** and the project `CLAUDE.md`.
 - **Obsidian set up** (branch docs/obsidian-setup): vault registered in Obsidian 1.15.1, dashboard rebuilt, Bases view of research notes ([[Setup Report]]).
 
-## Since phase 0 (2026-11-20, branch docs/product-audit, not committed)
+## On branch `develop` (2026-11-20, pushed; PR #2 into `main`, not merged)
 - **Game data foundation:** classes (`breed_info`), monsters with grades, zones and drops, character XP table. Inventory: `docs/GAME_DATA_INVENTORY.md`.
 - **All 19 classes:** onboarding grid, spell pages, builds (Fashionista names checked) and class filters. Crâ and Pandawa keep their URLs.
 - **Not in the game files:** profession XP table and XP per craft, prices.
@@ -42,4 +42,4 @@ From [[Release Checklist]]:
 - XP and kamas routes: no verified data, not implemented.
 
 ## What Claude Code is working on
-Phase 0 of `docs/GAME_DATA_AND_PRODUCT_AUDIT.md` done on 2026-11-20 (branch docs/product-audit, not committed): [[Blank pages on a first visit]] fixed, Succès query batched and indexed, quest graph built once. Phases 1–2 (all classes, class hub) wait for the owner's approval. Next recommended actions are in the latest [[Session Summaries|session summary]].
+Nothing in progress. The autonomous session of 2026-11-20 ended with everything committed and pushed on `develop` (PR #2 open, not merged). Next steps: [[2026-11-20 Autonomous development session#Next recommended actions]].
