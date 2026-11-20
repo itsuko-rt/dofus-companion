@@ -5,7 +5,8 @@
 export interface Activity { id: number; name: string; description: string | null; category: string; level: number; zone: string | null }
 export interface ZoneMonster { id: number; name: string; lmin: number; lmax: number; xpMin: number; xpMax: number }
 export interface Zone { id: number; name: string; area: string | null; monsters: ZoneMonster[]; harvest: string[] }
-export interface Drop { item: string; min: number; max: number }
+/** uses: how many recipes of the game take this item as an ingredient (craft demand from game data, not a price) */
+export interface Drop { item: string; min: number; max: number; uses: number }
 export interface Dungeon { id: number; name: string; minLevel: number; optimalLevel: number; bosses: string[] }
 export interface ZoneData { version: string; activities: Activity[]; zones: Zone[]; drops: Record<number, Drop[]>; dungeons: Dungeon[] }
 
@@ -23,6 +24,16 @@ export function forLevel(data: ZoneData, level: number, band: number) {
     return { ...z, monsters, loot: [...loot.values()].sort((a, b) => b.max - a.max).slice(0, 8) };
   }).filter((z) => z.monsters.length >= 2)
     .sort((a, b) => b.monsters.length - a.monsters.length || a.name.localeCompare(b.name, 'fr')).slice(0, 12);
+  // resources of those zones that crafters need most: the number of recipes using them (no price exists in the data)
+  const demand = new Map<string, { item: string; uses: number; zones: string[]; max: number }>();
+  for (const z of zones) for (const m of z.monsters) for (const d of data.drops[m.id] ?? []) {
+    if (!d.uses) continue;
+    const cur = demand.get(d.item) ?? { item: d.item, uses: d.uses, zones: [], max: 0 };
+    if (!cur.zones.includes(z.name)) cur.zones.push(z.name);
+    cur.max = Math.max(cur.max, d.max);
+    demand.set(d.item, cur);
+  }
+  const wanted = [...demand.values()].sort((a, b) => b.uses - a.uses || b.max - a.max).slice(0, 10);
   const dungeons = data.dungeons.filter((d) => near(d.optimalLevel) || (d.minLevel <= level && level <= d.optimalLevel));
-  return { byCategory, zones, dungeons };
+  return { byCategory, zones, dungeons, wanted };
 }

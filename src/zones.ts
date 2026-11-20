@@ -25,12 +25,14 @@ export const loadZoneData = (path: string) => withDb(path, (db): ZoneData | null
   }).filter((z) => z.monsters.length);
   // best 3 drops per monster of those zones (base chance before prospection, lowest–highest grade); drops with a game
   // condition (events such as Pwâk or Halouine, quests, level ranges) are left out: they are not what the zone gives every day
+  const uses = new Map<number, number>();
+  for (const r of all<{ ingredients: string }>('SELECT ingredients FROM recipe')) for (const [id] of JSON.parse(r.ingredients) as [number, number][]) uses.set(id, (uses.get(id) ?? 0) + 1);
   const drops: Record<number, Drop[]> = {};
   for (const d of all<{ m: number; i: number; chances: string }>("SELECT monster_id m, item_id i, chances FROM monster_drop WHERE criterion = ''")) {
     if (!used.has(d.m) || !itemName.has(d.i)) continue;
     const c = (JSON.parse(d.chances) as (number | null)[]).filter((x): x is number => x != null);
     if (!c.length) continue;
-    (drops[d.m] ??= []).push({ item: itemName.get(d.i)!, min: Math.min(...c), max: Math.max(...c) });
+    (drops[d.m] ??= []).push({ item: itemName.get(d.i)!, min: Math.min(...c), max: Math.max(...c), uses: uses.get(d.i) ?? 0 });
   }
   for (const k of Object.keys(drops)) drops[+k] = drops[+k].sort((a, b) => b.max - a.max).slice(0, 3);
   const bosses = new Map<number, string[]>();

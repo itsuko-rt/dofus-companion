@@ -92,13 +92,28 @@ export default function LevelView() {
                         ))}
                         {z.monsters.length > 8 && <li className="text-xs text-faint">et {z.monsters.length - 8} autres</li>}
                       </ul>
-                      {z.loot.length > 0 && <p className="mt-2 text-xs text-muted"><span className="font-semibold text-text">Butin :</span> {z.loot.map((l) => `${l.item} (${l.min === l.max ? pct(l.max) : `${pct(l.min)}–${pct(l.max)}`})`).join(', ')}</p>}
+                      {z.loot.length > 0 && <p className="mt-2 text-xs text-muted"><span className="font-semibold text-text">Butin :</span> {z.loot.map((l) => `${l.item} (${l.min === l.max ? pct(l.max) : `${pct(l.min)}–${pct(l.max)}`}${l.uses ? `, ${l.uses} recette${l.uses > 1 ? 's' : ''}` : ''})`).join(', ')}</p>}
                       {z.harvest.length > 0 && <p className="mt-1 text-xs text-muted"><span className="font-semibold text-text">Récoltes :</span> {z.harvest.join(', ')}</p>}
                     </Card>
                   ))}
                 </div>
               )}
             </section>
+
+            {r.wanted.length > 0 && (
+              <section aria-labelledby="wanted">
+                <h2 id="wanted" className="mb-1 font-display text-lg text-text">Ressources les plus utilisées par les artisans</h2>
+                <p className="mb-3 text-xs text-faint">Butins des monstres de ces zones, classés par nombre de recettes du jeu qui les demandent : une indication de demande, pas un prix (aucun prix n’est dans les données du jeu).</p>
+                <ul className="grid gap-2 text-sm sm:grid-cols-2">
+                  {r.wanted.map((w) => (
+                    <li key={w.item} className="rounded-md border border-line bg-surface px-3 py-2">
+                      <span className="text-text">{w.item}</span> <span className="text-xs text-accent">· {n(w.uses)} recette{w.uses > 1 ? 's' : ''}</span>
+                      <span className="block text-xs text-muted">jusqu’à {pct(w.max)} · {w.zones.slice(0, 3).join(', ')}{w.zones.length > 3 ? '…' : ''}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
 
             <section aria-labelledby="donjons">
               <h2 id="donjons" className="mb-1 font-display text-lg text-text">Donjons de votre niveau</h2>

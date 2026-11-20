@@ -134,3 +134,11 @@ test('real data: Almanax offering of a day comes from the game calendar', { skip
   let d = { day: 1, month: 1, year: 2027 };
   for (let i = 0; i < 365; i++, d = addDays(d, 1)) assert.ok(almanaxFor(entries, d).offering, `${d.day}/${d.month}`);
 });
+
+test('real data: craft demand ranks zone loot by how many game recipes use it', { skip }, async () => {
+  const { loadZoneData, forLevel } = await import('../src/zones.ts');
+  const w = forLevel(loadZoneData(db!)!, 30, 10).wanted;
+  assert.ok(w.length > 0 && w.length <= 10);
+  for (let i = 1; i < w.length; i++) assert.ok(w[i - 1].uses >= w[i].uses);
+  assert.ok(w.every((x) => x.uses > 0 && x.zones.length > 0));
+});
