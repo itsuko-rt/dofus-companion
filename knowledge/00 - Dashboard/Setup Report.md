@@ -62,7 +62,7 @@ I could not see the Obsidian window (no screen access in this session). Please c
 Also:
 - **Permanent location (since 2026-11-20):** the repository is cloned to `Documents\Atlas-des-Douze` on the owner's PC (with `core.longpaths true`). Obsidian's only registered vault is its `knowledge` folder. The local-only files (`data/`, `public/ankama/`) were copied there; they are git-ignored. The first copy, in a temporary Claude session folder, is no longer used.
 - `.gitattributes` keeps the vault in LF line endings, so Obsidian's rewrites of `.obsidian/*.json` no longer show as changes on Windows.
-- This work is on branch docs/obsidian-setup, pushed to GitHub, not merged into `main` (PR #1).
+- The setup commit reached `main` through PR #1. Later commits (line endings, this location note) are on branch docs/obsidian-setup until merged.
 
 ## 9. How to open and use the vault
 - **Open it:** start Obsidian. It reopens `Documents\Atlas-des-Douze\knowledge` automatically; to switch vaults, use the vault icon at the bottom left.
