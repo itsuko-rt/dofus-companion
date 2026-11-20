@@ -11,7 +11,9 @@ export interface RecipeInfo {
   ingredients: { id: number; name: string; iconId: number | null; qty: number; source: IngredientSource }[];
 }
 /** Where an ingredient comes from, as far as the game data tells: harvested, crafted, or neither (loot, shop…). */
-export type IngredientSource = { kind: 'gathered'; jobId: number; jobName: string; levelMin: number } | { kind: 'crafted'; jobId: number; jobName: string; level: number } | { kind: 'other' };
+export type IngredientSource = { kind: 'gathered'; jobId: number; jobName: string; levelMin: number } | { kind: 'crafted'; jobId: number; jobName: string; level: number } | { kind: 'other'; drops: DropSource[] };
+/** A monster that drops the item: chance in % before prospection (lowest and highest grade), conditional = the game sets a drop condition. */
+export interface DropSource { monster: string; min: number; max: number; conditional: boolean }
 export interface JobDetails { job: JobSummary; tiers: GatherTier[]; recipes: RecipeInfo[]; version: string }
 
 

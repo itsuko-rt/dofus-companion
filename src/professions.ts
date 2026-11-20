@@ -3,7 +3,7 @@ import { withDb } from './load.ts';
 import { jobSlug } from './professions-shared.ts';
 
 export * from './professions-shared.ts';
-import type { JobSummary, GatherTier, RecipeInfo, IngredientSource, JobDetails } from './professions-shared.ts';
+import type { JobSummary, GatherTier, RecipeInfo, IngredientSource, JobDetails, DropSource } from './professions-shared.ts';
 
 const hasWorld = (db: import('node:sqlite').DatabaseSync) => !!db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'world_subarea'").get();
 
@@ -37,11 +37,18 @@ export function loadJob(path: string, slug: string): JobDetails | null {
       .map((r) => [r.item_id as number, r]));
     const craftedBy = new Map((db.prepare('SELECT r.result_id, MIN(r.level) lv, r.job_id, j.name FROM recipe r JOIN job j ON j.id = r.job_id GROUP BY r.result_id').all() as Record<string, any>[])
       .map((r) => [r.result_id as number, r]));
+    // monsters dropping an item (game files, scripts/creatures-import.ts): the 3 best base chances
+    const dropQuery = db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'monster_drop'").get()
+      ? db.prepare('SELECT m.name, d.chances, d.criterion FROM monster_drop d JOIN monster m ON m.id = d.monster_id WHERE d.item_id = ?') : null;
+    const drops = (id: number): DropSource[] => !dropQuery ? [] : (dropQuery.all(id) as Record<string, any>[]).map((r) => {
+      const c = (JSON.parse(r.chances) as (number | null)[]).filter((x): x is number => x != null);
+      return { monster: r.name as string, min: c.length ? Math.min(...c) : 0, max: c.length ? Math.max(...c) : 0, conditional: !!r.criterion };
+    }).sort((a, b) => b.max - a.max || a.monster.localeCompare(b.monster, 'fr')).slice(0, 3);
     const source = (id: number): IngredientSource => {
       const g = gatheredBy.get(id);
       if (g) return { kind: 'gathered', jobId: g.job_id, jobName: g.name, levelMin: g.lv };
       const c = craftedBy.get(id);
-      return c ? { kind: 'crafted', jobId: c.job_id, jobName: c.name, level: c.lv } : { kind: 'other' };
+      return c ? { kind: 'crafted', jobId: c.job_id, jobName: c.name, level: c.lv } : { kind: 'other', drops: drops(id) };
     };
     const recipes = (db.prepare('SELECT r.result_id, r.level, r.ingredients, i.name, i.icon_id FROM recipe r JOIN item i ON i.id = r.result_id WHERE r.job_id = ? ORDER BY r.level, i.name')
       .all(job.id) as Record<string, any>[]).map((r): RecipeInfo => ({

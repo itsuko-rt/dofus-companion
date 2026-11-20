@@ -61,3 +61,18 @@ test('maps page: two external tools, new tab with safe rel, no iframe; old map A
   expect((await request.get('/api/world/1')).status()).toBe(404);
   expectNoErrors(errors);
 });
+
+test('profession XP calculator: XP shown in game → crafts and resources, and invalid numbers are refused', async ({ page }) => {
+  await page.goto('/metiers/paysan');
+  await page.getByLabel('Niveau de Paysan (nombre)').fill('10');
+  await page.getByLabel('XP actuelle').fill('1200');
+  await page.getByLabel('XP du niveau suivant').fill('2000');
+  await page.getByLabel('XP par fabrication').fill('30');
+  await expect(page.getByText(/Il reste 800 XP/)).toBeVisible();
+  await expect(page.getByText(/27\s+actions/)).toBeVisible();
+  const recipe = page.getByLabel(/Recette \(facultatif/);
+  await recipe.selectOption({ index: 1 });
+  await expect(page.getByRole('heading', { name: 'Ressources à réunir' })).toBeVisible();
+  await page.getByLabel('XP actuelle').fill('3000');
+  await expect(page.getByRole('alert').filter({ hasText: 'dépasse' })).toBeVisible();
+});
