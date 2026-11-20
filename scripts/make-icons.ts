@@ -1,7 +1,7 @@
 // Builds every favicon, app icon and the social preview from the Emerald Egg sources in brand/:
-//  - brand/emerald-egg-master.png (supplied artwork, 1254 px) for 32 px and up;
-//  - brand/emerald-egg-small.svg (same design without rocks, leaves and facets) for 16 px,
-//    where the full artwork blurs into a green blob.
+//  - brand/emerald-egg-master.png (supplied artwork, 1254 px) for 96 px and up;
+//  - brand/emerald-egg-small.svg (same design without rocks, leaves and facets) for 16–48 px (tab icons),
+//    where the full artwork blurs into a green blob; also copied to public/favicon.svg.
 // node scripts/make-icons.ts   (uses sharp, installed with Next.js)
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import sharp from 'sharp';
@@ -12,7 +12,7 @@ const small = readFileSync('brand/emerald-egg-small.svg');
 const BG = '#15110d'; // site background, also the manifest colours
 
 const fromMaster = (size: number) => sharp(master).resize(size, size, { kernel: 'lanczos3' }).png({ compressionLevel: 9, effort: 10 }).toBuffer();
-const icon = (size: number) => (size <= 16 ? sharp(small, { density: 384 }).resize(size, size).png({ compressionLevel: 9 }).toBuffer() : fromMaster(size));
+const icon = (size: number) => (size <= 48 ? sharp(small, { density: 384 }).resize(size, size).png({ compressionLevel: 9 }).toBuffer() : fromMaster(size));
 /** Mark centred on an opaque square: iOS and Android masks would turn transparent corners black. */
 const onBackground = async (size: number, scale: number) => sharp({ create: { width: size, height: size, channels: 4, background: BG } })
   .composite([{ input: await fromMaster(Math.round(size * scale)), gravity: 'center' }]).png({ compressionLevel: 9, effort: 10 }).toBuffer();
@@ -37,6 +37,7 @@ ico.forEach((s, i) => {
   header.writeUInt32LE(out[s].length, e + 8); header.writeUInt32LE(offset, e + 12);
   offset += out[s].length;
 });
+writeFileSync('public/favicon.svg', small);
 writeFileSync('public/favicon.ico', Buffer.concat([header, ...ico.map((s) => out[s])]));
 
 // social preview 1200×630: night background, the egg, name and tagline (system fonts: rendered server-side)

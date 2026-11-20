@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { collectErrors, expectNoErrors, localStore, seedLocal } from './helpers';
+import { character, collectErrors, expectNoErrors, localStore, seedLocal, STORE } from './helpers';
 
 test('every sitemap page loads with one h1, no script error and no CSP violation', async ({ page, request }) => {
   test.setTimeout(240_000);
@@ -58,7 +58,9 @@ test('quest tracker: search, right-click to complete, undo, persistence', async 
   await page.getByPlaceholder('Rechercher une quête…').fill('Premiers pas');
   await expect(page.locator('ul.absolute li', { hasText: 'Premiers pas' }).first()).toBeVisible();
   await page.getByPlaceholder('Rechercher une quête…').fill('');
-  // status filter
+  // status filter (behind the « Filtres » button on phones)
+  const filters = page.getByRole('button', { name: 'Filtres' });
+  if (await filters.isVisible()) await filters.click();
   await page.locator('select', { has: page.locator('option', { hasText: 'Tous les statuts' }) }).selectOption('available');
   expectNoErrors(errors);
 });
@@ -125,4 +127,41 @@ test('builds page shows community builds or an explicit error, never a blank pag
   await seedLocal(page);
   await page.goto('/builds');
   await expect(page.getByText(/Voir l’équipement|Fashionista ne répond pas|Aucun build/i).first()).toBeVisible({ timeout: 45_000 });
+});
+
+test('first visit without a saved character: pages opened directly render their content', async ({ page }) => {
+  // no seedLocal: a brand-new visitor (these pages stayed blank until 2026-11-20)
+  const errors = collectErrors(page);
+  await page.goto('/personnage');
+  await expect(page.getByText('Quelle est votre classe')).toBeVisible();
+  await page.goto('/builds');
+  await expect(page.getByText(/Des équipements complets partagés sur Dofus Fashionista/)).toBeVisible();
+  expectNoErrors(errors);
+});
+
+test('class-aware progression: an Iop sees its class quests and achievements, not the Crâ class quest', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'the region list is a drawer on mobile; the logic is the same');
+  const errors = collectErrors(page);
+  await page.addInitScript(([key, c]) => localStorage.setItem(key, JSON.stringify({ activeId: c.id, characters: [c] })),
+    [STORE, character('ciop', 'Iopette', { level: 30, profile: { breed: 8 } })] as const);
+  await page.goto('/progression/quetes/astrub');
+  const panel = page.getByRole('region', { name: 'Quêtes de classe Iop' });
+  await expect(panel).toBeVisible();
+  await expect(panel.getByText('Iop et hop')).toBeVisible(); // the Iop's Astrub class quest (PG=8)
+  await expect(page.locator('.react-flow__node', { hasText: "C'est pour ta pomme" })).toHaveCount(0); // Crâ only (PG=9)
+  await page.goto('/progression/succes');
+  await expect(page.getByRole('heading', { name: 'Pour votre classe · Iop' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Dopeul Iop/ })).toBeVisible();
+  expectNoErrors(errors);
+});
+
+test('level page: the game suggestions, zones and dungeons follow the chosen level', async ({ page }) => {
+  const errors = collectErrors(page);
+  await page.goto('/progression/niveau');
+  await page.getByLabel('Niveau', { exact: true }).fill('50');
+  await expect(page.getByText('Donjon des Forgerons', { exact: true }).first()).toBeVisible(); // suggested by the game at 50
+  await expect(page.getByRole('heading', { name: 'Zones et monstres de votre niveau' })).toBeVisible();
+  await page.getByLabel('Niveau', { exact: true }).fill('200');
+  await expect(page.getByText('Donjon des Forgerons', { exact: true })).toHaveCount(0); // ("Expédition - Donjon des Forgerons" is a 190–200 dungeon)
+  expectNoErrors(errors);
 });
