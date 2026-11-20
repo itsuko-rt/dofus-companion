@@ -52,7 +52,7 @@ export default function Home() {
     return (
       <div className="h-full overflow-y-auto">
         <section className="relative isolate overflow-hidden border-b border-black/40 bg-sec-characters"
-          style={{ backgroundImage: `url(${SUPPORTED_BREEDS[0].art.scene})`, backgroundSize: 'cover', backgroundPosition: 'right center' }}>
+          style={{ backgroundImage: `url(${SUPPORTED_BREEDS.find((b) => b.id === 9)!.art.scene})`, backgroundSize: 'cover', backgroundPosition: 'right center' }}>
           <div className="absolute inset-0 -z-10 bg-gradient-to-r from-bg via-bg/70 to-transparent" aria-hidden />
           <div className="mx-auto max-w-5xl px-4 py-12 sm:py-16">
             <p className="text-xs font-medium uppercase tracking-[0.16em] text-[#ffe2a6]">Bienvenue, aventurier</p>

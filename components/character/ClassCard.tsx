@@ -1,9 +1,7 @@
 'use client';
 // Class card: official portrait (local copy) on its class colour, roles as diamonds.
-import { SUPPORTED_BREEDS } from '../breeds';
+import type { Breed } from '../breeds';
 import { Diamond } from '../ui';
-
-type Breed = (typeof SUPPORTED_BREEDS)[number];
 
 export default function ClassCard({ breed, selected, compact }: { breed: Breed; selected?: boolean; compact?: boolean }) {
   return (
@@ -12,8 +10,9 @@ export default function ClassCard({ breed, selected, compact }: { breed: Breed; 
       <img src={breed.art.portrait} alt="" className={`${compact ? 'h-24 w-24' : 'h-36 w-32 sm:w-36'} shrink-0 object-cover object-top`}
         onError={(e) => { e.currentTarget.style.visibility = 'hidden'; }} />
       <span className="flex min-w-0 flex-1 flex-col justify-center gap-1 p-3">
-        <span className="title-hero text-xl text-white">{breed.name}</span>
-        <span className="text-xs font-medium uppercase tracking-wide text-[#ffe2a6]">{breed.title}</span>
+        <span className={`title-hero ${compact ? 'text-lg leading-tight [overflow-wrap:anywhere]' : 'text-xl'} text-white`}>{breed.name}</span>
+        <span className="text-xs font-medium uppercase tracking-wide text-[#ffe2a6]">{breed.title}
+          {breed.complexity != null && <span className="ml-1 normal-case tracking-normal text-white/60" title="Complexité de la classe selon le jeu">· complexité {breed.complexity}/5</span>}</span>
         {!compact && <span className="text-xs text-white/75">{breed.blurb}</span>}
         <span className="mt-1 flex flex-wrap gap-x-2 gap-y-1 text-[11px] text-white/80">
           {breed.roles.map((r) => (
