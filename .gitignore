@@ -8,3 +8,12 @@ public/ankama/
 .env*.local
 test-results/
 playwright-report/
+
+# Obsidian: keep vault config and notes, not per-user workspace state
+knowledge/.obsidian/workspace*.json
+knowledge/.obsidian/cache
+knowledge/.obsidian/graph.json
+knowledge/.obsidian/plugins/
+knowledge/.obsidian/community-plugins.json
+knowledge/.trash/
+knowledge/Attachments/
