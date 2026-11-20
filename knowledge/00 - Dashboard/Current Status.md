@@ -5,7 +5,7 @@
 ## Where we are
 **Pre-launch.** The site runs locally. All checks pass: typecheck, 72 unit tests, 22 E2E tests, production build, `npm audit` with 0 vulnerabilities.
 
-## Latest changes (uncommitted on 2026-11-20)
+## Latest changes (committed locally on 2026-11-20, not pushed)
 - **In-site map removed:** `/carte` is now a directory of DofusDB and Dofus Maps ([[ADR-0005 Remove the in-site map]]).
 - **Security audit and fixes:** reset links kept out of production logs, password hashing capped, JSON-LD escape fixed ([[Security Audit]]).
 - **This knowledge base** and the project `CLAUDE.md`.

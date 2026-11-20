@@ -3,6 +3,9 @@
 ## Backslashes in shell-written code
 On this Windows setup, code written through shell heredocs or `sed` lost its backslashes. A regex `\b` became a backspace byte, and `'\\u003c'` lost a level of escaping. **Write source files with the editor tools, not the shell, whenever they contain backslashes**, and check the bytes (`od -c`) when in doubt.
 
+## Long note paths on Windows
+Vault paths are long (`knowledge/09 - Development Memory/Architecture Decision Records/...`). Inside a deeply nested folder they pass Windows' 260-character limit, and `git add` fails with "Filename too long". This repository sets `git config core.longpaths true` (local config). Anyone cloning on Windows into a deep folder needs the same setting, or a shorter clone path.
+
 ## Check the data before building on it
 - The game files give resources per zone, not per map. A full interactive map was built before that limit was accepted, then removed ([[ADR-0005 Remove the in-site map]]).
 - Check what the data really contains (`docs/RAPPORT_ARCHITECTURE.md` §3 is a good example) before designing features that need more.

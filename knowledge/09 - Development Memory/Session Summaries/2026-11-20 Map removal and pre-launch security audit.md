@@ -36,7 +36,7 @@ components/world and app/api/world (both deleted), `app/carte/page.tsx`, `src/pr
 - Backups.
 - Staging run.
 - Legal review.
-- Changes are uncommitted.
+- Committed locally as `02b400a` and `72ad961`; not pushed.
 
 ## Next recommended actions
 Commit and push; then the [[Release Checklist]].
