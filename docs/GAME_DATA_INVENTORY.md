@@ -30,6 +30,7 @@ The release has 250 files. This table lists the ones that matter for the site, c
 - Character XP: level 2 = 110, level 200 = 5,555,424,000, strictly increasing.
 - Monster grades, zones and drops point to existing monsters. Example: Bouftou drops "Laine de Bouftou" at 53% for every grade.
 - Monster grade XP matches the game's `getEXP` formula for only 4,745 of 18,500 grades below level 200. **The stored XP is used, never the formula.**
+- 9,308 of 26,851 grades have XP `0` (mostly quest monsters, summons, archmonsters). A zero means "not set in this file", not "gives no XP". Whether players earn the stored value is UNVERIFIED (see `docs/PR2_TECHNICAL_REVIEW.md`, H2 and M6).
 
 ## Missing from the game files (not invented)
 | Wanted | Status |

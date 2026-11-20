@@ -11,7 +11,7 @@ With the owner's full authorization: commit, push and open PRs; no merge, no dep
 |---|---|
 | Phases 0–6 committed as 9 reviewable commits on `develop`; PR #2 into `main` opened (not merged) | Git |
 | First Quêtes visit: graph data and graph view warmed on idle from other pages; no loading frame on revisits | `components/Nav.tsx`, `components/quests/useGame.ts` |
-| Quest drawer « Où trouver »: zones of objective monsters, sources of objective items (exact game names, ~99% resolved) | `src/objective-targets.ts`, `loadQuestDetails` |
+| Quest drawer « Où trouver »: zones of objective monsters, sources of objective items (exact game names: 1,369 of 1,382 monster names found, but 155 are shared by several monsters and dungeon-only monsters get no zone; see [[2026-11-20 PR 2 technical review]]) | `src/objective-targets.ts`, `loadQuestDetails` |
 | Item sources shared by professions, quests and equipment | `itemSources` in `src/professions.ts`, `components/professions/SourceLabel.tsx` |
 | Equipment cards « Obtention »: recipe with ingredients, or dropping monsters | `searchItems`, `components/equipment/EquipmentView.tsx` |
 | Class pages: official description, complexity, class quests with links, linked achievements, then spells | `loadClassExtras`, `components/SpellGuide.tsx` |

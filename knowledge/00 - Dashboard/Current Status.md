@@ -3,7 +3,14 @@
 *Last updated: 2026-11-20 by Claude Code. Update this note after each significant session.*
 
 ## Where we are
-**Pre-launch.** The site runs locally. On branch `develop` (2026-11-20): typecheck clean, 88 unit tests, 37 E2E tests passed (1 skipped by design), production build OK. Not deployed.
+**Pre-launch.** The site runs locally. On branch `develop` (review of 2026-11-20): typecheck clean, 88/88 unit tests, production build OK. E2E: 36 passed, 1 skipped by design, 1 failed (sitemap test over its 240 s budget with 2 workers; passes alone). Not deployed.
+
+## PR #2 review (2026-11-20): not ready to merge
+Report: `docs/PR2_TECHNICAL_REVIEW.md`, summary [[2026-11-20 PR 2 technical review]]. Fix first:
+1. Almanax shows the season's offering on 81 days a year.
+2. Level page: "0 XP" monsters; archmonster, quest and event monsters counted in the zone ranking.
+3. Craft-demand ranking limited to each monster's 3 best drops.
+4. Sitemap E2E test over its time budget.
 
 ## Latest changes (2026-11-20, pushed to `main`)
 - **In-site map removed:** `/carte` is now a directory of DofusDB and Dofus Maps ([[ADR-0005 Remove the in-site map]]).
@@ -42,4 +49,4 @@ From [[Release Checklist]]:
 - XP and kamas routes: no verified data, not implemented.
 
 ## What Claude Code is working on
-Nothing in progress. The autonomous session of 2026-11-20 ended with everything committed and pushed on `develop` (PR #2 open, not merged). Next steps: [[2026-11-20 Autonomous development session#Next recommended actions]].
+Nothing in progress. PR #2 is reviewed and not merged; it waits for the owner's decision on the pre-merge fixes. Next steps: [[2026-11-20 PR 2 technical review#Next recommended actions]].

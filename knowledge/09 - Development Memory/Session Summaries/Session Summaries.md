@@ -2,6 +2,7 @@
 
 One note per significant session, named `YYYY-MM-DD <topic>`, from [[Development Session]]. Newest first.
 
+- [[2026-11-20 PR 2 technical review]]
 - [[2026-11-20 Autonomous development session]]
 - [[2026-11-20 UX pass and favicon]]
 - [[2026-11-20 Level page for XP and loot]]
