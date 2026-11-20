@@ -11,6 +11,15 @@
 - **This knowledge base** and the project `CLAUDE.md`.
 - **Obsidian set up** (branch docs/obsidian-setup): vault registered in Obsidian 1.15.1, dashboard rebuilt, Bases view of research notes ([[Setup Report]]).
 
+## Since phase 0 (2026-11-20, branch docs/product-audit, not committed)
+- **Game data foundation:** classes (`breed_info`), monsters with grades, zones and drops, character XP table. Inventory: `docs/GAME_DATA_INVENTORY.md`.
+- **All 19 classes:** onboarding grid, spell pages, builds (Fashionista names checked) and class filters. Crâ and Pandawa keep their URLs.
+- **Not in the game files:** profession XP table and XP per craft, prices.
+- **Class-aware progression:** class quests panel and hiding of other classes' exclusive quests; "Pour votre classe" achievements (linked by class quests, or named after the class); fix of [[Server-only objectives counted as met]].
+- **Professions:** XP calculator on every profession page ([[ADR-0007 Profession XP comes from the player's screen]]); loot ingredients show up to 3 monsters that drop them, with the base chance.
+- **Que faire à mon niveau** (`/progression/niveau`): game suggestions, zones and monsters (base XP, drops, harvests) and dungeons for a level. No rates or prices.
+- **UX pass:** sharper tab icon (`favicon.svg`), compact mobile Quêtes header with a « Filtres » button, five progression tabs that fit 375 px, one category navigation in Succès (with progress), short fade-in after loading.
+
 ## Blocking a public launch
 From [[Release Checklist]]:
 1. **E-mail provider:** password reset can't send links in production.
@@ -28,4 +37,4 @@ From [[Release Checklist]]:
 - XP and kamas routes: no verified data, not implemented.
 
 ## What Claude Code is working on
-Nothing in progress after this session. Next recommended actions are in the latest [[Session Summaries|session summary]].
+Phase 0 of `docs/GAME_DATA_AND_PRODUCT_AUDIT.md` done on 2026-11-20 (branch docs/product-audit, not committed): [[Blank pages on a first visit]] fixed, Succès query batched and indexed, quest graph built once. Phases 1–2 (all classes, class hub) wait for the owner's approval. Next recommended actions are in the latest [[Session Summaries|session summary]].

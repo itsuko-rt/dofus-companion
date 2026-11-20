@@ -4,7 +4,7 @@ Facts in this section come from the **game files** of DOFUS 3.7.14.18, extracted
 
 | Topic | Note | In the database |
 |---|---|---|
-| Classes | [[Cra]] · [[Pandawa]] (the two classes the site focuses on; 19 classes exist) | `breed` |
+| Classes | 19 classes, all supported since 2026-11-20 (official title, roles and complexity in `breed_info`); research notes: [[Cra]] · [[Pandawa]] | `breed` |
 | Spells | [[Spells]] | `spell`, `spell_level` |
 | Monsters | [[Monsters]] | only as dungeon bosses and objectives |
 | Dungeons | [[Dungeons]] | `dungeon*` |

@@ -4,6 +4,8 @@ Bugs worth remembering (not every small fix). Template: [[Bug Report]].
 
 | Bug | Severity | Status |
 |---|---|---|
+| [[Blank pages on a first visit]] | high | fixed |
+| [[Server-only objectives counted as met]] | medium | fixed |
 | [[Item effects lost through rounded ids]] | high | fixed |
 | [[Reset links in production logs]] | high | fixed |
 | [[JSON-LD escape did nothing]] | low | fixed |

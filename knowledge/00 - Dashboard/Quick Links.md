@@ -30,6 +30,8 @@
 | `docs/AUDIT_SECURITE.md` · `docs/SECURITY_AUDIT.md` · `docs/SECURITY_FIXES.md` | Security audits |
 | `docs/PRIVACY_GDPR_REVIEW.md` · `docs/RELEASE_READINESS.md` | Privacy review, release readiness |
 | `docs/MAP_REMOVAL_REPORT.md` | Map removal |
+| `docs/GAME_DATA_INVENTORY.md` | Every game dataset, coverage, relationships, what is missing (2026-11-20) |
+| `docs/GAME_DATA_AND_PRODUCT_AUDIT.md` | Game data, all classes, performance, UX, roadmap (2026-11-20) |
 
 ## External
 Repository: https://github.com/itsuko-rt/dofus-companion · Game data: https://github.com/ledouxm/dofus-sqlite/releases · Builds: https://dofusfashionista.gg
