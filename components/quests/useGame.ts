@@ -10,16 +10,25 @@ import { setRegionSlugs } from './NextSteps';
 let cache: Promise<GraphData> | null = null;
 const fetchGraph = () => (cache ??= fetch('/api/graph').then(async (r) => {
   if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? r.statusText);
-  return r.json() as Promise<GraphData>;
+  return (r.json() as Promise<GraphData>).then((d) => (loaded = d));
 }).catch((e) => { cache = null; throw e; }));
+let loaded: GraphData | null = null; // the resolved download: a later mount renders with it at once, no loading frame
 
 // Built once per page lifetime: rebuilding 5,050 nodes and their statuses on every visit to Quêtes or Succès cost
 // ~230 ms of main thread on a mid-range phone. Keyed by object identity: same download, same character object.
 let graphMemo: { data: GraphData; graph: Graph } | null = null;
 let statusMemo: { graph: Graph; character: object; map: Map<string, Status> } | null = null;
 
+/** Downloads the graph and builds it ahead of time (called on idle from other pages): the first visit to Quêtes or
+ *  Succès then skips the download and the build. Statuses still depend on the character, so they are left to useGame. */
+export function warmGame() {
+  return fetchGraph().then((data) => {
+    if (graphMemo?.data !== data) graphMemo = { data, graph: new Graph(data.nodes, data.extraEdges) };
+  }, () => {});
+}
+
 export function useGame() {
-  const [data, setData] = useState<GraphData | null>(null);
+  const [data, setData] = useState<GraphData | null>(() => loaded);
   const [error, setError] = useState<string | null>(null);
   const ch = useCharacter();
 

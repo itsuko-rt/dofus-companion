@@ -222,3 +222,22 @@ These absolute numbers are higher than in §4 because the PC was busier during t
 **Checks:** `npm run typecheck` clean; `npm test` 73/73 passed; `npx playwright test` 24/24 passed against the new production build.
 
 **Still slow:** the first visit to Quêtes (download and parse of the whole graph, P3, plus the React Flow layout). This is the candidate for phase 4 (per-region data), to measure before deciding.
+
+---
+
+## First Quêtes load (2026-11-20, after phase 6)
+
+**Profile, 4× CPU, first client navigation Home → Quêtes:** about 555 ms of the 721 ms were the browser's own work (script compile, first render), mostly for the 330 KB flow-graph chunk. The data side is small: on the dev PC, parsing takes 2 ms, building the graph 16–26 ms and the 5,050 statuses 9 ms.
+
+**Change:**
+- Once any other page is loaded and the browser is idle (and data saver is off), `Nav` downloads and builds the quest graph (`warmGame` in `components/quests/useGame.ts`) and loads the graph view's code.
+- `useGame` renders with already-downloaded data at once, with no loading frame.
+
+**Same-time comparison**, 4× CPU, median of 3, after 3 s on the home page (time to content / blocked main-thread time):
+
+| Navigation | Before | After |
+|---|---|---|
+| Home → Quêtes (first) | 730 ms / 461 ms | 580 ms / 203 ms |
+| Quêtes → Succès (first) | 692 ms / 122 ms | 620 ms / 50 ms |
+
+**Cost:** a visitor who never opens Quêtes still downloads about 130 KB of graph data and the graph chunk, in idle time. Not done with data saver on.
