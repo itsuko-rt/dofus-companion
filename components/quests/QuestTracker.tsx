@@ -3,10 +3,11 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, CircleHelp, Map as MapIcon, MousePointerClick, Search, Undo2, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, CircleHelp, Map as MapIcon, MousePointerClick, Search, SlidersHorizontal, Undo2, X } from 'lucide-react';
 import { REGION_GROUPS, isRecommended, regionLayout, regionSummaries, type RegionGroup, type RegionSummary } from '../../src/regions.ts';
 import { focusView, preds, prerequisitesToComplete } from '../../src/views.ts';
 import type { Status } from '../../src/graph.ts';
+import { classQuests, reservedToOtherClass } from '../../src/class-quests.ts';
 import { SUPPORTED_BREEDS } from '../breeds';
 import FlowCanvas from '../FlowCanvas';
 import { Button, ProgressBar, STATUS } from '../ui';
@@ -75,6 +76,7 @@ export default function QuestTracker({ region: regionParam }: { region?: number 
   const [query, setQuery] = useState('');
   const [railOpen, setRailOpen] = useState(false); // mobile only
   const [help, setHelp] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false); // mobile only
   const [undo, setUndo] = useState<{ label: string; done: string[]; active: string[] } | null>(null);
 
   // Deep links: /progression/quetes/19#quest:1642
@@ -86,7 +88,7 @@ export default function QuestTracker({ region: regionParam }: { region?: number 
   }, []);
 
   const level = ch.character.level;
-  const regions = useMemo(() => (graph && data ? regionSummaries(graph, data.categories, status) : []), [graph, data, status]);
+  const regions = useMemo(() => (graph && data ? regionSummaries(graph, data.categories, status, ch.character.profile.breed) : []), [graph, data, status, ch.character.profile.breed]);
   // Without a region in the URL: the first region recommended for the character's level.
   const region = regionParam ?? (regions.find((r) => isRecommended(r, level)) ?? regions.find((r) => !r.side))?.id;
   const summary = regions.find((r) => r.id === region);
@@ -100,11 +102,13 @@ export default function QuestTracker({ region: regionParam }: { region?: number 
   }, [prefs.status, status, isActive]);
 
   // Hiding is applied to the region's quests; the layout re-packs what is left.
+  const breedId = ch.character.profile.breed;
   const view = useMemo(() => {
     if (!graph || !layout) return null;
     if (focus) return focusView(graph, focus);
     const keep = (id: string) => {
       const n = graph.nodes.get(id)!;
+      if (reservedToOtherClass(n, breedId)) return false; // e.g. the Crâ class quest for an Iop
       if (prefs.hideDone && status(id) === 'done') return false;
       if (prefs.upToLevel && (n.level ?? 0) > level) return false;
       return true;
@@ -114,7 +118,7 @@ export default function QuestTracker({ region: regionParam }: { region?: number 
     // an OR gate stays if it still leads to a visible quest
     for (const e of layout.edges) if (e.from.startsWith('gate:') && set.has(e.to)) set.add(e.from);
     return { nodes: set, edges: layout.edges };
-  }, [graph, layout, focus, prefs.hideDone, prefs.upToLevel, status, level]);
+  }, [graph, layout, focus, prefs.hideDone, prefs.upToLevel, status, level, breedId]);
 
   const external = useCallback((id: string) => {
     const ext = layout?.external.get(id);
@@ -135,13 +139,14 @@ export default function QuestTracker({ region: regionParam }: { region?: number 
     if (!graph) return t;
     const counted = new Set(regions.filter((r) => !r.side).map((r) => r.id));
     for (const n of graph.nodes.values()) {
-      if (n.kind !== 'quest' || !counted.has(n.category ?? -1)) continue;
+      if (n.kind !== 'quest' || !counted.has(n.category ?? -1) || reservedToOtherClass(n, breedId)) continue;
       t.total++;
       t[status(n.id)]++;
       if (isActive(n.id) && status(n.id) !== 'done') t.active++;
     }
     return t;
-  }, [graph, regions, status, isActive]);
+  }, [graph, regions, status, isActive, breedId]);
+  const myClassQuests = useMemo(() => (graph && breedId != null ? classQuests(graph, breedId) : []), [graph, breedId]);
 
   const results = useMemo(() => {
     const q = norm(query.trim());
@@ -206,6 +211,27 @@ export default function QuestTracker({ region: regionParam }: { region?: number 
         ) : <p className="text-sm text-muted">Progression non enregistrée dans un profil.</p>}
         <Link href="/personnage" className="mt-1.5 block text-xs text-brand hover:underline">{ch.characters.length ? 'Gérer les profils et sauvegardes' : 'Créer un personnage'}</Link>
       </div>
+      {breed && myClassQuests.length > 0 && (
+        <section aria-label={`Quêtes de classe ${breed.name}`} className="rounded-lg border border-line p-2.5">
+          <h2 className="text-[11px] font-semibold uppercase tracking-wide text-faint">Quêtes de classe · {breed.name}</h2>
+          <p className="mt-0.5 text-[11px] text-faint">Celles des autres classes sont masquées.</p>
+          <ul className="mt-1.5 flex flex-col gap-0.5">
+            {myClassQuests.map((n) => {
+              const s = STATUS[status(n.id)];
+              const Icon = s.icon;
+              return (
+                <li key={n.id}>
+                  <Link href={questHref(n)} className="flex items-center gap-1.5 rounded px-1 py-1 text-sm hover:bg-surface-2" title={s.label}>
+                    <Icon size={13} className={`shrink-0 ${s.text}`} aria-label={s.label} />
+                    <span className="min-w-0 flex-1 truncate text-text">{n.label}</span>
+                    <span className="shrink-0 text-[10.5px] text-faint">niv. {n.level}</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
       {REGION_GROUPS.map((g) => {
         const rs = regions.filter((r) => r.group === g.id);
         if (!rs.length) return null;
@@ -250,7 +276,9 @@ export default function QuestTracker({ region: regionParam }: { region?: number 
               <span className="whitespace-nowrap text-xs text-muted">{summary.done}/{summary.total} · niv. {summary.levelMin}–{summary.levelMax}</span>
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-x-5 gap-y-1 sm:grid-cols-6 lg:ml-auto" aria-label="Progression globale (hors annexes)">
+          {/* mobile: one line instead of six figures (they took half of a phone screen) */}
+          <p className="text-xs text-muted sm:hidden">{totals.done}/{totals.total} terminées · <span className="text-accent">{totals.available} disponibles</span> · {pct} %</p>
+          <div className="hidden grid-cols-6 gap-x-5 gap-y-1 sm:grid lg:ml-auto" aria-label="Progression globale (hors annexes)">
             <Stat label="Quêtes" value={totals.total} />
             <Stat label="Terminées" value={totals.done} tone="text-done" />
             <Stat label="Disponibles" value={totals.available} tone="text-accent" />
@@ -283,6 +311,10 @@ export default function QuestTracker({ region: regionParam }: { region?: number 
               </ul>
             )}
           </label>
+          <button className="inline-flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-sm sm:hidden" aria-expanded={filtersOpen} aria-controls="quest-filters" onClick={() => setFiltersOpen(!filtersOpen)}>
+            <SlidersHorizontal size={15} aria-hidden /> Filtres
+          </button>
+          <div id="quest-filters" className={`${filtersOpen ? 'flex' : 'hidden'} w-full flex-wrap items-center gap-2 sm:flex sm:w-auto sm:flex-1`}>
           <label className="flex items-center gap-1.5 text-sm text-muted">Niveau
             <input type="number" min={1} max={200} value={level} onChange={(e) => ch.setLevel(Number(e.target.value))} className={`${field} w-16`} />
           </label>
@@ -306,6 +338,7 @@ export default function QuestTracker({ region: regionParam }: { region?: number 
           <button onClick={() => setHelp(!help)} aria-expanded={help} className="ml-auto inline-flex items-center gap-1 rounded-lg px-2 py-1.5 text-sm text-muted hover:bg-surface-2 hover:text-text">
             <CircleHelp size={15} /> Aide
           </button>
+          </div>
         </div>
 
         <section aria-label="Carte des quêtes" className="relative min-h-[60vh] flex-1">

@@ -22,3 +22,11 @@ test('achievement: never obtained without confirmation, even with every objectiv
   assert.equal(achievementProgress(7, objs, prog(['quest:10', 'quest:11', 'obj:3'])).state, 'ready');
   assert.equal(achievementProgress(7, objs, prog(['ach:7'])).state, 'obtained');
 });
+
+test('an objective made only of server-side conditions is never counted as met', () => {
+  const empty = { level: 1, done: new Set<string>(), active: new Set<string>() };
+  assert.equal(objectiveState(7662, 'Sc=4012', empty), 'unknown');
+  // a server condition next to a real one does not change that one's result
+  assert.equal(objectiveState(1, 'Sc=4012&PL>9', empty), 'todo');
+  assert.equal(achievementProgress(2676, [[7663, 'OA=2316'], [7662, 'Sc=4012'], [7447, 'PL>9']], empty).state, 'not_started');
+});

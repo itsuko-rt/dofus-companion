@@ -1,4 +1,5 @@
 // Player-facing structure on top of the graph: regions ordered by level, quest chains, next steps.
+import { reservedToOtherClass } from './class-quests.ts';
 import type { GEdge, GNode, Graph, Status } from './graph.ts';
 import type { Atom, Progress } from './criteria.ts';
 import { reference } from './criteria.ts';
@@ -56,11 +57,11 @@ const median = (xs: number[]) => {
 
 /** One summary per quest category, sorted by the median level of its quests. */
 export function regionSummaries(
-  g: Graph, categories: { id: number; name: string }[], status: (id: string) => Status,
+  g: Graph, categories: { id: number; name: string }[], status: (id: string) => Status, breed?: number,
 ): RegionSummary[] {
   const byCat = new Map<number, GNode[]>();
   for (const n of g.nodes.values()) {
-    if (n.kind !== 'quest' || n.category == null) continue;
+    if (n.kind !== 'quest' || n.category == null || reservedToOtherClass(n, breed)) continue; // another class's quest is not counted
     byCat.set(n.category, [...(byCat.get(n.category) ?? []), n]);
   }
   return categories.filter((c) => byCat.has(c.id)).map((c) => {
