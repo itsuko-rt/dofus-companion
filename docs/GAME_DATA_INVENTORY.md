@@ -17,7 +17,7 @@ The release has 250 files. This table lists the ones that matter for the site, c
 | Professions | `jobsdata`, `skillsdata`, `recipesdata`, `mapsinformationdata`, `subareasdata`, `areasdata`, `superareasdata`, `waypointsdata` | `job` (22), `gather_skill` (125), `recipe` (4,743), `world_subarea` (254) | Professions guide |
 | Formulas | `luaformulasdata` (38 Lua scripts) | — | Read only (see below) |
 | Activities | `activitysuggestionsdata` (1,410: level, map, category), `activitysuggestioncategoriesdata` | **`activity`** (667 with a level, no event dates) | Level page `/progression/niveau` (2026-11-20) |
-| Almanax | `almanaxcalendarsdata` (376: day pattern, NPC, objective) | — | Candidate for an Almanax calendar (blocked before) |
+| Almanax | `almanaxcalendarsdata` (376: day pattern, NPC, objective), `questobjectivesdata` | **`almanax`** (376, offering item and quantity) | Home card « Almanax du jour » (2026-11-20) |
 
 ## Relationships that can be followed
 - **Class → quests:** start conditions with `PG=<class>` (40 quests). Class → spells: `spell.breed_id`.

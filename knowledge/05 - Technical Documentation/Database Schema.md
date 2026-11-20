@@ -21,6 +21,7 @@ Rebuilt from scratch by the import and read-only at runtime. Primary keys are An
 | `breed_info` | 19 | Official title, description, complexity (1–5) and role scores per class (`scripts/creatures-import.ts`, 2026-11-20) |
 | `monster`, `monster_grade`, `monster_subarea`, `monster_drop` | 5,135 / 26,851 / 3,305 / 13,567 | Monsters: grade level, XP and life; zones; drop chance per grade with the game's condition (2026-11-20) |
 | `xp_level` | 200 | Total XP to reach each character level (2026-11-20) |
+| `almanax` | 376 | The game's Almanax calendar: date patterns, bonus, offering item and quantity (2026-11-20) |
 | `activity` | 667 | The game's activity suggestions that have a level (dungeon, quest, archmonster, wanted, discovery, event, other), with their zone when the game gives a map (2026-11-20) |
 
 The map tables (`world_cell`, `world_hint`…) were dropped on 2026-11-20 with the in-site map.

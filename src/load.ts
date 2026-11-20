@@ -6,6 +6,7 @@ import type { Item, ItemSet } from './stats.ts';
 import { objectiveTargets } from './objective-targets.ts';
 import { classAchievements, classQuests } from './class-quests.ts';
 import { regionSlugMap } from './regions.ts';
+import type { AlmanaxEntry } from './almanax-shared.ts';
 import { itemSources } from './professions.ts';
 import type { IngredientSource } from './professions-shared.ts';
 
@@ -323,3 +324,11 @@ export function loadClassExtras(path: string, breedId: number, breedName: string
     achievements: [...ach.linked.map((n) => ({ name: n.label, why: 'quests' as const })), ...ach.named.map((n) => ({ name: n.label, why: 'name' as const }))],
   };
 }
+
+/** The game's Almanax calendar with each offering's item name and where it comes from (null before the creatures import). */
+export const loadAlmanax = (path: string) => withDb(path, (db): AlmanaxEntry[] | null => {
+  if (!db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'almanax'").get()) return null;
+  const source = itemSources(db);
+  return (db.prepare('SELECT a.id, a.dates, a.name, a.description, a.item_id, a.qty, i.name item FROM almanax a JOIN item i ON i.id = a.item_id ORDER BY a.id').all() as Record<string, any>[])
+    .map((r) => ({ id: r.id, dates: JSON.parse(r.dates), name: r.name, description: r.description, item: r.item, qty: r.qty, source: source(r.item_id) }));
+});

@@ -11,7 +11,7 @@ import { DatabaseSync } from 'node:sqlite';
 type Row = Record<string, any>;
 const arr = (x: any): any[] => x?.Array ?? [];
 
-export const CREATURE_FILES = ['breedsdata', 'breedrolesdata', 'monstersdata', 'monsterracesdata', 'characterxpmappingsdata', 'activitysuggestionsdata', 'activitysuggestioncategoriesdata', 'mapsinformationdata', 'i18n_fr'] as const;
+export const CREATURE_FILES = ['breedsdata', 'breedrolesdata', 'monstersdata', 'monsterracesdata', 'characterxpmappingsdata', 'activitysuggestionsdata', 'activitysuggestioncategoriesdata', 'mapsinformationdata', 'almanaxcalendarsdata', 'questobjectivesdata', 'i18n_fr'] as const;
 
 export function importCreatures(db: DatabaseSync, rawDir: string, sourceUrl: string) {
   const read = (f: string): Row[] => JSON.parse(readFileSync(`${rawDir}/${f}.json`, 'utf8')).references.RefIds.map((r: Row) => r.data).filter(Boolean);
@@ -20,7 +20,7 @@ export function importCreatures(db: DatabaseSync, rawDir: string, sourceUrl: str
 
   db.exec(`
     DROP TABLE IF EXISTS breed_info; DROP TABLE IF EXISTS monster; DROP TABLE IF EXISTS monster_grade;
-    DROP TABLE IF EXISTS monster_subarea; DROP TABLE IF EXISTS monster_drop; DROP TABLE IF EXISTS xp_level; DROP TABLE IF EXISTS activity;
+    DROP TABLE IF EXISTS monster_subarea; DROP TABLE IF EXISTS monster_drop; DROP TABLE IF EXISTS xp_level; DROP TABLE IF EXISTS activity; DROP TABLE IF EXISTS almanax;
     -- roles: JSON [{ name, value }], the game's own score per role (0–12 in 3.7.14.18, no stated maximum);
     -- complexity: the game's scale (1–5 in 3.7.14.18); sort_index: the game's class order
     CREATE TABLE breed_info(breed_id INTEGER PRIMARY KEY, title TEXT, description TEXT, complexity INTEGER, sort_index INTEGER, roles TEXT);
@@ -36,6 +36,8 @@ export function importCreatures(db: DatabaseSync, rawDir: string, sourceUrl: str
     CREATE TABLE xp_level(level INTEGER PRIMARY KEY, xp INTEGER);
     -- the game's own activity suggestions (dungeons, quests, archmonsters, wanted, discoveries…) that have a level
     CREATE TABLE activity(id INTEGER PRIMARY KEY, name TEXT, description TEXT, category TEXT, level INTEGER, subarea_id INTEGER);
+    -- the game's Almanax calendar: date patterns ("dd/mm/yyyy" with * wildcards), the bonus, and the offering to bring
+    CREATE TABLE almanax(id INTEGER PRIMARY KEY, dates TEXT, name TEXT, description TEXT, item_id INTEGER, qty INTEGER);
   `);
   const insert = (table: string, cols: string[], data: unknown[][]) => {
     const st = db.prepare(`INSERT INTO ${table}(${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`);
@@ -86,9 +88,18 @@ export function importCreatures(db: DatabaseSync, rawDir: string, sourceUrl: str
     a.id, t(a.nameId), t(a.descriptionId), category.get(a.categoryId) ?? null, a.level, a.mapId ? zoneOfMap.get(a.mapId) ?? null : null,
   ]));
 
+  // Almanax: every entry's objective is "bring back x<qty> <item> to <npc>" (objective type 3: parameter1 = item, parameter2 = qty)
+  const objective = new Map(read('questobjectivesdata').map((o) => [o.id as number, o]));
+  const almanax = read('almanaxcalendarsdata').map((a) => {
+    const o = objective.get(a.objectiveId);
+    const p = o?.typeId === 3 ? o.parameters : null;
+    return [a.id, JSON.stringify(arr(a.dates)), t(a.nameId), t(a.descId)?.replace(/<[^>]+>/g, '') ?? null, p?.parameter1 ?? null, p?.parameter2 ?? null];
+  });
+  insert('almanax', ['id', 'dates', 'name', 'description', 'item_id', 'qty'], almanax);
+
   const now = new Date().toISOString();
   db.prepare('INSERT OR REPLACE INTO data_source(dataset, url, retrieved_at) VALUES (?, ?, ?)').run('creatures', sourceUrl, now);
-  return { breeds: read('breedsdata').length, monsters: named.length, grades: grades.length, zones: zones.length, drops: drops.length, xpLevels: Math.min(200, xp.length), activities: activities.length };
+  return { breeds: read('breedsdata').length, monsters: named.length, grades: grades.length, zones: zones.length, drops: drops.length, xpLevels: Math.min(200, xp.length), activities: activities.length, almanax: almanax.length };
 }
 
 // standalone: rebuild these tables in the newest existing game database

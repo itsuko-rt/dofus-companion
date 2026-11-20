@@ -18,7 +18,7 @@ Status values: **planned** (agreed, not started), **idea** (not agreed), **block
 | N1ark progress import | idea | export format UNVERIFIED |
 | Class guides with sourced advice (layer B) | planned | needs sources; see [[Cra]], [[Pandawa]] |
 | Recommended routes, XP and kamas routes (layer C) | blocked (no verified data) | [[XP Routes]], [[Kamas Routes]] |
-| Almanax calendar | blocked | the data doesn't link quests to dates (`docs/RAPPORT_SUIVI_QUETES.md` §4) |
+| Almanax calendar | **implemented** 2026-11-20 (home card: today's offering, bonus, next 6 days; unit, data and E2E tests) | from `almanaxcalendarsdata`, which the import did not read before (`docs/RAPPORT_SUIVI_QUETES.md` §4 said blocked) |
 | Keyboard navigation of the quest graph | idea | search, sheet and prerequisite list work with the keyboard |
 | Terms of service page | planned | [[GDPR and Privacy]] |
 | tesseract.js 7 | idea | needs a scanner retest |

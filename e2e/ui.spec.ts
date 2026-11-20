@@ -192,3 +192,13 @@ test('class page: official description, class quests with links, linked achievem
   await expect(overview.getByRole('link', { name: "Les paroles s'envolent, les aigris restent" })).toHaveAttribute('href', /#quest:1677$/);
   await expect(overview.getByText(/Dopeul Huppermage/)).toBeVisible();
 });
+
+test('home page shows the Almanax of the day from the game calendar', async ({ page }) => {
+  await seedLocal(page);
+  const errors = collectErrors(page);
+  await page.goto('/');
+  await expect(page.getByText('Almanax du jour')).toBeVisible();
+  await expect(page.getByText(/Offrande : \d+ × /)).toBeVisible();
+  await expect(page.getByText('Prochains jours')).toBeVisible();
+  expectNoErrors(errors);
+});

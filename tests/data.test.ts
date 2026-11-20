@@ -120,3 +120,17 @@ test('real data: quest objectives link to where monsters live and where items co
   assert.equal(t.items[0].name, 'Défense de sanglier agressif');
   assert.equal(t.items[0].source.kind, 'other');
 });
+
+test('real data: Almanax offering of a day comes from the game calendar', { skip }, async () => {
+  const { loadAlmanax } = await import('../src/load.ts');
+  const { almanaxFor, addDays } = await import('../src/almanax-shared.ts');
+  const entries = loadAlmanax(db!)!;
+  assert.equal(entries.length, 376);
+  const r = almanaxFor(entries, { day: 20, month: 11, year: 2026 });
+  assert.equal(r.offering?.item, 'Sang coagulé');
+  assert.equal(r.offering?.qty, 2);
+  assert.ok(r.period.every((e) => e !== r.offering));
+  // every day of a year has an offering
+  let d = { day: 1, month: 1, year: 2027 };
+  for (let i = 0; i < 365; i++, d = addDays(d, 1)) assert.ok(almanaxFor(entries, d).offering, `${d.day}/${d.month}`);
+});
