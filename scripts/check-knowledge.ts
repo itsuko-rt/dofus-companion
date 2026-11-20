@@ -5,12 +5,12 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { basename, join } from 'node:path';
 
 const ROOT = 'knowledge';
-const files: string[] = [];
+const files: string[] = [], bases: string[] = []; // bases: Obsidian Bases views, linked as [[Name.base]]
 const walk = (d: string) => {
   for (const f of readdirSync(d)) {
     const p = join(d, f);
     if (f === '.obsidian' || f === '.trash') continue;
-    if (statSync(p).isDirectory()) walk(p); else if (f.endsWith('.md')) files.push(p);
+    if (statSync(p).isDirectory()) walk(p); else if (f.endsWith('.md')) files.push(p); else if (f.endsWith('.base')) bases.push(p);
   }
 };
 walk(ROOT);
@@ -22,6 +22,7 @@ for (const f of files) {
   if (byName.has(n)) problems.push(`duplicate note name "${n}": ${byName.get(n)} and ${f}`);
   byName.set(n, f);
 }
+for (const b of bases) byName.set(basename(b), b);
 const slug = (h: string) => h.trim().toLowerCase();
 const headings = (f: string) => new Set([...readFileSync(f, 'utf8').matchAll(/^#{1,6}\s+(.+)$/gm)].map((m) => slug(m[1])));
 

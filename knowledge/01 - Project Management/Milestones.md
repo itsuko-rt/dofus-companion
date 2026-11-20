@@ -13,7 +13,7 @@
 | 2026-11-19 | Public launch preparation (SEO, legal, icons) | `71e79b0` |
 | 2026-11-19/20 | First security audit and Playwright E2E | `320c1ef`, `6f38cc6` |
 | 2026-11-20 | Professions guide (and world map v1) | `3f64221`, `97381f8` |
-| 2026-11-20 | Map removed, pre-launch security audit, knowledge base | `02b400a`, `72ad961`, `8b16623` (not pushed) |
+| 2026-11-20 | Map removed, pre-launch security audit, knowledge base | `02b400a`, `72ad961`, `8b16623`, `b027176` (pushed) |
 | — | **Public launch** | planned |
 
 History detail: [[Development Logs]].

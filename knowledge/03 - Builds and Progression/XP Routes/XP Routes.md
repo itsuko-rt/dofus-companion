@@ -1,8 +1,14 @@
 ---
 type: research
 topic: XP routes
-verification: HYPOTHESIS
+source_name: none found
+source_url: none
+source_type: none
+game_version: "3.7.14.18"
+researched: 2026-11-19
 last_verified: 2026-11-20
+confidence: low
+verification: HYPOTHESIS
 ---
 # XP Routes
 

@@ -1,0 +1,24 @@
+filters:
+  and:
+    - note.type == "research"
+    - '!file.inFolder("Templates")'
+properties:
+  note.verification:
+    displayName: Label
+  note.game_version:
+    displayName: Game version
+  note.last_verified:
+    displayName: Last verified
+views:
+  - type: table
+    name: Research by label
+    groupBy:
+      property: note.verification
+      direction: ASC
+    order:
+      - file.name
+      - note.verification
+      - note.source_type
+      - note.game_version
+      - note.confidence
+      - note.last_verified

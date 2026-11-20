@@ -4,10 +4,12 @@
 2. **Labels on research:** VERIFIED, COMMUNITY, UNVERIFIED, OUTDATED, HYPOTHESIS, as defined in [[Verification Status]]. Research notes use the frontmatter of [[Research Template]].
 3. **Status words for features:**
    - **implemented** (with how it was tested);
+   - **in progress**;
    - **planned**;
    - **idea**;
    - **blocked** (on what);
-   - **removed** (with the ADR).
+   - **removed** or **rejected** (with the ADR);
+   - **needs verification** (written NEEDS VERIFICATION: not checked yet, never guessed).
 4. **Decisions:** one ADR per decision, numbered, never rewritten. A change of mind is a new ADR that says *Supersedes ADR-000N*, and the old one gets *Superseded by …* added at the top.
 5. **Dates:** absolute (`2026-11-20`), never "yesterday".
 6. **Links:** Obsidian wikilinks `[[Note]]` inside the vault (note names are unique). Repository files as code: `src/server/auth.ts`.
