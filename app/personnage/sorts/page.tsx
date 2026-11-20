@@ -15,7 +15,7 @@ export default function Page() {
       </p>
       <ul className="mt-6 grid gap-4 sm:grid-cols-2">
         {SUPPORTED_BREEDS.map((b) => (
-          <li key={b.id}><Link href={`/personnage/sorts/${b.slug}`} className="block rounded-xl" aria-label={`Sorts du ${b.name}`}><ClassCard breed={b} /></Link></li>
+          <li key={b.id}><Link href={`/personnage/sorts/${b.slug}`} className="block rounded-xl" aria-label={`${b.name} : la classe et ses sorts`}><ClassCard breed={b} /></Link></li>
         ))}
       </ul>
     </div>

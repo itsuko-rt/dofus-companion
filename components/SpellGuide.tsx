@@ -28,7 +28,7 @@ export default function SpellGuide({ data, extras }: { data: ClassData; extras?:
 
   return (
     <div className="h-full overflow-y-auto">
-      <PageHero color={info?.hue ?? 'var(--color-sec-characters)'} image={info?.art.scene} kicker={info ? `${info.title} · ${info.roles.join(' · ')}` : 'Classe'} title={`Sorts du ${data.breed.name}`}>
+      <PageHero color={info?.hue ?? 'var(--color-sec-characters)'} image={info?.art.scene} kicker={info ? `${info.title} · ${info.roles.join(' · ')}` : 'Classe'} title={data.breed.name}>
         <p className="text-sm text-white/80">{data.spells.length} sorts · 22 emplacements, 2 variantes chacun (une seule active à la fois) · données {data.version}</p>
       </PageHero>
       <div className="mx-auto max-w-6xl px-4 py-6">
