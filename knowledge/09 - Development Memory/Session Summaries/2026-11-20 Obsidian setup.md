@@ -27,7 +27,7 @@ Details: [[Setup Report#7. Tests performed]].
 
 ## Remaining issues
 - The window was not seen on screen. The Bases table and the templates need a manual check.
-- The vault folder is session-local; GitHub holds the durable copy.
+- The vault moved to the permanent clone in `Documents\Atlas-des-Douze` the same day ([[Setup Report#8. What remains incomplete (manual checks)]]).
 
 ## Next recommended actions
 - Do the three manual checks in [[Setup Report]].
