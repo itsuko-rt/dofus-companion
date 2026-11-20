@@ -32,3 +32,9 @@ export function currentBracket<T extends { levelMin: number }>(tiers: T[], level
   return { index: i, current: b[i] ?? null, next: b[i + 1] ?? null };
 }
 
+
+/** True when every ingredient can be harvested or crafted with the character's own profession levels (jobId → level).
+ *  Loot and shop items ('other') never qualify: the game data cannot say the character owns them. */
+export const selfSufficient = (r: RecipeInfo, jobs: Record<string, number>) => r.ingredients.every((g) =>
+  g.source.kind === 'gathered' ? (jobs[g.source.jobId] ?? 0) >= g.source.levelMin
+    : g.source.kind === 'crafted' ? (jobs[g.source.jobId] ?? 0) >= g.source.level : false);

@@ -76,3 +76,15 @@ test('profession XP calculator: XP shown in game → crafts and resources, and i
   await page.getByLabel('XP actuelle').fill('3000');
   await expect(page.getByRole('alert').filter({ hasText: 'dépasse' })).toBeVisible();
 });
+
+test('recipes « Avec vos métiers » keep only recipes whose ingredients the character can harvest or craft', async ({ page }) => {
+  await page.addInitScript(([key]) => localStorage.setItem(key, JSON.stringify({ activeId: 'cj', characters: [{ id: 'cj', name: 'Paysanne', level: 60, profile: { breed: 9 }, done: [], active: [], builds: [], notes: '', history: [], jobs: { 28: 60 }, updatedAt: new Date().toISOString() }] })),
+    ['dofus-companion:characters:v2'] as const);
+  await page.goto('/metiers/paysan');
+  const list = page.locator('section', { has: page.getByRole('heading', { name: /^Recettes/ }) }).locator('ul.parchment');
+  const before = await list.locator(':scope > li').count();
+  await page.getByLabel('Avec vos métiers').check();
+  await expect.poll(async () => list.locator(':scope > li').count()).toBeLessThan(before);
+  expect(await list.locator(':scope > li').count()).toBeGreaterThan(0);
+  await expect(list.getByText('butin', { exact: false })).toHaveCount(0);
+});

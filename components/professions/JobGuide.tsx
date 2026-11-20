@@ -4,7 +4,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { Check, Lock, Map as MapIcon, Search } from 'lucide-react';
-import { brackets, currentBracket, MAX_JOB_LEVEL, type IngredientSource, type JobDetails, type RecipeInfo } from '../../src/professions-shared.ts';
+import { brackets, currentBracket, MAX_JOB_LEVEL, selfSufficient, type IngredientSource, type JobDetails, type RecipeInfo } from '../../src/professions-shared.ts';
 import { checkInput, plan } from '../../src/craft-calc.ts';
 import SourceLabel from './SourceLabel';
 import { jobSlug } from '../../src/professions-shared.ts';
@@ -103,21 +103,25 @@ export default function JobGuide({ details, recipeTotal }: { details: JobDetails
 
       <Calculator recipes={recipes} level={level} jobName={job.name} />
 
-      {recipes.length > 0 && <Recipes recipes={recipes} total={recipeTotal ?? recipes.length} level={level} />}
+      {recipes.length > 0 && <Recipes recipes={recipes} total={recipeTotal ?? recipes.length} level={level} jobs={ch.hasCharacter ? { ...ch.character.jobs, [job.id]: level } : null} />}
     </div>
   );
 }
 
-function Recipes({ recipes, total, level }: { recipes: RecipeInfo[]; total: number; level: number }) {
+function Recipes({ recipes, total, level, jobs }: { recipes: RecipeInfo[]; total: number; level: number; jobs: Record<string, number> | null }) {
   const [q, setQ] = useState('');
   const [mine, setMine] = useState(false);
+  const [own, setOwn] = useState(false);
   const [limit, setLimit] = useState(PAGE);
-  const shown = recipes.filter((r) => (!mine || r.level <= level) && (!q || r.name.toLowerCase().includes(q.toLowerCase())));
+  const shown = recipes.filter((r) => (!mine || r.level <= level) && (!own || (jobs != null && selfSufficient(r, jobs))) && (!q || r.name.toLowerCase().includes(q.toLowerCase())));
   return (
     <section>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-display text-base text-text">Recettes ({total})</h2>
-        <label className="flex items-center gap-2 text-sm text-muted"><input type="checkbox" checked={mine} onChange={(e) => { setMine(e.target.checked); setLimit(PAGE); }} className="accent-[var(--color-brand)]" /> Jusqu’à mon niveau ({level})</label>
+        <div className="flex flex-wrap gap-x-4 gap-y-1">
+          <label className="flex items-center gap-2 text-sm text-muted"><input type="checkbox" checked={mine} onChange={(e) => { setMine(e.target.checked); setLimit(PAGE); }} className="accent-[var(--color-brand)]" /> Jusqu’à mon niveau ({level})</label>
+          {jobs && <label className="flex items-center gap-2 text-sm text-muted" title="Tous les ingrédients se récoltent ou se fabriquent avec les niveaux de métier enregistrés sur votre personnage"><input type="checkbox" checked={own} onChange={(e) => { setOwn(e.target.checked); setLimit(PAGE); }} className="accent-[var(--color-brand)]" /> Avec vos métiers</label>}
+        </div>
       </div>
       <label className="relative mb-3 block">
         <Search size={15} className="pointer-events-none absolute left-2.5 top-2.5 text-faint" aria-hidden />
