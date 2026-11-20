@@ -17,7 +17,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   return [
     url('/', 1, 'daily'),
     url('/guides', 0.9), url('/guides/quetes', 0.9), url('/guides/dofus', 0.9),
-    url('/progression/quetes', 0.8), url('/progression/succes', 0.8), url('/progression/dofus', 0.7),
+    url('/progression/quetes', 0.8), url('/progression/succes', 0.8), url('/progression/dofus', 0.7), url('/progression/niveau', 0.7),
     url('/carte', 0.8), url('/metiers', 0.8), ...jobs.map((j) => url(`/metiers/${j.slug}`, 0.7)),
     url('/builds', 0.8, 'daily'), url('/equipement', 0.6), url('/personnage/sorts', 0.7), url('/progression/scan', 0.5),
     ...SUPPORTED_BREEDS.map((b) => url(`/personnage/sorts/${b.slug}`, 0.7)),

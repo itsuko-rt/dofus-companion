@@ -43,3 +43,72 @@ test('real data: quest chains stay compact (no endless row)', { skip }, async ()
     assert.ok(l.width < 5500, `${c.name}: ${Math.round(l.width)} px wide`);
   }
 });
+
+test('real data: batched achievement loading keeps every objective, in order', { skip }, async () => {
+  const { loadAchievements } = await import('../src/load.ts');
+  const { DatabaseSync } = await import('node:sqlite');
+  const raw = new DatabaseSync(db!, { readOnly: true });
+  const one = raw.prepare('SELECT id, name, criterion_raw AS criterion FROM achievement_objective WHERE achievement_id = ? ORDER BY ordinal');
+  const list = loadAchievements(db!, [3, 11, 12, 13, 14, 59, 116, 15]);
+  assert.ok(list.length > 700);
+  for (const a of list) assert.deepEqual(a.objectives, one.all(a.id).map((r) => ({ ...r })), `achievement ${a.id}`);
+  raw.close();
+});
+
+test('real data: classes, monsters and character XP come from the game files', { skip }, async () => {
+  const { DatabaseSync } = await import('node:sqlite');
+  const raw = new DatabaseSync(db!, { readOnly: true });
+  const one = (sql: string) => raw.prepare(sql).get() as Record<string, any>;
+  // every class has its official title, description, complexity and roles
+  assert.equal(one('SELECT COUNT(*) n FROM breed b LEFT JOIN breed_info i ON i.breed_id = b.id WHERE i.title IS NULL OR i.description IS NULL OR i.complexity IS NULL').n, 0);
+  assert.equal(one("SELECT title FROM breed_info WHERE breed_id = 8").title, 'Guerrier téméraire');
+  // character XP: level 2 = 110, level 200 = 5,555,424,000 (the game's table), strictly increasing
+  assert.equal(one('SELECT xp FROM xp_level WHERE level = 2').xp, 110);
+  assert.equal(one('SELECT xp FROM xp_level WHERE level = 200').xp, 5555424000);
+  assert.equal(one('SELECT COUNT(*) n FROM xp_level a JOIN xp_level b ON b.level = a.level + 1 WHERE b.xp <= a.xp').n, 0);
+  // monsters: grades, zones and drops are linked to existing monsters and items
+  assert.ok(one('SELECT COUNT(*) n FROM monster').n > 4000);
+  assert.equal(one('SELECT COUNT(*) n FROM monster_grade g LEFT JOIN monster m ON m.id = g.monster_id WHERE m.id IS NULL').n, 0);
+  assert.equal(one('SELECT chances FROM monster_drop d JOIN monster m ON m.id = d.monster_id JOIN item i ON i.id = d.item_id WHERE m.name = \'Bouftou\' AND i.name = \'Laine de Bouftou\'').chances, '[53,53,53,53,53]');
+  raw.close();
+});
+
+test('real data: class quests come from the class condition, never from guesses', { skip }, async () => {
+  const { classQuests, classScope, reservedToOtherClass } = await import('../src/class-quests.ts');
+  const g = loadGraph(db!);
+  const exclusive = [...g.nodes.values()].filter((n) => n.kind === 'quest' && classScope(n.crit)?.kind === 'exclusive');
+  assert.equal(exclusive.length, 38); // 19 Astrub class quests + 19 "Dévotion"
+  for (const id of [8, 9, 12, 17]) {
+    const mine = classQuests(g, id).map((n) => n.refId);
+    assert.equal(mine.length, 4, `breed ${id}`); // Astrub quest, Dévotion, and the class branch of 1960 and 1938
+    assert.ok(mine.includes(1960) && mine.includes(1938));
+  }
+  assert.ok(classQuests(g, 9).some((n) => n.refId === 1971)); // "C'est pour ta pomme", Crâ
+  const crâQuest = g.nodes.get('quest:1971')!;
+  assert.equal(reservedToOtherClass(crâQuest, 9), false);
+  assert.equal(reservedToOtherClass(crâQuest, 8), true);
+  assert.equal(reservedToOtherClass(crâQuest, undefined), false); // no class chosen: nothing hidden
+  assert.equal(reservedToOtherClass(g.nodes.get('quest:1960')!, 8), false); // per-class branch: open to all
+});
+
+test('real data: achievements tied to a class through its class quests, and named after it', { skip }, async () => {
+  const { classAchievements } = await import('../src/class-quests.ts');
+  const { loadObjectiveIndex } = await import('../src/load.ts');
+  const g = loadGraph(db!);
+  const r = classAchievements(g, loadObjectiveIndex(db!), 8, 'Iop');
+  assert.deepEqual(r.named.map((n) => n.label).sort(), ['Challenge Iop', 'Dopeul Iop']);
+  assert.ok(r.linked.length >= 2 && r.linked.every((n) => n.kind === 'achievement'));
+});
+
+test('real data: level suggestions, zones and dungeons for a level come only from game values', { skip }, async () => {
+  const { loadZoneData, forLevel } = await import('../src/zones.ts');
+  const data = loadZoneData(db!)!;
+  assert.ok(data.activities.length > 600 && data.zones.length > 100);
+  const r = forLevel(data, 50, 10);
+  for (const list of r.byCategory.values()) for (const a of list) assert.ok(Math.abs(a.level - 50) <= 10, a.name);
+  assert.ok(r.byCategory.get('Donjon')!.some((a) => a.name === 'Donjon des Forgerons')); // the game suggests it at 50
+  assert.ok(r.zones.length > 0 && r.zones.length <= 12);
+  for (const z of r.zones) for (const m of z.monsters) assert.ok(m.lmax >= 40 && m.lmin <= 60, `${z.name}: ${m.name}`);
+  assert.ok(r.dungeons.every((d) => Math.abs(d.optimalLevel - 50) <= 10 || (d.minLevel <= 50 && 50 <= d.optimalLevel)));
+  assert.ok(r.dungeons.length > 0);
+});
