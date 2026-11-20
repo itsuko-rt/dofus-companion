@@ -3,6 +3,8 @@
 Reviewed on 2026-11-20 at commit `d3fb282` (18 commits, 88 files, +2,280 / −142). Game data: `data/game-3.7.14.18.sqlite` (dofus-sqlite `v6.0_3.7.14.18`, dofusdude `3.7.14.18`).
 Method: code read of every changed source file and its callers, the full verification suite, and read-only integrity queries on the game database and raw files (scripts kept outside the repository). No application code was changed.
 
+> **Status (2026-11-20, later the same day):** the pre-merge blockers H1, H2, H3 and M9 have been fixed on `develop` with regression tests. See **§12 Remediation**. Sections 1–11 below are the original review, kept unchanged as the record of what was found.
+
 ## 1. Executive summary
 
 PR #2 is technically sound: it typechecks, all 88 unit tests pass, the production build succeeds, 36 of 37 runnable E2E tests pass (the 37th is a timing budget problem, M9), the database passes `PRAGMA integrity_check`, and no imported reference is dangling (drops, recipes, bosses, Almanax items all resolve). There is no security or privacy regression.
@@ -265,3 +267,58 @@ Everything else (M2–M8, L1–L8) can follow in separate PRs. None of it makes 
 4. **Progression planner v1 (B):** Cra and Pandawa first. Class quests, objectives by id, zones for the level, equipment by level and element, profession routes. Community advice is labelled COMMUNITY.
 5. **Damage calculator:** only after the formula is verified against in-game tooltips.
 6. **Budget and kamas:** only with a dated, licensed or player-entered price source.
+
+## 12. Remediation (2026-11-20, after the review)
+
+The owner approved fixing the pre-merge blockers (§10). The fixes are on `develop`, made with no new dependency, no schema change, and no change to the import.
+
+### 12.1 Fixes
+
+| Finding | Root cause | Fix | Files | Before → after | Regression tests |
+|---|---|---|---|---|---|
+| **H1** Almanax | Season entries (#2, #130, #131) list some of their days explicitly (`01/03/*`…), so they score the same "exact day" precision as the day's own entry. The sort was stable over id order, so a season with a lower id won. | Ties of equal precision go to the entry with **fewer dates** (the most specific). A season that loses is listed among the period bonuses. Exact-year entries (events) still win. | `src/almanax-shared.ts` | Days of 2026 showing a season's offering: **81 → 0**. 122 days of 2026 have a competing season; all now show the day's own entry. 1 March: "La Chaîne Nhanor Kibrill" (was "2 × Rondelle de Bois"). | Unit: season tie. Real data: 1 March and 21 December 2026; every day of 2026–2027 against the calendar (exact-year entry, else the day's own entry); the season stays a period bonus; month-wide season (15 January) stays a period bonus; no offering repeated as a bonus. |
+| **H2** Level page XP | `MIN/MAX(xp)` over grades included `0`, which in the files means "not set". | XP range over non-zero grades (`NULLIF`); `null` → "XP non renseignée". Never shown as 0. | `src/zones.ts`, `src/zones-shared.ts`, `components/progression/LevelView.tsx` | Zone monsters showing "0 XP": **533 grades → 0**; 3–7 monsters per level now say "non renseignée". | Real data: no zone monster has XP 0. |
+| **H2** Zone ranking | Every monster placed in a zone counted, whatever its race. | Races "Archimonstres", "Monstres de quête…" (incl. alignment and Pwâk), "Avis de recherche…", "Dopeuls" and "Invocations…" are left out of the level page's zone lists only (`NOT_REGULAR`, game race names). They stay in the database for quests, achievements and item sources. | `src/zones.ts`, `LevelView.tsx` (explanation text) | Excluded entries in the top zones at level 60: **75 → 0** (50 archmonsters, 8 quest, 17 Pwâk). `/api/zones`: 469 → 355 KB raw. | Real data: no excluded race in any zone; more than 1,000 such monsters still in the database (5,135 monsters unchanged); Bouftou still in "Coin des Bouftous" with a known XP and found at level 26. |
+| **H3** Demand ranking | `drops` were cut to each monster's 3 best before `forLevel` computed `wanted`. | All unconditional drops with a chance above 0 are kept; zone loot display still shows the top 8 per zone. Payload measured: all drops 355 KB / 47 KB gzip, versus top 3 at 343 / 46 KB. Computing candidates server-side would save under 1 KB gzip, so it was not worth the extra code. | `src/zones.ts` | 162 zone monsters have more than 3 drops. Ranking changes were **smaller than the review feared**: 1 new top-10 entry at level 60 ("Capsule Explosive"), none at 20, 120, 190. | Real data: a monster with more than 3 drops exists in the payload; "Capsule Explosive" (outside its monsters' top 3) is in the level-60 ranking. |
+| **M9** Sitemap E2E | 180 pages in one test. Measured alone: 65–88 s on desktop and 51–87 s on mobile per run, of which only 13 s is server time; the browser time varies ±40% between runs on this machine. With 2 workers and the rest of the suite in parallel, one run crossed 240 s. Blocking the quest-graph prefetch did not change the picture (not the cause). | Split into **6 equal batches** whose size follows the sitemap length (no page can be left out), 120 s each, desktop and mobile kept. No retries, no skip. | `e2e/ui.spec.ts` | Full suite 6.0 min with 1 failure → **4.1 min, 0 failures**. Slowest batch 45.9 s (budget 120 s). | The batches themselves. |
+
+The tests were checked against the old code: with the H1 and H2/H3 production changes reverted, the new real-data tests fail (Almanax test 0/1; level tests 0/2). With the fixes, they pass.
+
+### 12.2 Verification after the fixes (commit below, same machine)
+
+| Command | Exit | Result |
+|---|---|---|
+| `npm run typecheck` | 0 | clean |
+| `npm test` | 0 | **90 / 90** pass, 0 skipped (88 before + 2 new real-data tests; other new checks extend existing tests) |
+| `npm run build` | 0 | compiled, all routes generated |
+| `E2E_BASE_URL=http://127.0.0.1:3101 npx playwright test` (desktop + mobile, 2 workers) | 0 | **47 passed, 1 skipped, 0 failed** (4.1 min). The skip is the pre-existing desktop-only class test on mobile. |
+| `PRAGMA integrity_check` | — | ok |
+| Reference checks (drops, recipes, ingredients, bosses, Almanax items) | — | 0 dangling, unchanged |
+| Server log during E2E | — | no error |
+
+No dependency was added (`package.json` unchanged). No new SQL was written with user input: the only new SQL is constant (`NULLIF`), and the race filter runs in JavaScript on game data.
+
+### 12.3 Status of every finding
+
+| Finding | Status |
+|---|---|
+| H1, H2, H3, M9 | **Fixed** (regression tests above) |
+| M1 doc claims | **Fixed** (vault and inventory corrected) |
+| M2 objective targets by name | Unresolved: needs the `quest_objective` table (data foundation) |
+| M3 dungeons and instances missing from zones | Unresolved: needs all subareas (data foundation) |
+| M4 drop fields not imported, duplicates | Unresolved (data foundation) |
+| M5 profession progress % | Unresolved: **not verified in game** |
+| M6 monster XP meaning | Unresolved: **not verified in game**. The page keeps "valeur de base…" and never computes earned XP. |
+| M7 static routes bake a 503 | Unresolved (small, next PR) |
+| M8 importer structure | Unresolved: future architectural work (§7, §11) |
+| L1–L8 | Unresolved, low priority |
+| New: event zones | Unresolved: event-only zones (e.g. "Havre de Nowel", "Terre de Nowel") are still listed. Their monsters are the regular population of those zones, and no game-data flag marking a zone as event-only was found, so they are not hidden by guesswork. |
+
+### 12.4 New risks introduced
+
+- `NOT_REGULAR` matches race names by prefix. A renamed or new race in a future game version could slip through, or be hidden. Mitigation: the real-data test fails if more than 0 excluded-race monsters appear in zones, and re-checks after every import.
+- The Almanax rule assumes a day's own entry lists fewer dates than any season covering it. This is true for every day of 2026–2027 in 3.7.14.18 (tested); a new calendar shape would be caught by the same test.
+
+### 12.5 Merge recommendation
+
+The four pre-merge blockers are fixed and proven by tests that fail on the old code, and the full suite is green. **PR #2 can be merged**, keeping in mind that M2–M8 remain open by design. They do not make current pages wrong, but they must be done (data foundation PR) **before** the equipment optimizer or the solo progression planner are built on this data.

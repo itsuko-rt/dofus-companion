@@ -6,6 +6,9 @@ Status values: **planned** (agreed, not started), **idea** (not agreed), **block
 |---|---|---|
 | Fix first-visit blank pages, Succès query indexes, quest graph cache | **implemented** 2026-11-20 (unit + E2E tests, measured) | `docs/GAME_DATA_AND_PRODUCT_AUDIT.md` §4 |
 | All 19 classes and a class hub page | planned (phases 1–2, awaiting approval) | same audit §2–3 |
+| **Game data foundation**: quest objectives with game ids, all subareas (dungeons), full monster grades (resistances), drop fields, class characteristic costs, keys and an integrity gate after import | planned, **before** the equipment builder and the progression planner | `docs/PR2_TECHNICAL_REVIEW.md` M2–M8, §11 step 1 |
+| In-game checks: monster XP (2–3 monsters), profession XP panel, one spell tooltip | planned (owner, in game) | `docs/PR2_TECHNICAL_REVIEW.md` M5, M6 |
+| Label event-only zones (Nowel) on the level page | idea (no game-data flag found yet) | `docs/PR2_TECHNICAL_REVIEW.md` §12 |
 | E-mail provider for password reset and verification | blocked (choice of provider) | `docs/RELEASE_READINESS.md` |
 | "Log out other devices", idle session timeout | planned | `docs/SECURITY_AUDIT.md` F10 |
 | E-mail verification at sign-up | planned | needs the e-mail provider; also stops registration enumeration |

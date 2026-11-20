@@ -75,7 +75,8 @@ export default function LevelView() {
             <section aria-labelledby="zones">
               <h2 id="zones" className="mb-1 font-display text-lg text-text">Zones et monstres de votre niveau</h2>
               <p className="mb-3 text-xs text-faint">
-                Zones du Monde des Douze où vivent le plus de monstres de niveau {Math.max(1, level - band)}–{Math.min(200, level + band)}. XP : valeur de base d’un monstre dans les données du jeu, avant sagesse, taille du groupe et bonus.
+                Zones du Monde des Douze où vivent le plus de monstres de niveau {Math.max(1, level - band)}–{Math.min(200, level + band)}. Sans les archimonstres, monstres de quête (dont Pwâk), cibles d’avis de recherche, Dopeuls et invocations, qui ne peuplent pas la zone au quotidien.
+                XP : valeur de base d’un monstre dans les données du jeu, avant sagesse, taille du groupe et bonus (« non renseignée » quand le fichier n’en donne pas).
                 Butin : chance de base avant prospection, sans les butins sous condition (évènements, quêtes). Aucun prix : il n’est pas dans les données.
               </p>
               {r.zones.length === 0 ? <EmptyState title="Aucune zone à ce niveau">Élargissez l’écart.</EmptyState> : (
@@ -87,7 +88,7 @@ export default function LevelView() {
                         {z.monsters.slice(0, 8).map((m) => (
                           <li key={m.id} className="flex justify-between gap-2">
                             <span className="truncate text-text">{m.name} <span className="text-xs text-muted">niv. {m.lmin === m.lmax ? m.lmin : `${m.lmin}–${m.lmax}`}</span></span>
-                            <span className="shrink-0 text-xs text-muted">{m.xpMin === m.xpMax ? n(m.xpMax) : `${n(m.xpMin)}–${n(m.xpMax)}`} XP</span>
+                            <span className="shrink-0 text-xs text-muted">{m.xpMin == null || m.xpMax == null ? 'XP non renseignée' : `${m.xpMin === m.xpMax ? n(m.xpMax) : `${n(m.xpMin)}–${n(m.xpMax)}`} XP`}</span>
                           </li>
                         ))}
                         {z.monsters.length > 8 && <li className="text-xs text-faint">et {z.monsters.length - 8} autres</li>}

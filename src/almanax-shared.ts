@@ -19,8 +19,10 @@ const precision = (pattern: string, d: Day) => {
 
 export function almanaxFor(entries: AlmanaxEntry[], d: Day): { offering: AlmanaxEntry | null; period: AlmanaxEntry[] } {
   const scored = entries.map((e) => ({ e, p: Math.max(...e.dates.map((x) => precision(x, d))) })).filter((x) => x.p >= 0);
-  const best = scored.filter((x) => x.p >= 2).sort((a, b) => b.p - a.p)[0]?.e ?? null;
-  return { offering: best, period: scored.filter((x) => x.e !== best && x.p === 0).map((x) => x.e) };
+  // equal precision: the entry with fewer dates is the day's own; season entries list each of their days explicitly
+  // (e.g. 01/03/* … 19/03/*) and must not win over the day's offering (81 days of 2026 before this rule)
+  const best = scored.filter((x) => x.p >= 2).sort((a, b) => b.p - a.p || a.e.dates.length - b.e.dates.length)[0]?.e ?? null;
+  return { offering: best, period: scored.filter((x) => x.e !== best && (x.p === 0 || x.e.dates.length > 1)).map((x) => x.e) };
 }
 
 /** Today in the game's time zone (Europe/Paris): the Almanax day changes at midnight Paris time. */

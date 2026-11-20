@@ -12,6 +12,13 @@ test('a day picks its exact entry; wider patterns are the period bonuses; an exa
   assert.equal(almanaxFor(entries, { day: 22, month: 11, year: 2027 }).offering, null);
 });
 
+test('a season listing its days explicitly does not replace the day’s own offering; it is shown as a period bonus', () => {
+  const entries = [e(130, ['28/02/*', '01/03/*', '02/03/*']), e(193, ['01/03/*'])];
+  const r = almanaxFor(entries, { day: 1, month: 3, year: 2026 });
+  assert.equal(r.offering?.id, 193);
+  assert.deepEqual(r.period.map((x) => x.id), [130]);
+});
+
 test('days roll over months and years; Paris time decides the day', () => {
   assert.deepEqual(addDays({ day: 31, month: 12, year: 2026 }, 1), { day: 1, month: 1, year: 2027 });
   assert.deepEqual(addDays({ day: 28, month: 2, year: 2028 }, 1), { day: 29, month: 2, year: 2028 });

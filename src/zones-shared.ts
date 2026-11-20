@@ -3,7 +3,8 @@
 // no XP per hour and no kamas estimates: they are not in the data.
 // Types and the pure level filter, shared by the server loader (src/zones.ts) and the browser.
 export interface Activity { id: number; name: string; description: string | null; category: string; level: number; zone: string | null }
-export interface ZoneMonster { id: number; name: string; lmin: number; lmax: number; xpMin: number; xpMax: number }
+/** xpMin/xpMax: base XP over the grades that have one; null when the data sets none (shown as unknown, never as 0) */
+export interface ZoneMonster { id: number; name: string; lmin: number; lmax: number; xpMin: number | null; xpMax: number | null }
 export interface Zone { id: number; name: string; area: string | null; monsters: ZoneMonster[]; harvest: string[] }
 /** uses: how many recipes of the game take this item as an ingredient (craft demand from game data, not a price) */
 export interface Drop { item: string; min: number; max: number; uses: number }

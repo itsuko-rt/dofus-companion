@@ -33,7 +33,8 @@ The owner asked for a rigorous check of PR #2 before merging, with special atten
 - **Monster XP:** stored values match the game's `getEXP` formula for only 5,447 of 26,851 grades. What players actually earn is UNVERIFIED.
 
 ## Remaining issues
-- PR #2 is not merged. Must fix first: Almanax tie-break, "0 XP" and race mixing on the level page, demand ranking, and the sitemap E2E budget.
+- The pre-merge blockers were fixed afterwards: [[2026-11-20 PR 2 pre-merge fixes]].
+- PR #2 is not merged; merging is the owner's decision.
 - Data foundation gaps that block the planner and optimizer: objective ids, all subareas, full monster grades (resistances), class characteristic costs, foreign keys, an integrity gate after import.
 
 ## Next recommended actions

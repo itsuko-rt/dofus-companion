@@ -3,14 +3,16 @@
 *Last updated: 2026-11-20 by Claude Code. Update this note after each significant session.*
 
 ## Where we are
-**Pre-launch.** The site runs locally. On branch `develop` (review of 2026-11-20): typecheck clean, 88/88 unit tests, production build OK. E2E: 36 passed, 1 skipped by design, 1 failed (sitemap test over its 240 s budget with 2 workers; passes alone). Not deployed.
+**Pre-launch.** The site runs locally. On branch `develop` (after the pre-merge fixes of 2026-11-20): typecheck clean, 90/90 unit tests, production build OK, E2E 47 passed and 1 skipped by design, 0 failed. Not deployed.
 
-## PR #2 review (2026-11-20): not ready to merge
-Report: `docs/PR2_TECHNICAL_REVIEW.md`, summary [[2026-11-20 PR 2 technical review]]. Fix first:
-1. Almanax shows the season's offering on 81 days a year.
-2. Level page: "0 XP" monsters; archmonster, quest and event monsters counted in the zone ranking.
-3. Craft-demand ranking limited to each monster's 3 best drops.
-4. Sitemap E2E test over its time budget.
+## PR #2 review (2026-11-20)
+Report: `docs/PR2_TECHNICAL_REVIEW.md`, summary [[2026-11-20 PR 2 technical review]]. The four pre-merge fixes are done on `develop`, with regression tests ([[2026-11-20 PR 2 pre-merge fixes]]):
+1. Almanax: a season no longer replaces the day's offering (81 days of 2026 → 0).
+2. Level page: "XP non renseignée" instead of 0; archmonsters, quest monsters (incl. Pwâk), wanted targets, Dopeuls and summons left out of zones (still in the database).
+3. Craft-demand ranking uses every unconditional drop.
+4. Sitemap E2E test split into 6 batches.
+
+Open after the fixes: findings M2–M8 and L1–L8 of the report (data foundation work).
 
 ## Latest changes (2026-11-20, pushed to `main`)
 - **In-site map removed:** `/carte` is now a directory of DofusDB and Dofus Maps ([[ADR-0005 Remove the in-site map]]).
@@ -49,4 +51,4 @@ From [[Release Checklist]]:
 - XP and kamas routes: no verified data, not implemented.
 
 ## What Claude Code is working on
-Nothing in progress. PR #2 is reviewed and not merged; it waits for the owner's decision on the pre-merge fixes. Next steps: [[2026-11-20 PR 2 technical review#Next recommended actions]].
+Nothing in progress. PR #2 is fixed and ready for the owner to merge (not merged). Next steps: [[2026-11-20 PR 2 pre-merge fixes#Next recommended actions]].

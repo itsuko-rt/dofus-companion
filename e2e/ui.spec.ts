@@ -1,23 +1,30 @@
 import { expect, test } from '@playwright/test';
 import { character, collectErrors, expectNoErrors, localStore, seedLocal, STORE } from './helpers';
 
-test('every sitemap page loads with one h1, no script error and no CSP violation', async ({ page, request }) => {
-  test.setTimeout(240_000);
-  const xml = await (await request.get('/sitemap.xml')).text();
-  const paths = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => new URL(m[1]).pathname);
-  expect(paths.length).toBeGreaterThan(100);
-  await seedLocal(page);
-  const errors = collectErrors(page);
-  const bad: string[] = [];
-  for (const p of paths) {
-    const r = await page.goto(p, { waitUntil: 'domcontentloaded' });
-    if (r?.status() !== 200) bad.push(`${p}: ${r?.status()}`);
-    const h1 = await page.locator('h1').count();
-    if (h1 !== 1 && !/^\/(progression\/quetes|progression\/scan)/.test(p)) bad.push(`${p}: ${h1} h1`);
-  }
-  expect(bad, bad.join('\n')).toEqual([]);
-  expectNoErrors(errors);
-});
+// The sitemap (180 pages) is checked in 6 equal batches so each test stays far from its timeout when workers run in
+// parallel; the batch size follows the sitemap, so a growing sitemap never leaves pages unchecked.
+const SITEMAP_BATCHES = 6;
+for (let b = 0; b < SITEMAP_BATCHES; b++) {
+  test(`every sitemap page loads with one h1, no script error and no CSP violation (batch ${b + 1}/${SITEMAP_BATCHES})`, async ({ page, request }) => {
+    test.setTimeout(120_000);
+    const xml = await (await request.get('/sitemap.xml')).text();
+    const all = [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => new URL(m[1]).pathname);
+    expect(all.length).toBeGreaterThan(100);
+    const size = Math.ceil(all.length / SITEMAP_BATCHES);
+    const paths = all.slice(b * size, (b + 1) * size);
+    await seedLocal(page);
+    const errors = collectErrors(page);
+    const bad: string[] = [];
+    for (const p of paths) {
+      const r = await page.goto(p, { waitUntil: 'domcontentloaded' });
+      if (r?.status() !== 200) bad.push(`${p}: ${r?.status()}`);
+      const h1 = await page.locator('h1').count();
+      if (h1 !== 1 && !/^\/(progression\/quetes|progression\/scan)/.test(p)) bad.push(`${p}: ${h1} h1`);
+    }
+    expect(bad, bad.join('\n')).toEqual([]);
+    expectNoErrors(errors);
+  });
+}
 
 test('navigation bar reaches every section; skip link works from the keyboard', async ({ page, isMobile }) => {
   await seedLocal(page);

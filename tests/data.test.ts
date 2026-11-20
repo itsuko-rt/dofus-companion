@@ -109,6 +109,23 @@ test('real data: level suggestions, zones and dungeons for a level come only fro
   assert.ok(r.byCategory.get('Donjon')!.some((a) => a.name === 'Donjon des Forgerons')); // the game suggests it at 50
   assert.ok(r.zones.length > 0 && r.zones.length <= 12);
   for (const z of r.zones) for (const m of z.monsters) assert.ok(m.lmax >= 40 && m.lmin <= 60, `${z.name}: ${m.name}`);
+  // XP 0 is "not set": never shown as a value; archmonsters, quest monsters, wanted targets and Dopeuls are not zone population
+  const { DatabaseSync } = await import('node:sqlite');
+  const g = new DatabaseSync(db!, { readOnly: true });
+  const race = new Map((g.prepare('SELECT id, race FROM monster').all() as { id: number; race: string | null }[]).map((m) => [m.id, m.race ?? '']));
+  g.close();
+  const { NOT_REGULAR } = await import('../src/zones.ts');
+  for (const z of data.zones) for (const m of z.monsters) {
+    assert.ok(m.xpMin !== 0 && m.xpMax !== 0, `${m.name}: XP 0 shown`);
+    assert.ok(!NOT_REGULAR.test(race.get(m.id)!), `${z.name}: ${m.name} (${race.get(m.id)})`);
+  }
+  // the excluded races exist in those zones in the game data (so the rule is doing something) and stay in the database
+  assert.ok([...race.values()].filter((r) => NOT_REGULAR.test(r)).length > 1000);
+  assert.equal(race.size, 5135);
+  // ordinary monsters remain: Bouftous live in "Coin des Bouftous" with a known base XP
+  const coin = data.zones.find((z) => z.name === 'Coin des Bouftous')!;
+  assert.ok(coin.monsters.some((m) => m.name === 'Bouftou' && m.xpMax != null && m.xpMax > 0));
+  assert.ok(forLevel(data, 26, 5).zones.some((z) => z.name === 'Coin des Bouftous')); // Bouftou grades: levels 22–30
   assert.ok(r.dungeons.every((d) => Math.abs(d.optimalLevel - 50) <= 10 || (d.minLevel <= 50 && 50 <= d.optimalLevel)));
   assert.ok(r.dungeons.length > 0);
 });
@@ -130,9 +147,44 @@ test('real data: Almanax offering of a day comes from the game calendar', { skip
   assert.equal(r.offering?.item, 'Sang coagulé');
   assert.equal(r.offering?.qty, 2);
   assert.ok(r.period.every((e) => e !== r.offering));
-  // every day of a year has an offering
-  let d = { day: 1, month: 1, year: 2027 };
-  for (let i = 0; i < 365; i++, d = addDays(d, 1)) assert.ok(almanaxFor(entries, d).offering, `${d.day}/${d.month}`);
+});
+
+test('real data: Almanax season entries never replace the day’s own offering (review finding H1)', { skip }, async () => {
+  const { loadAlmanax } = await import('../src/load.ts');
+  const { almanaxFor, addDays } = await import('../src/almanax-shared.ts');
+  const entries = loadAlmanax(db!)!;
+  // the day's own entry, read from the calendar itself (no expected offering is written into the code)
+  const own = (d: { day: number; month: number }) => entries.find((e) => e.dates.length === 1 && e.dates[0] === `${String(d.day).padStart(2, '0')}/${String(d.month).padStart(2, '0')}/*`);
+  const exactYear = (d: { day: number; month: number; year: number }) => entries.find((e) => e.dates.includes(`${String(d.day).padStart(2, '0')}/${String(d.month).padStart(2, '0')}/${d.year}`));
+  // a season entry lists the day explicitly among other days (the cause of the bug)
+  const seasonOn = (d: { day: number; month: number }) => entries.filter((e) => e.dates.length > 1 && e.dates.some((p) => p === `${String(d.day).padStart(2, '0')}/${String(d.month).padStart(2, '0')}/*`));
+
+  // 1 March and 21 December 2026: the days named in the review
+  for (const d of [{ day: 1, month: 3, year: 2026 }, { day: 21, month: 12, year: 2026 }]) {
+    const r = almanaxFor(entries, d);
+    assert.ok(own(d) && seasonOn(d).length > 0, `${d.day}/${d.month}: a season entry lists this day`);
+    assert.equal(r.offering?.id, own(d)!.id, `${d.day}/${d.month}`);
+    for (const s of seasonOn(d)) assert.ok(r.period.includes(s), `${d.day}/${d.month}: season bonus #${s.id} still shown`);
+  }
+  assert.equal(almanaxFor(entries, { day: 1, month: 3, year: 2026 }).offering?.item, 'La Chaîne Nhanor Kibrill');
+
+  // every day of 2026 and 2027: exactly one offering; an exact-year entry (events) wins; otherwise the day's own entry
+  let affected = 0;
+  let d = { day: 1, month: 1, year: 2026 };
+  for (let i = 0; i < 730; i++, d = addDays(d, 1)) {
+    const r = almanaxFor(entries, d);
+    assert.ok(r.offering, `${d.day}/${d.month}/${d.year}: no offering`);
+    const expected = exactYear(d) ?? own(d);
+    if (expected) assert.equal(r.offering.id, expected.id, `${d.day}/${d.month}/${d.year}`);
+    assert.ok(!r.period.includes(r.offering), `${d.day}/${d.month}/${d.year}: offering repeated as a period bonus`);
+    if (d.year === 2026 && own(d) && !exactYear(d) && seasonOn(d).length) affected++;
+  }
+  // 122 days of 2026 where a season competes with the day's own entry; before the fix the 81 of them whose season
+  // entry had the lower id showed the season's offering. All are checked above.
+  assert.equal(affected, 122);
+
+  // a month-wide season (January has no explicit days in #130) stays a period bonus
+  assert.ok(almanaxFor(entries, { day: 15, month: 1, year: 2026 }).period.some((e) => e.id === 130));
 });
 
 test('real data: craft demand ranks zone loot by how many game recipes use it', { skip }, async () => {
@@ -141,4 +193,8 @@ test('real data: craft demand ranks zone loot by how many game recipes use it', 
   assert.ok(w.length > 0 && w.length <= 10);
   for (let i = 1; i < w.length; i++) assert.ok(w[i - 1].uses >= w[i].uses);
   assert.ok(w.every((x) => x.uses > 0 && x.zones.length > 0));
+  // every unconditional drop counts, not only each monster's 3 most likely ones (162 zone monsters have more than 3)
+  const data = loadZoneData(db!)!;
+  assert.ok(Object.values(data.drops).some((d) => d.length > 3));
+  assert.ok(forLevel(data, 60, 10).wanted.some((x) => x.item === 'Capsule Explosive')); // 4th+ drop of its monsters
 });
