@@ -1,62 +1,102 @@
-# World map — implementation
+# World map — implementation (updated 2026-11-20)
 
-Page: `/carte`. Components: `components/world/WorldMap.tsx` (state, panel, search, routes) and `components/world/MapCanvas.tsx` (drawing, pan, zoom). Data: `GET /api/world/:mapId` (`src/world.ts` → `loadWorld`).
+Page: `/carte`. Code: `components/world/`:
+- `WorldMap.tsx`: state, deep links, keyboard shortcuts, route planner;
+- `MapCanvas.tsx`: drawing, pan and zoom, hit-testing;
+- `MapFilters.tsx`: resources and layers;
+- `MapDetails.tsx`: the selected map;
+- `MapSearch.tsx`: the search palette;
+- `layers.tsx`: points of interest.
 
-## What the map is
-- **Geometry:** one unit is one in-game map, at the same `[x, y]` coordinates players read in the game; y grows southwards. The map is built from `mapsinformationdata`. Each coordinate is given to the zone that most of its maps belong to; indoor maps share their outdoor coordinates.
-- **Zones and colours:** each zone is drawn as its cells, with borders where neighbouring cells belong to another zone. The colour is a muted tone picked per region. It says nothing about the terrain, and the source note says so.
-- **Artwork:** no Ankama map artwork is used or hotlinked. The release does ship `images-worldmap.zip`, but redistributing it is not ours to decide.
-- **Worlds:** 26 worlds are available (Monde des Douze, Harebourg, Osavora, Sufokia's depths…); the selector is in the panel.
+Data comes from `GET /api/world/:mapId?s=2` (`src/world.ts`). Pure helpers live in `src/world-shared.ts` and are tested.
 
-## Why SVG rather than Leaflet or MapLibre
-Leaflet and MapLibre are built around image or vector tiles, and here there are none to serve. The map is a few thousand unit squares plus a few hundred markers. A home-made SVG layer (about 150 lines) handles that with no new dependency:
-- pan by dragging;
-- zoom with the wheel, a pinch or the buttons;
-- markers that keep a constant size on screen;
-- zone labels from about 22 px per map.
+## Reference studied: DofusDB (dofusdb.fr/fr/tools/map)
+What DofusDB does, and what we kept:
+- **Map:** Leaflet over the official world-map artwork, with a map grid and coordinates shown on hover.
+- **Resources:** buttons per profession that open a grid of resource icons; a total count per resource ("581" for Ash).
+- **Map clicks:** information about the clicked map.
 
-Clicks are found by hit-testing: the nearest marker within the marker radius, otherwise the zone under the pointer. This is needed because pointer capture redirects the browser's own `click` event to the SVG element.
+Our version keeps the same information hierarchy but uses our own interface. Profession filters sit in a side panel with levels, and details appear in a card. Search uses a palette (Ctrl+K), which DofusDB does not offer. Nothing is copied from DofusDB's code or data.
 
-## Layers (combinable)
+## Foundation
+- **Official artwork:** the game ships the world map as tiles (`images-worldmap.zip` in the dofus-sqlite release): 1024 px tiles, row by row, at 5 scales for the Monde des Douze (0.2 to 1). `scripts/fetch-worldmap.ts`, run by `npm run assets`:
+  - copies them to `public/ankama/worldmap/`, git-ignored and never committed, as for the other Ankama images;
+  - writes an `index.json` of the scales.
+  The map shows "Carte © Ankama". Without the tiles, the zones are drawn in colour from the coordinates.
+- **Alignment:** taken from the game data (`worldmapsdata`): map `(x, y)` covers `origin + (x·mapW, y·mapH)`. For the Monde des Douze, origin is (6480, 4944) and each map is 69.5 × 49.7 px; the world is 10,000 × 9,664 px, which matches 9 × 1024 + 784 by 9 × 1024 + 448. This was checked visually: [5, −18] falls on Astrub's zaap.
+- **Display:**
+  - the tile scale follows the zoom, and only tiles in view are loaded;
+  - zones and borders are drawn over the artwork; the hovered map is outlined, the selected map is framed;
+  - region names are shown when zoomed out, zone names when zoomed in.
+- **Controls:**
+  - pan by dragging or with the arrow keys;
+  - zoom with the wheel, a pinch, the +/− buttons or the + / − / 0 keys;
+  - "Réinitialiser la vue" and "Effacer les filtres" buttons;
+  - 26 worlds can be chosen.
+- **Clicks:** found by hit-testing, so any map on the world can be clicked, as well as the markers.
 
-| Layer | Source | Display |
+## Resource filters (map side)
+- **Layout:** one collapsible section per gathering profession: Bûcheron, Mineur, Alchimiste, Paysan, Pêcheur.
+- **Resources:** icon, name and unlock level for each, all from the game data (`skillsdata`).
+- **Level selector:** one per profession, starting from the active character's level. Resources above it show a padlock, and "Tout afficher (≤ niv. N)" only selects the reachable ones.
+- **Selection:** several resources at once, across professions. "Masquer" clears a profession, "Tout effacer" clears everything, and a text field filters the resources.
+- **On the map:** zones with a selected resource are highlighted, and the resource's icon sits at the zone centre. Markers cluster with a count when zoomed out; clicking a cluster zooms in.
+
+## Points of interest (separate layers)
+
+| Layer | Source | Precision |
 |---|---|---|
-| Zaaps | `waypointsdata` | Marker at the zaap's coordinates |
-| Transports, Donjons, Ateliers, Hôtels de vente, Lieux de classes, Divers… | `hintsdata` (official world-map markers) | One marker per hint, one icon and colour per category |
-| Resources / profession | `subareasdata.harvestables` + `skillsdata` | Zones where the resource grows filled in gold; other zones dimmed |
-| Monsters | `subareasdata.monsters` | Zones outlined in red |
-| Quest-giving NPCs | Quest start data | One marker per zone, with the number of NPCs |
-| Route | Saved on the character | Numbered stops and a dashed line |
+| Zaaps | `waypointsdata` | Exact map |
+| Transports | Official markers "Transports" (`hintsdata`) | Exact map |
+| Donjons | `dungeonsdata.entranceMapId` (with recommended level), plus "Donjons" markers not already covered | Exact map |
+| Ateliers | Official markers | Exact map |
+| Hôtels de vente | Official markers | Exact map |
+| Temples de classe | Official markers "Lieux de classes" | Exact map |
+| PNJ donneurs de quêtes | `questsdata.startPosition` (NPC and starting map) | Exact map |
+| Mines et grottes | Official markers whose name contains mine, grotte, caverne, souterrain or galerie (dungeons and workshops excepted) | Exact map |
+| Autres repères | Other official markers (banks, taverns, attitudes…) | Exact map |
 
-Event and quest items that the game lists as "harvestable" (such as the Rékloot boxes) are left out: only items a profession actually harvests are resources.
+**Hidden maps:** not in the game files, so there is no layer, and the panel says so. Each layer's source shows when hovering it in the panel.
 
-## Zone details
-The panel shows:
-- name, region, level and centre `[x, y]`;
-- the zone's own zaap; if the zone has none (the data uses map 0 at [0, 0] to mean "none"), the nearest zaap in a straight line, labelled as such;
-- resources grouped by profession, with a padlock when above the character's level;
-- monsters with their level range;
-- markers inside the zone;
-- quests starting there, with links to the quest map;
-- the data version, the source, and the import date.
+## Map details
+Clicking a map, a marker or a search result opens a card with:
+- the coordinates, with "Copier X,Y" and "Copier /travel X,Y" (or the **C** key);
+- the zone, its region and its level;
+- what is on that exact map: zaap, dungeon entrance with its level, quest giver with links to the quests;
+- the zone's harvestable resources by profession, with a padlock above the level filter;
+- **nearby alternatives:** the closest other zones for each selected resource;
+- the zone's monsters with their level ranges;
+- the zone's other markers;
+- quests starting in the zone, and a link to the guides.
 
-## Search
-Zones, resources, monsters, markers (dungeons, workshops…) and quest NPCs. Each result selects, highlights or recentres the map.
+The selected map is stored in the URL (`?x=&y=`), so a link reopens it.
+
+## Search (Ctrl+K or /, Escape to close)
+- **Matches:** coordinates (`5,-18`, `[5, -18]`, `5 -18`, `/travel 5,-18`), regions, zones, gathering professions (selects their reachable resources), resources, monsters (zones outlined) and every point of interest.
+- **Keyboard:** arrow keys and Enter.
+- **Accents:** ignored ("cite" finds "Cité").
 
 ## Route planner
-- **Stops:** zones, added one by one or all the zones of a resource at once (filtered by the character's profession level, so locked resources are not proposed).
-- **Order:** nearest neighbour, then 2-opt (`orderStops`, tested).
-- **Distance:** `|Δx| + |Δy|` between zone centres, a lower bound on the number of maps to cross. The data has no water, walls or exits, so the interface calls it an estimate and never "optimal".
-- **Zaaps (option):** a leg may start at the zaap nearest to its destination when that is shorter.
-- **Saving:** routes are stored on the active character (at most 20 of 40 stops), reopened from the panel or from the character page, and synced with the account.
+Unchanged in principle:
+- **Stops:** zones, ordered by nearest neighbour then 2-opt, with an option to use zaaps.
+- **Distance:** a straight-line estimate, presented as such.
+- **Saving:** routes are stored on the character. "Ajouter les N zones en surbrillance" fills the route from the resource filters.
 
-## Deep links
-- `/carte?metier=2&niveau=45`: profession and level.
-- `?ressource=303`, `?monstre=…`, `?zone=95`: one resource, monster or zone.
-- `?itineraire=r…`: a saved route.
-- `?carte=12`: another world.
+## What the data does not allow (not shown, never guessed)
+- **Exact gathering spots and quantities:** `maps.sqlite` (in the same release) lists 31,707 interactive elements with their map and cell, but only by graphic id, not by resource. I tried deducing the resource by checking which harvestable is common to every zone where a graphic appears. That pins down only 4,281 elements (14%), and some results are implausible (a decorative tree read as "snowdrop"). So resources stay at zone level, with no count, and the interface says so.
+- **Route distances:** straight lines, since the data has no walls, water or exits.
+- **Hidden maps:** not in the data.
 
-## Limits
-- **Gathering spots:** the exact cell of each spot is not in this release, so the map works at zone level.
-- **Distances:** straight-line estimates only.
-- **Small worlds:** the smallest instance worlds (under 20 coordinates) are not offered.
+## Tests
+- **Unit** (`tests/world.test.ts`):
+  - coordinate parsing and `/travel`;
+  - clustering;
+  - the mine and cave rule;
+  - artwork geometry, dungeons and NPCs at real coordinates, Astrub's zaap at [5, −18];
+  - plus the earlier route and storage tests.
+- **E2E** (`e2e/world.spec.ts`, desktop and mobile):
+  - layers;
+  - Ctrl+K with coordinates → details → `/travel` copied with C;
+  - Escape and the / key;
+  - profession filters with the level limit and clearing;
+  - profession → map → saved route → reopened from the character page.

@@ -12,10 +12,18 @@ export interface WorldZone {
 export interface WorldMarker { id: number; category: string; categoryId: number; name: string; x: number; y: number; zone: number | null }
 export interface WorldResource { id: number; name: string; iconId: number | null; jobId: number; levelMin: number }
 export interface WorldMonster { id: number; name: string; levelMin: number | null; levelMax: number | null }
-export interface WorldNpc { name: string; zone: number; quest: { id: number; name: string; category: number } }
+/** Quest giver at the map where the quest starts (questsdata.startPosition). */
+export interface WorldNpc { npcId: number; name: string; x: number; y: number; quest: { id: number; name: string; category: number } }
+export interface WorldDungeon { id: number; name: string; level: number | null; x: number; y: number }
+/** Pixel geometry of the official world-map artwork: map (x, y) has its top-left corner at origin + (x·mapW, y·mapH). */
+export interface WorldGeometry { originX: number; originY: number; mapW: number; mapH: number; totalW: number; totalH: number }
+export interface TileScale { scale: number; cols: number; rows: number }
 export interface WorldData {
   version: string; retrievedAt: string | null; source: string | null;
-  map: { id: number; name: string }; maps: { id: number; name: string; cells: number }[];
+  map: { id: number; name: string } & WorldGeometry; maps: { id: number; name: string; cells: number }[];
+  /** official artwork tiles copied by scripts/fetch-worldmap.ts, or null when absent */
+  tiles: TileScale[] | null;
+  dungeons: WorldDungeon[];
   /** [x, y, zoneId] per map coordinate */
   cells: [number, number, number][];
   zones: WorldZone[]; markers: WorldMarker[];
@@ -37,6 +45,27 @@ export type IngredientSource = { kind: 'gathered'; jobId: number; jobName: strin
 export interface JobDetails { job: JobSummary; tiers: GatherTier[]; recipes: RecipeInfo[]; version: string }
 
 // ---------------------------------------------------------------- pure helpers (tested)
+export const TILE_PX = 1024;
+
+/** "12,-5", "[12, -5]", "12 -5", "/travel 12,-5" → map coordinates; null when the text is not coordinates. */
+export function parseCoords(q: string): { x: number; y: number } | null {
+  const m = /^\s*(?:\/travel\s+)?\[?\s*(-?\d{1,3})\s*[,;\s]\s*(-?\d{1,3})\s*\]?\s*$/i.exec(q);
+  return m ? { x: Number(m[1]), y: Number(m[2]) } : null;
+}
+/** In-game autopilot command for a map. */
+export const travelCommand = (x: number, y: number) => `/travel ${x},${y}`;
+
+/** Points grouped by square buckets of `size` maps; one group per bucket and key (e.g. marker category). */
+export function cluster<T extends { x: number; y: number; key: string }>(points: T[], size: number): { key: string; x: number; y: number; items: T[] }[] {
+  if (size <= 1) return points.map((p) => ({ key: p.key, x: p.x, y: p.y, items: [p] }));
+  const b = new Map<string, T[]>();
+  for (const p of points) { const k = `${p.key}|${Math.floor(p.x / size)}|${Math.floor(p.y / size)}`; (b.get(k) ?? b.set(k, []).get(k)!).push(p); }
+  return [...b.values()].map((items) => ({ key: items[0].key, x: items.reduce((s, p) => s + p.x, 0) / items.length, y: items.reduce((s, p) => s + p.y, 0) / items.length, items }));
+}
+
+/** Official markers whose name says mine, cave, cavern, tunnels or galleries (dungeons and workshops excepted). */
+export const isMineOrCave = (m: { name: string; category: string }) =>
+  m.category !== 'Donjons' && m.category !== 'Ateliers' && /\b(mine|grotte|caverne|souterrain|galerie)/i.test(m.name);
 export const MAX_JOB_LEVEL = 200;
 
 /** Tiers as level brackets: each resource is the newest one from its unlock level until the next unlock. */

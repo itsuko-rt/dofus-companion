@@ -1,410 +1,293 @@
 'use client';
-// World map page: zones from the game's map coordinates, official markers, resource / monster / NPC layers,
-// zone details and a gathering route planner saved on the active character.
-import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+// Interactive world map: official artwork + zones from the game coordinates, resource filters by profession,
+// point-of-interest layers, map details with /travel, search palette (Ctrl+K, /), route planner.
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import {
-  Anchor, BookOpen, Castle, Flag, Hammer, Home as HomeIcon, Info, Landmark, Layers, Lock, MapPin, Route, Save, ScrollText, Search,
-  Shield, Skull, Store, Trash2, Users, X, Zap,
-} from 'lucide-react';
-import { mapSteps, orderStops, type WorldData, type WorldZone } from '../../src/world-shared.ts';
-import { regionPath } from '../quests/NextSteps';
+import { Eraser, Layers, Maximize2, Route, Save, Search, SlidersHorizontal, Trash2, X } from 'lucide-react';
+import { cluster, orderStops, type WorldData, type WorldZone } from '../../src/world-shared.ts';
 import { useCharacter } from '../useCharacter';
-import MapCanvas, { type MapFocus, type MapMarker } from './MapCanvas';
+import MapCanvas, { type MapHandle, type MapMarker } from './MapCanvas';
+import MapDetails from './MapDetails';
+import { ActiveFilter, LayerFilters, ResourceFilters } from './MapFilters';
+import MapSearch, { type SearchHit } from './MapSearch';
+import { buildPois, LAYER, type LayerId } from './layers';
 
-// official marker categories (hintcategories), each one a layer
-const CATEGORIES: Record<number, { label: string; color: string; icon: typeof MapPin }> = {
-  9: { label: 'Transports', color: '#2f7e8f', icon: Anchor },
-  6: { label: 'Donjons', color: '#8c2f2a', icon: Skull },
-  3: { label: 'Ateliers', color: '#7a5a1c', icon: Hammer },
-  2: { label: 'Hôtels de vente', color: '#4a6a1d', icon: Store },
-  1: { label: 'Lieux de classes', color: '#4b3d7a', icon: Shield },
-  4: { label: 'Divers', color: '#5c5346', icon: Info },
-  5: { label: 'Territoires de conquête', color: '#6a3b52', icon: Flag },
-  7: { label: 'Possessions', color: '#5c5346', icon: HomeIcon },
-  8: { label: 'Points de repère', color: '#5c5346', icon: Landmark },
-  10: { label: 'Anomalies', color: '#6a3b52', icon: Zap },
-  11: { label: 'Quêtes', color: '#7a5a1c', icon: ScrollText },
-  12: { label: 'Quêtes répétables', color: '#7a5a1c', icon: ScrollText },
-};
-const ZAAP = { label: 'Zaaps', color: '#1e7a70', icon: Castle };
-// muted terrain tones, one per area (a deterministic pick, not a claim about the terrain)
 const AREA_TONES = ['#3f5a2c', '#4d5f33', '#5b6236', '#56502f', '#4a5a3d', '#3d5240', '#5a4e35', '#4f5a46', '#45573a', '#5d5a3c', '#3e4f35', '#52553a'];
 const tone = (s: string | null) => AREA_TONES[[...(s ?? '?')].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % AREA_TONES.length];
-
-type Selection = { kind: 'zone'; id: number } | { kind: 'marker'; id: number } | null;
+const RES_COLOR = '#f0b23a';
+const WORLD_SCHEMA = 2;
+type Tab = 'resources' | 'layers' | 'route';
 
 export default function WorldMap() {
   const ch = useCharacter();
-  const [mapId, setMapId] = useState(1);
+  const params = useSearchParams();
+  const map = useRef<MapHandle>(null);
+  const [mapId, setMapId] = useState(() => Number(params.get('carte')) || 1);
   const [data, setData] = useState<WorldData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [layers, setLayers] = useState<Set<string>>(new Set(['zaap', 'c6']));
-  const [jobId, setJobId] = useState<number | null>(null);
-  const [jobLevel, setJobLevel] = useState(1);
-  const [resourceId, setResourceId] = useState<number | null>(null);
+  const [tab, setTab] = useState<Tab>('resources');
+  const [panelOpen, setPanelOpen] = useState(true);
+  const [layers, setLayers] = useState<Set<LayerId>>(new Set(['zaap', 'dungeon']));
+  const [selectedRes, setSelectedRes] = useState<Set<number>>(new Set());
+  const [openJobs, setOpenJobs] = useState<Set<number>>(new Set());
+  const [levels, setLevels] = useState<Record<number, number>>({});
   const [monsterId, setMonsterId] = useState<number | null>(null);
-  const [npcLayer, setNpcLayer] = useState(false);
-  const [sel, setSel] = useState<Selection>(null);
-  const [focus, setFocus] = useState<MapFocus | null>(null);
-  const [query, setQuery] = useState('');
+  const [areaFocus, setAreaFocus] = useState<string | null>(null);
+  const [cell, setCell] = useState<{ x: number; y: number } | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [pxPerMap, setPxPerMap] = useState(4);
+  const [toast, setToast] = useState<string | null>(null);
   const [stops, setStops] = useState<number[]>([]);
   const [useZaaps, setUseZaaps] = useState(true);
   const [routeName, setRouteName] = useState('');
-  const [panel, setPanel] = useState<'layers' | 'route'>('layers');
-  const [panelOpen, setPanelOpen] = useState(true);
 
-  // deep links: ?zone= ?ressource= ?metier=&niveau= ?monstre= ?itineraire= ?carte=
-  const params = useSearchParams();
-  useEffect(() => { const c = Number(params.get('carte')); if (c > 0) setMapId(c); }, [params]);
   useEffect(() => {
     setData(null); setError(null);
-    fetch(`/api/world/${mapId}`).then(async (r) => { const j = await r.json(); if (!r.ok) throw new Error(j.error); setData(j); }).catch((e) => setError((e as Error).message));
+    // ?s= schema version: a cached response of an older shape is never reused after an update
+    fetch(`/api/world/${mapId}?s=${WORLD_SCHEMA}`).then(async (r) => { const j = await r.json(); if (!r.ok) throw new Error(j.error); setData(j); }).catch((e) => setError((e as Error).message));
   }, [mapId]);
 
+  // on a phone the map comes first: filters start folded (the filter button opens them)
+  useEffect(() => { if (window.matchMedia('(max-width: 767px)').matches) setPanelOpen(false); }, []);
   const zoneById = useMemo(() => new Map((data?.zones ?? []).map((z) => [z.id, z])), [data]);
+  const cellZone = useMemo(() => new Map((data?.cells ?? []).map(([x, y, z]) => [`${x},${y}`, z])), [data]);
   const resById = useMemo(() => new Map((data?.resources ?? []).map((r) => [r.id, r])), [data]);
-  const monById = useMemo(() => new Map((data?.monsters ?? []).map((m) => [m.id, m])), [data]);
-  const jobById = useMemo(() => new Map((data?.jobs ?? []).map((j) => [j.id, j])), [data]);
-  const gatheringJobs = useMemo(() => (data?.jobs ?? []).filter((j) => j.kind === 'gathering'), [data]);
-  const focusZone = useCallback((z: WorldZone, w = 24) => setFocus({ x: z.cx + 0.5, y: z.cy + 0.5, w, seq: Date.now() }), []);
+  const zoneName = useCallback((id: number) => zoneById.get(id)?.name ?? '?', [zoneById]);
+  const pois = useMemo(() => (data ? buildPois(data, zoneName) : []), [data, zoneName]);
+  const zone = cell ? zoneById.get(cellZone.get(`${cell.x},${cell.y}`) ?? -1) ?? null : null;
 
-  // apply the deep link once the data is there
-  const [linked, setLinked] = useState(false);
+  // profession levels start from the active character
+  useEffect(() => { if (ch.ready) setLevels((l) => ({ ...Object.fromEntries(Object.entries(ch.character.jobs).map(([k, v]) => [Number(k), v])), ...l })); }, [ch.ready, ch.character.jobs]);
+
+  const focusCell = useCallback((x: number, y: number, across = 14) => { setCell({ x, y }); map.current?.focus(x, y, across); }, []);
+  const focusZone = useCallback((z: WorldZone, across = 18) => focusCell(Math.round(z.cx), Math.round(z.cy), across), [focusCell]);
+  const selectJob = useCallback((jobId: number, level?: number) => {
+    if (!data) return;
+    const lv = level ?? levels[jobId] ?? ch.character.jobs[jobId] ?? 200;
+    setLevels((l) => ({ ...l, [jobId]: lv }));
+    setSelectedRes((s) => new Set([...s, ...data.resources.filter((r) => r.jobId === jobId && r.levelMin <= lv).map((r) => r.id)]));
+    setOpenJobs((o) => new Set([...o, jobId]));
+    setTab('resources'); setPanelOpen(true);
+  }, [data, levels, ch.character.jobs]);
+
+  // deep links: ?x=&y= ?zone= ?ressource=1,2 ?metier=&niveau= ?monstre= ?itineraire= ?carte=
+  const linked = useRef(false);
   useEffect(() => {
-    if (!data || linked || !ch.ready) return; // saved routes and job levels come from the character
-    setLinked(true);
-    const job = Number(params.get('metier')), lvl = Number(params.get('niveau')), res = Number(params.get('ressource'));
-    const zone = Number(params.get('zone')), mon = Number(params.get('monstre')), route = params.get('itineraire');
-    if (job && jobById.has(job)) { setJobId(job); setJobLevel(lvl >= 1 && lvl <= 200 ? lvl : ch.character.jobs[job] ?? 1); }
-    if (res && resById.has(res)) { setResourceId(res); setJobId(resById.get(res)!.jobId); if (!job) setJobLevel(200); }
-    if (mon && monById.has(mon)) setMonsterId(mon);
-    if (zone && zoneById.has(zone)) { setSel({ kind: 'zone', id: zone }); focusZone(zoneById.get(zone)!); }
-    const saved = route ? ch.character.routes.find((r) => r.id === route) : null;
-    if (saved) { setStops(saved.stops.filter((s) => zoneById.has(s))); setRouteName(saved.name); setPanel('route'); }
-  }, [data, linked, params, jobById, resById, monById, zoneById, ch.character, ch.ready, focusZone]);
-
-  // a profession chosen without a level: the character's own level for it
-  const pickJob = (id: number | null) => { setJobId(id); setResourceId(null); if (id) setJobLevel(ch.character.jobs[id] ?? 1); };
-
-  const jobResources = useMemo(() => (data?.resources ?? []).filter((r) => r.jobId === jobId).sort((a, b) => a.levelMin - b.levelMin || a.name.localeCompare(b.name)), [data, jobId]);
-  const highlight = useMemo(() => {
-    const s = new Set<number>();
-    if (!data) return s;
-    for (const z of data.zones) {
-      if (resourceId ? z.resources.includes(resourceId)
-        : jobId ? z.resources.some((r) => resById.get(r)?.jobId === jobId && resById.get(r)!.levelMin <= jobLevel) : false) s.add(z.id);
+    if (!data || linked.current || !ch.ready) return;
+    linked.current = true;
+    const job = Number(params.get('metier')), lvl = Number(params.get('niveau'));
+    const res = (params.get('ressource') ?? '').split(',').map(Number).filter((id) => resById.has(id));
+    if (job && data.jobs.some((j) => j.id === job)) {
+      if (res.length) { setLevels((l) => ({ ...l, [job]: lvl >= 1 && lvl <= 200 ? lvl : 200 })); setOpenJobs(new Set([job])); }
+      else selectJob(job, lvl >= 1 && lvl <= 200 ? lvl : undefined);
     }
-    return s;
-  }, [data, resourceId, jobId, jobLevel, resById]);
+    if (res.length) { setSelectedRes(new Set(res)); setOpenJobs((o) => new Set([...o, ...res.map((id) => resById.get(id)!.jobId)])); }
+    const mon = Number(params.get('monstre'));
+    if (mon && data.monsters.some((m) => m.id === mon)) setMonsterId(mon);
+    const x = params.get('x'), y = params.get('y'), z = Number(params.get('zone'));
+    if (x != null && y != null && !Number.isNaN(Number(x)) && !Number.isNaN(Number(y))) setTimeout(() => focusCell(Number(x), Number(y)), 0);
+    else if (z && zoneById.has(z)) setTimeout(() => focusZone(zoneById.get(z)!), 0);
+    const route = params.get('itineraire');
+    const saved = route ? ch.character.routes.find((r) => r.id === route) : null;
+    if (saved) { setStops(saved.stops.filter((s) => zoneById.has(s))); setRouteName(saved.name); setTab('route'); }
+  }, [data, ch.ready, ch.character.routes, params, resById, zoneById, selectJob, focusCell, focusZone]);
+
+  // keep the selected map in the URL (shareable), without a navigation
+  useEffect(() => {
+    if (!data) return;
+    const u = new URL(window.location.href);
+    if (cell) { u.searchParams.set('x', String(cell.x)); u.searchParams.set('y', String(cell.y)); u.searchParams.delete('zone'); }
+    else { u.searchParams.delete('x'); u.searchParams.delete('y'); }
+    window.history.replaceState(window.history.state, '', u);
+  }, [cell, data]);
+
+  const copy = useCallback((text: string, what: string) => {
+    navigator.clipboard?.writeText(text).then(() => setToast(`${what} copiée : ${text}`), () => setToast(`Copie impossible : ${text}`));
+  }, []);
+  useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 2500); return () => clearTimeout(t); }, [toast]);
+
+  // keyboard: Ctrl+K or / opens the search, Escape closes it / clears the selection, C copies the /travel command
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const typing = e.target instanceof HTMLElement && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); setSearchOpen(true); return; }
+      if (typing) return;
+      if (e.key === '/') { e.preventDefault(); setSearchOpen(true); }
+      else if (e.key === 'Escape') { if (searchOpen) setSearchOpen(false); else setCell(null); }
+      else if ((e.key === 'c' || e.key === 'C') && !e.ctrlKey && !e.metaKey && cell) copy(`/travel ${cell.x},${cell.y}`, 'Commande');
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [searchOpen, cell, copy]);
+
+  const highlight = useMemo(() => new Set((data?.zones ?? []).filter((z) => (selectedRes.size && z.resources.some((r) => selectedRes.has(r))) || (areaFocus && z.area === areaFocus)).map((z) => z.id)), [data, selectedRes, areaFocus]);
   const outline = useMemo(() => new Set((data?.zones ?? []).filter((z) => monsterId != null && z.monsters.includes(monsterId)).map((z) => z.id)), [data, monsterId]);
 
-  const npcsByZone = useMemo(() => {
-    const m = new Map<number, WorldData['npcs']>();
-    for (const n of data?.npcs ?? []) (m.get(n.zone) ?? m.set(n.zone, []).get(n.zone)!).push(n);
-    return m;
-  }, [data]);
-
+  // markers: points of interest of the active layers + selected resources at zone centres, clustered when zoomed out
+  const bucket = pxPerMap < 3 ? 8 : pxPerMap < 6 ? 4 : pxPerMap < 12 ? 2 : 1;
   const markers: MapMarker[] = useMemo(() => {
     if (!data) return [];
-    const out: MapMarker[] = [];
-    for (const m of data.markers) {
-      const c = CATEGORIES[m.categoryId];
-      if (!c || !layers.has(`c${m.categoryId}`)) continue;
-      const Icon = c.icon;
-      out.push({ key: `m${m.id}`, x: m.x + 0.5, y: m.y + 0.5, color: c.color, glyph: <Icon color="#fff" strokeWidth={2.4} />, label: `${m.name} (${c.label}) [${m.x}, ${m.y}]`,
-        selected: sel?.kind === 'marker' && sel.id === m.id, onClick: () => setSel({ kind: 'marker', id: m.id }) });
-    }
-    if (layers.has('zaap')) for (const z of data.zaaps) {
-      const zone = zoneById.get(z.zone);
-      out.push({ key: `z${z.x},${z.y}`, x: z.x + 0.5, y: z.y + 0.5, color: ZAAP.color, glyph: <Castle color="#fff" strokeWidth={2.4} />,
-        label: `Zaap ${zone ? `· ${zone.name} ` : ''}[${z.x}, ${z.y}]`, onClick: () => zone && setSel({ kind: 'zone', id: zone.id }) });
-    }
-    if (npcLayer) for (const [zid, list] of npcsByZone) {
-      const z = zoneById.get(zid);
-      if (!z) continue;
-      out.push({ key: `n${zid}`, x: z.cx + 0.5, y: z.cy + 0.5, color: '#3d4f6a', glyph: <Users color="#fff" strokeWidth={2.4} />,
-        label: `${new Set(list.map((n) => n.name)).size} PNJ donneurs de quêtes · ${z.name}`, onClick: () => setSel({ kind: 'zone', id: zid }) });
-    }
-    return out;
-  }, [data, layers, sel, zoneById, npcLayer, npcsByZone]);
+    type Pt = { key: string; x: number; y: number; p?: (typeof pois)[number]; z?: WorldZone; r?: number };
+    const points: Pt[] = [
+      ...pois.filter((p) => layers.has(p.layer)).map((p) => ({ key: p.layer, x: p.x + 0.5, y: p.y + 0.5, p })),
+      ...data.zones.flatMap((z) => z.resources.filter((r) => selectedRes.has(r)).map((r, i) => ({ key: `res:${r}`, x: z.cx + 0.5 + i * 0.9, y: z.cy + 0.5, z, r }))),
+    ];
+    return cluster(points, bucket).map((g): MapMarker => {
+      const first = g.items[0];
+      const n = g.items.length;
+      // unique per group: several dungeons can share one map
+      const key = `${g.key}@${first.p?.key ?? `${first.r}:${first.z?.id}`}+${n}`;
+      const zoomIn = () => map.current?.focus(Math.floor(g.x), Math.floor(g.y), bucket * 5);
+      if (first.r != null) {
+        const r = resById.get(first.r)!;
+        return { key, x: g.x, y: g.y, color: RES_COLOR, glyph: null, count: n, image: r.iconId != null ? `/ankama/items/${r.iconId}.png` : undefined,
+          label: n > 1 ? `${r.name} : ${n} zones` : `${r.name} (niv. ${r.levelMin}) · ${first.z!.name}`,
+          onClick: () => (n > 1 ? zoomIn() : focusZone(first.z!)) };
+      }
+      const p = first.p!;
+      const L = LAYER[p.layer], Icon = L.icon;
+      return { key, x: g.x, y: g.y, color: L.color, glyph: <Icon color="#fff" strokeWidth={2.4} />, count: n,
+        selected: n === 1 && cell?.x === p.x && cell?.y === p.y,
+        label: n > 1 ? `${L.label} : ${n}` : `${p.name} (${L.label}) [${p.x}, ${p.y}]`,
+        onClick: () => (n > 1 ? zoomIn() : focusCell(p.x, p.y, 12)) };
+    });
+  }, [data, pois, layers, selectedRes, bucket, resById, cell, focusCell, focusZone]);
 
   const labels = useMemo(() => {
     if (!data) return [];
     const areas = new Map<string, { sx: number; sy: number; n: number }>();
-    for (const z of data.zones) {
-      const a = areas.get(z.area ?? '') ?? { sx: 0, sy: 0, n: 0 };
-      a.sx += z.cx; a.sy += z.cy; a.n++;
-      areas.set(z.area ?? '', a);
-    }
+    for (const z of data.zones) { const a = areas.get(z.area ?? '') ?? { sx: 0, sy: 0, n: 0 }; a.sx += z.cx; a.sy += z.cy; a.n++; areas.set(z.area ?? '', a); }
     return [
       ...[...areas].filter(([n]) => n).map(([name, a]) => ({ key: `a${name}`, x: a.sx / a.n + 0.5, y: a.sy / a.n + 0.5, text: name, minZoom: 0, big: true })),
-      ...data.zones.map((z) => ({ key: `l${z.id}`, x: z.cx + 0.5, y: z.cy + 1.4, text: z.name, minZoom: 22 })),
+      ...data.zones.map((z) => ({ key: `l${z.id}`, x: z.cx + 0.5, y: z.cy + 1.6, text: z.name, minZoom: 26 })),
     ];
   }, [data]);
 
-  // route: zones in visit order (centres), optional zaap shortcuts
   const planned = useMemo(() => {
     const pts = stops.flatMap((id) => { const z = zoneById.get(id); return z ? [{ id, x: z.cx + 0.5, y: z.cy + 0.5 }] : []; });
     return orderStops(pts, null, useZaaps ? (data?.zaaps ?? []).map((z) => ({ x: z.x + 0.5, y: z.y + 0.5 })) : []);
   }, [stops, zoneById, useZaaps, data]);
-  const addStop = (id: number) => setStops((s) => (s.includes(id) ? s : [...s, id].slice(0, 40)));
-  const addAllHighlighted = () => setStops((s) => [...new Set([...s, ...highlight])].slice(0, 40));
-  const saveRoute = () => {
-    ch.saveRoute({ name: routeName.trim() || `Itinéraire ${new Date().toLocaleDateString('fr-FR')}`, stops: planned.order.map((p) => p.id), jobId: jobId ?? undefined, resourceId: resourceId ?? undefined });
-    setRouteName('');
+
+  const onPick = (h: SearchHit) => {
+    if (!data) return;
+    if (h.kind === 'cell') focusCell(h.x, h.y);
+    else if (h.kind === 'zone') focusZone(zoneById.get(h.id)!);
+    else if (h.kind === 'area') {
+      setAreaFocus(h.name);
+      const zs = data.zones.filter((z) => z.area === h.name);
+      map.current?.focus(Math.round(zs.reduce((s, z) => s + z.cx, 0) / zs.length), Math.round(zs.reduce((s, z) => s + z.cy, 0) / zs.length), 40);
+    } else if (h.kind === 'resource') { setSelectedRes((s) => new Set([...s, h.id])); setOpenJobs((o) => new Set([...o, resById.get(h.id)!.jobId])); setTab('resources'); }
+    else if (h.kind === 'job') selectJob(h.id);
+    else if (h.kind === 'monster') setMonsterId(h.id);
+    else { setLayers((l) => new Set([...l, h.poi.layer])); focusCell(h.poi.x, h.poi.y, 12); }
   };
-
-  // search: zones, resources, monsters, markers, quest NPCs
-  const results = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!data || q.length < 2) return [];
-    const has = (s: string | null) => !!s && s.toLowerCase().includes(q);
-    return [
-      ...data.zones.filter((z) => has(z.name)).map((z) => ({ key: `z${z.id}`, label: z.name, hint: `Zone · ${z.area ?? ''} · niv. ${z.level}`, go: () => { setSel({ kind: 'zone', id: z.id }); focusZone(z); } })),
-      ...data.resources.filter((r) => has(r.name)).map((r) => ({ key: `r${r.id}`, label: r.name, hint: `Ressource · ${jobById.get(r.jobId)?.name} niv. ${r.levelMin}`, go: () => { setJobId(r.jobId); setJobLevel(200); setResourceId(r.id); } })),
-      ...data.monsters.filter((m) => has(m.name)).map((m) => ({ key: `mo${m.id}`, label: m.name, hint: `Monstre · niv. ${m.levelMin ?? '?'}–${m.levelMax ?? '?'}`, go: () => setMonsterId(m.id) })),
-      ...data.markers.filter((m) => has(m.name)).map((m) => ({ key: `mk${m.id}`, label: m.name, hint: `${CATEGORIES[m.categoryId]?.label ?? m.category} · [${m.x}, ${m.y}]`, go: () => {
-        setLayers((l) => new Set([...l, `c${m.categoryId}`])); setSel({ kind: 'marker', id: m.id }); setFocus({ x: m.x + 0.5, y: m.y + 0.5, w: 20, seq: Date.now() });
-      } })),
-      ...[...new Map(data.npcs.filter((n) => has(n.name)).map((n) => [`${n.name}|${n.zone}`, n])).values()].map((n) => ({ key: `n${n.name}${n.zone}`, label: n.name, hint: `PNJ · ${zoneById.get(n.zone)?.name}`, go: () => { setSel({ kind: 'zone', id: n.zone }); focusZone(zoneById.get(n.zone)!); } })),
-    ].slice(0, 30);
-  }, [query, data, jobById, zoneById, focusZone]);
-
-  const toggle = (k: string) => setLayers((l) => { const n = new Set(l); if (n.has(k)) n.delete(k); else n.add(k); return n; });
-  const zoneFill = useCallback((id: number) => tone(zoneById.get(id)?.area ?? null), [zoneById]);
-  const onZone = useCallback((id: number) => setSel({ kind: 'zone', id }), []);
+  const clearFilters = () => { setSelectedRes(new Set()); setMonsterId(null); setAreaFocus(null); setCell(null); };
+  const toggleLayer = (l: LayerId) => setLayers((s) => { const n = new Set(s); if (n.has(l)) n.delete(l); else n.add(l); return n; });
+  const toggleRes = (id: number) => setSelectedRes((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   if (error) return <p className="p-8 text-sm text-muted">Carte indisponible : {error}</p>;
-  const selZone = sel?.kind === 'zone' ? zoneById.get(sel.id) ?? null : null;
-  const selMarker = sel?.kind === 'marker' ? data?.markers.find((m) => m.id === sel.id) ?? null : null;
-  const field = 'w-full rounded-md border border-line bg-bg px-2.5 py-1.5 text-sm text-text';
-  const myLevel = (job: number) => ch.character.jobs[job];
+  const here = cell ? pois.filter((p) => p.x === cell.x && p.y === cell.y) : [];
+  const inZone = zone ? pois.filter((p) => cellZone.get(`${p.x},${p.y}`) === zone.id) : [];
+  const tabBtn = (id: Tab, label: string, Icon: typeof Layers, count = 0) => (
+    <button key={id} role="tab" aria-selected={tab === id} onClick={() => setTab(id)}
+      className={`flex flex-1 items-center justify-center gap-1.5 whitespace-nowrap border-b-2 px-1.5 py-2.5 text-[13px] ${tab === id ? 'border-accent text-text' : 'border-transparent text-muted hover:text-text'}`}>
+      <Icon size={14} aria-hidden /> {label}{count > 0 && <span className="rounded-sm bg-accent/20 px-1 text-[11px] text-accent">{count}</span>}
+    </button>
+  );
 
   return (
     <div className="relative flex h-full flex-col md:flex-row">
-      <div className="relative min-h-0 min-w-0 flex-1">
-        {data ? (
-          <MapCanvas cells={data.cells} zoneFill={zoneFill} highlight={highlight} outline={outline} dimOthers={highlight.size > 0}
-            labels={labels} markers={markers} route={planned.order} selectedZone={selZone?.id ?? null} onZone={onZone} focus={focus} />
-        ) : <p className="p-8 text-sm text-muted">Chargement de la carte…</p>}
-        {/* search over the map */}
-        <div className="absolute left-3 right-3 top-3 z-10 md:right-auto md:w-80">
-          <label className="relative block">
-            <Search size={15} className="pointer-events-none absolute left-2.5 top-2.5 text-faint" aria-hidden />
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Zone, ressource, monstre, donjon, PNJ…" aria-label="Rechercher sur la carte"
-              className="w-full rounded-md border border-line bg-surface py-2 pl-8 pr-8 text-sm shadow-lg" />
-            {query && <button aria-label="Effacer" className="absolute right-2 top-2 text-faint hover:text-text" onClick={() => setQuery('')}><X size={16} /></button>}
-          </label>
-          {results.length > 0 && (
-            <ul className="mt-1 max-h-72 overflow-y-auto rounded-md border border-line bg-surface shadow-lg" role="listbox">
-              {results.map((r) => (
-                <li key={r.key}><button role="option" aria-selected={false} className="block w-full px-3 py-1.5 text-left text-sm hover:bg-surface-2" onClick={() => { r.go(); setQuery(''); }}>
-                  <span className="block text-text">{r.label}</span><span className="text-xs text-muted">{r.hint}</span>
-                </button></li>
-              ))}
-            </ul>
-          )}
-        </div>
-        <button className="absolute right-3 top-3 z-10 rounded-md border border-line bg-surface p-2 text-muted md:hidden" aria-label={panelOpen ? 'Masquer le panneau' : 'Afficher le panneau'} onClick={() => setPanelOpen((o) => !o)}><Layers size={16} /></button>
-      </div>
-
-      {/* control panel: layers / route, then the selection details */}
       {panelOpen && (
-        <aside className="max-h-[48vh] shrink-0 overflow-y-auto border-t border-line bg-surface md:max-h-none md:w-[360px] md:border-l md:border-t-0" aria-label="Panneau de la carte">
-          <div className="flex border-b border-line" role="tablist">
-            {([['layers', 'Calques', Layers], ['route', `Itinéraire${stops.length ? ` (${stops.length})` : ''}`, Route]] as const).map(([id, label, Icon]) => (
-              <button key={id} role="tab" aria-selected={panel === id} onClick={() => setPanel(id)}
-                className={`flex flex-1 items-center justify-center gap-1.5 border-b-2 px-3 py-2.5 text-sm ${panel === id ? 'border-accent text-text' : 'border-transparent text-muted hover:text-text'}`}>
-                <Icon size={15} aria-hidden /> {label}
-              </button>
-            ))}
+        <aside aria-label="Filtres de la carte" className="order-2 max-h-[45vh] shrink-0 overflow-y-auto border-t border-line bg-surface md:order-1 md:max-h-none md:w-[330px] md:border-r md:border-t-0">
+          <div className="sticky top-0 z-10 flex border-b border-line bg-surface" role="tablist">
+            {tabBtn('resources', 'Ressources', SlidersHorizontal, selectedRes.size)}
+            {tabBtn('layers', 'Repères', Layers)}
+            {tabBtn('route', 'Itinéraire', Route, stops.length)}
           </div>
-
-          {(selZone || selMarker) && (
-            <section className="border-b border-line p-4" aria-label="Détails">
-              <div className="mb-2 flex items-start justify-between gap-2">
-                <div>
-                  <h2 className="font-display text-base text-text">{selZone?.name ?? selMarker?.name}</h2>
-                  <p className="text-xs text-muted">
-                    {selZone ? <>{selZone.area} · niveau {selZone.level} · centre ≈ [{Math.round(selZone.cx)}, {Math.round(selZone.cy)}]</>
-                      : <>{CATEGORIES[selMarker!.categoryId]?.label ?? selMarker!.category} · [{selMarker!.x}, {selMarker!.y}]{selMarker!.zone && zoneById.get(selMarker!.zone) ? ` · ${zoneById.get(selMarker!.zone)!.name}` : ''}</>}
-                  </p>
-                </div>
-                <button aria-label="Fermer les détails" className="text-faint hover:text-text" onClick={() => setSel(null)}><X size={16} /></button>
-              </div>
-              {selMarker?.zone && zoneById.get(selMarker.zone) && (
-                <button className="text-sm text-accent underline" onClick={() => setSel({ kind: 'zone', id: selMarker.zone! })}>Voir la zone</button>
+          <div className="p-3">
+            {!data ? <p className="text-sm text-muted">Chargement…</p>
+              : tab === 'resources' ? <ResourceFilters data={data} selected={selectedRes} setSelected={setSelectedRes} levels={levels}
+                  setLevel={(j, lv) => setLevels((l) => ({ ...l, [j]: lv }))} open={openJobs} setOpen={setOpenJobs} />
+              : tab === 'layers' ? (
+                <>
+                  <LayerFilters pois={pois} layers={layers} toggle={toggleLayer} />
+                  {data.maps.length > 1 && (
+                    <label className="mt-4 block text-xs text-faint">Monde
+                      <select className="mt-1 block w-full rounded-md border border-line bg-bg px-2 py-1.5 text-sm text-text" value={mapId}
+                        onChange={(e) => { setMapId(Number(e.target.value)); setCell(null); setStops([]); setSelectedRes(new Set()); }}>
+                        {data.maps.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                      </select>
+                    </label>
+                  )}
+                </>
+              ) : (
+                <RoutePanel planned={planned} zoneById={zoneById} stops={stops} setStops={setStops} useZaaps={useZaaps} setUseZaaps={setUseZaaps}
+                  routeName={routeName} setRouteName={setRouteName} canSave={ch.hasCharacter} saved={ch.character.routes}
+                  onAddHighlighted={() => setStops((s) => [...new Set([...s, ...highlight])].slice(0, 40))} highlighted={highlight.size}
+                  onSave={() => { ch.saveRoute({ name: routeName.trim() || `Itinéraire ${new Date().toLocaleDateString('fr-FR')}`, stops: planned.order.map((p) => p.id), resourceId: [...selectedRes][0] }); setRouteName(''); }}
+                  onLoad={(r) => { setStops(r.stops.filter((s) => zoneById.has(s))); setRouteName(r.name); }} onDelete={ch.removeRoute}
+                  onFocus={(id) => { const z = zoneById.get(id); if (z) focusZone(z); }} />
               )}
-              {selZone && <ZoneDetails zone={selZone} data={data!} resById={resById} monById={monById} jobById={jobById} npcs={npcsByZone.get(selZone.id) ?? []}
-                myLevel={myLevel} inRoute={stops.includes(selZone.id)} onAdd={() => { addStop(selZone.id); setPanel('route'); }}
-                onResource={(id) => { setResourceId(id); setJobId(resById.get(id)!.jobId); setJobLevel(Math.max(jobLevel, resById.get(id)!.levelMin)); }} onMonster={setMonsterId} />}
-            </section>
-          )}
-
-          {panel === 'layers' ? (
-            <div className="flex flex-col gap-4 p-4">
-              <section>
-                <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-faint">Métier et ressources</h2>
-                <div className="grid grid-cols-[1fr_88px] gap-2">
-                  <select aria-label="Métier de récolte" className={field} value={jobId ?? ''} onChange={(e) => pickJob(e.target.value ? Number(e.target.value) : null)}>
-                    <option value="">Aucun métier</option>
-                    {gatheringJobs.map((j) => <option key={j.id} value={j.id}>{j.name}{myLevel(j.id) ? ` (niv. ${myLevel(j.id)})` : ''}</option>)}
-                  </select>
-                  <input aria-label="Niveau du métier" type="number" min={1} max={200} className={field} value={jobLevel} disabled={!jobId}
-                    onChange={(e) => setJobLevel(Math.min(200, Math.max(1, Number(e.target.value) || 1)))} />
-                </div>
-                {jobId && (
-                  <>
-                    <select aria-label="Ressource" className={`${field} mt-2`} value={resourceId ?? ''} onChange={(e) => setResourceId(e.target.value ? Number(e.target.value) : null)}>
-                      <option value="">Toutes les ressources accessibles (niv. ≤ {jobLevel})</option>
-                      {jobResources.map((r) => <option key={r.id} value={r.id}>{r.levelMin > jobLevel ? '🔒 ' : ''}{r.name} · niv. {r.levelMin}</option>)}
-                    </select>
-                    <p className="mt-2 text-xs text-muted">{highlight.size} zone(s) en surbrillance. Les données du jeu disent dans quelles zones une ressource pousse, pas l’emplacement exact de chaque spot.</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {highlight.size > 0 && <button className="text-xs text-accent underline" onClick={() => { addAllHighlighted(); setPanel('route'); }}>Ajouter ces zones à l’itinéraire</button>}
-                      {jobById.get(jobId) && <Link className="text-xs text-accent underline" href={`/metiers/${jobById.get(jobId)!.slug}`}>Guide du métier</Link>}
-                      <button className="text-xs text-muted underline" onClick={() => pickJob(null)}>Effacer</button>
-                    </div>
-                  </>
-                )}
-              </section>
-              {monsterId != null && (
-                <p className="flex items-center justify-between gap-2 rounded-md border border-red-500/40 px-3 py-2 text-sm">
-                  <span><Skull size={14} className="mr-1 inline text-[#e0503f]" aria-hidden /> {monById.get(monsterId)?.name} : {outline.size} zone(s)</span>
-                  <button aria-label="Effacer le monstre" className="text-faint hover:text-text" onClick={() => setMonsterId(null)}><X size={14} /></button>
-                </p>
-              )}
-              <section>
-                <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-faint">Repères officiels</h2>
-                <ul className="flex flex-col gap-1">
-                  {[['zaap', ZAAP, data?.zaaps.length ?? 0] as const, ...Object.entries(CATEGORIES).map(([id, c]) => [`c${id}`, c, data?.markers.filter((m) => m.categoryId === Number(id)).length ?? 0] as const)]
-                    .filter(([, , n]) => n > 0).map(([key, c, n]) => {
-                      const Icon = c.icon;
-                      return (
-                        <li key={key}><label className="flex cursor-pointer items-center gap-2 text-sm">
-                          <input type="checkbox" checked={layers.has(key)} onChange={() => toggle(key)} className="accent-[var(--color-brand)]" />
-                          <span className="flex h-5 w-5 items-center justify-center rounded-full" style={{ background: c.color }}><Icon size={12} color="#fff" aria-hidden /></span>
-                          <span className="flex-1">{c.label}</span><span className="text-xs tabular-nums text-faint">{n}</span>
-                        </label></li>
-                      );
-                    })}
-                  <li><label className="flex cursor-pointer items-center gap-2 text-sm">
-                    <input type="checkbox" checked={npcLayer} onChange={() => setNpcLayer((v) => !v)} className="accent-[var(--color-brand)]" />
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#3d4f6a]"><Users size={12} color="#fff" aria-hidden /></span>
-                    <span className="flex-1">PNJ donneurs de quêtes (par zone)</span>
-                  </label></li>
-                </ul>
-              </section>
-              {data && data.maps.length > 1 && (
-                <section>
-                  <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-faint">Monde</h2>
-                  <select aria-label="Monde affiché" className={field} value={mapId} onChange={(e) => { setMapId(Number(e.target.value)); setSel(null); setStops([]); }}>
-                    {data.maps.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                  </select>
-                </section>
-              )}
-            </div>
-          ) : (
-            <RoutePanel planned={planned} zoneById={zoneById} stops={stops} setStops={setStops} useZaaps={useZaaps} setUseZaaps={setUseZaaps}
-              routeName={routeName} setRouteName={setRouteName} onSave={saveRoute} saved={ch.character.routes} canSave={ch.hasCharacter}
-              onLoad={(r) => { setStops(r.stops.filter((s) => zoneById.has(s))); setRouteName(r.name); }} onDelete={ch.removeRoute}
-              onFocus={(id) => { const z = zoneById.get(id); if (z) { setSel({ kind: 'zone', id }); focusZone(z); } }} />
-          )}
+          </div>
           {data && (
-            <p className="border-t border-line p-4 text-[11px] leading-relaxed text-faint">
-              Données officielles du jeu {data.version}, extraites par <a className="underline" href={data.source ?? 'https://github.com/ledouxm/dofus-sqlite'}>dofus-sqlite</a>
-              {data.retrievedAt && <>, importées le {new Date(data.retrievedAt).toLocaleDateString('fr-FR')}</>}. Carte dessinée à partir des coordonnées des cartes ; couleurs par région, sans valeur de relief.
+            <p className="border-t border-line p-3 text-[11px] leading-relaxed text-faint">
+              Données du jeu {data.version} (<a className="underline" href={data.source ?? 'https://github.com/ledouxm/dofus-sqlite'}>dofus-sqlite</a>{data.retrievedAt && <>, importées le {new Date(data.retrievedAt).toLocaleDateString('fr-FR')}</>}).
+              {data.tiles ? ' Illustration de la carte © Ankama, issue des fichiers du jeu.' : ' Illustration officielle non installée (npm run assets) : zones dessinées depuis les coordonnées.'}
             </p>
           )}
         </aside>
       )}
-    </div>
-  );
-}
 
-function ZoneDetails({ zone, data, resById, monById, jobById, npcs, myLevel, inRoute, onAdd, onResource, onMonster }: {
-  zone: WorldZone; data: WorldData; resById: Map<number, WorldData['resources'][number]>; monById: Map<number, WorldData['monsters'][number]>;
-  jobById: Map<number, WorldData['jobs'][number]>; npcs: WorldData['npcs']; myLevel: (job: number) => number | undefined;
-  inRoute: boolean; onAdd: () => void; onResource: (id: number) => void; onMonster: (id: number) => void;
-}) {
-  const byJob = new Map<number, WorldData['resources']>();
-  for (const id of zone.resources) { const r = resById.get(id); if (r) (byJob.get(r.jobId) ?? byJob.set(r.jobId, []).get(r.jobId)!).push(r); }
-  const markers = data.markers.filter((m) => m.zone === zone.id);
-  const mons = zone.monsters.map((id) => monById.get(id)).filter(Boolean).sort((a, b) => (a!.levelMin ?? 0) - (b!.levelMin ?? 0));
-  const quests = [...new Map(npcs.map((n) => [n.quest.id, n])).values()];
-  return (
-    <div className="flex flex-col gap-3 text-sm">
-      <div className="flex flex-wrap gap-2">
-        <button onClick={onAdd} disabled={inRoute} className="inline-flex items-center gap-1 rounded-md border border-line px-2.5 py-1 text-xs hover:border-faint disabled:opacity-50"><Route size={13} aria-hidden /> {inRoute ? 'Dans l’itinéraire' : 'Ajouter à l’itinéraire'}</button>
-        {(() => {
-          if (zone.zaap) return <span className="inline-flex items-center gap-1 text-xs text-muted"><Castle size={13} aria-hidden /> Zaap de la zone : [{zone.zaap[0]}, {zone.zaap[1]}]</span>;
-          const near = [...data.zaaps].sort((a, b) => mapSteps(a, { x: zone.cx, y: zone.cy }) - mapSteps(b, { x: zone.cx, y: zone.cy }))[0];
-          return near ? <span className="inline-flex items-center gap-1 text-xs text-muted"><Castle size={13} aria-hidden /> Zaap le plus proche en ligne droite : [{near.x}, {near.y}] (≈ {Math.round(mapSteps(near, { x: zone.cx, y: zone.cy }))} cartes)</span> : null;
-        })()}
+      <div className="relative order-1 min-h-0 min-w-0 flex-1 md:order-2">
+        {data ? (
+          <MapCanvas handle={map} worldId={mapId} geom={data.map} tiles={data.tiles} cells={data.cells} zoneFill={(id) => tone(zoneById.get(id)?.area ?? null)}
+            highlight={highlight} outline={outline} labels={labels} markers={markers} route={planned.order} selected={cell} selectedZone={zone?.id ?? null}
+            zoneName={zoneName} onCell={(x, y) => setCell({ x, y })} onZoom={setPxPerMap} />
+        ) : <p className="p-8 text-sm text-muted">Chargement de la carte…</p>}
+
+        <div className="absolute left-3 right-3 top-3 z-10 flex flex-wrap items-center gap-2">
+          <button onClick={() => setSearchOpen(true)} className="flex min-w-0 flex-1 items-center gap-2 rounded-md border border-line bg-surface px-3 py-2 text-left text-sm text-muted shadow-lg hover:text-text sm:max-w-sm">
+            <Search size={15} aria-hidden /> <span className="truncate">Rechercher : coordonnées, zone, ressource…</span>
+            <kbd className="ml-auto hidden rounded-sm border border-line px-1.5 text-[10px] text-faint sm:inline">Ctrl K</kbd>
+          </button>
+          <button onClick={() => map.current?.fit()} className="rounded-md border border-line bg-surface p-2 text-muted shadow-lg hover:text-text" aria-label="Réinitialiser la vue" title="Réinitialiser la vue (0)"><Maximize2 size={15} /></button>
+          <button onClick={clearFilters} className="rounded-md border border-line bg-surface p-2 text-muted shadow-lg hover:text-text" aria-label="Effacer les filtres" title="Effacer les filtres"><Eraser size={15} /></button>
+          <button onClick={() => setPanelOpen((o) => !o)} className="rounded-md border border-line bg-surface p-2 text-muted shadow-lg hover:text-text" aria-label={panelOpen ? 'Masquer les filtres' : 'Afficher les filtres'} aria-pressed={panelOpen}><SlidersHorizontal size={15} /></button>
+        </div>
+        {(monsterId != null || areaFocus) && data && (
+          <div className="absolute left-3 top-14 z-10 flex flex-wrap gap-1">
+            {monsterId != null && <ActiveFilter label={`Monstre : ${data.monsters.find((m) => m.id === monsterId)?.name} (${outline.size} zones)`} onClear={() => setMonsterId(null)} />}
+            {areaFocus && <ActiveFilter label={`Région : ${areaFocus}`} onClear={() => setAreaFocus(null)} />}
+          </div>
+        )}
+
+        {cell && data && (
+          <div className="absolute inset-x-0 bottom-0 z-20 max-h-[55%] overflow-y-auto border-t border-line bg-surface shadow-xl md:inset-x-auto md:bottom-auto md:right-3 md:top-16 md:max-h-[calc(100%-5rem)] md:w-[360px] md:rounded-md md:border">
+            <MapDetails cell={cell} zone={zone} data={data} here={here} inZone={inZone} levels={levels} selectedRes={selectedRes}
+              inRoute={!!zone && stops.includes(zone.id)} onClose={() => setCell(null)} onCopy={copy}
+              onAddRoute={() => { if (zone) setStops((s) => (s.includes(zone.id) ? s : [...s, zone.id])); }}
+              onResource={toggleRes} onMonster={setMonsterId} onFocusZone={(z) => focusZone(z)} />
+          </div>
+        )}
+        {searchOpen && data && <MapSearch data={data} pois={pois} onPick={onPick} onClose={() => setSearchOpen(false)} />}
+        {toast && <p role="status" className="absolute left-1/2 top-16 z-30 -translate-x-1/2 rounded-md border border-line bg-surface px-3 py-1.5 text-sm shadow-lg">{toast}</p>}
       </div>
-      {byJob.size > 0 && (
-        <div>
-          <h3 className="mb-1 text-xs font-medium uppercase tracking-wide text-faint">Ressources récoltables</h3>
-          {[...byJob].map(([job, list]) => (
-            <div key={job} className="mb-1.5">
-              <p className="text-xs text-muted">{jobById.get(job)?.name}{myLevel(job) ? ` · vous : niv. ${myLevel(job)}` : ''}</p>
-              <ul className="flex flex-wrap gap-1">
-                {list.sort((a, b) => a.levelMin - b.levelMin).map((r) => {
-                  const locked = myLevel(job) != null && myLevel(job)! < r.levelMin;
-                  return (
-                    <li key={r.id}><button onClick={() => onResource(r.id)} title={locked ? `Niveau ${r.levelMin} requis` : `Voir toutes les zones de ${r.name}`}
-                      className={`inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 text-xs ${locked ? 'border-line text-faint' : 'border-line text-text hover:border-accent'}`}>
-                      {locked && <Lock size={11} aria-hidden />}{r.name} <span className="text-faint">{r.levelMin}</span>
-                    </button></li>
-                  );
-                })}
-              </ul>
-            </div>
-          ))}
-        </div>
-      )}
-      {mons.length > 0 && (
-        <div>
-          <h3 className="mb-1 text-xs font-medium uppercase tracking-wide text-faint">Monstres ({mons.length})</h3>
-          <ul className="flex flex-wrap gap-1">
-            {mons.slice(0, 24).map((m) => <li key={m!.id}><button onClick={() => onMonster(m!.id)} className="rounded-sm border border-line px-1.5 py-0.5 text-xs hover:border-[#e0503f]">{m!.name} <span className="text-faint">{m!.levelMin === m!.levelMax ? m!.levelMin : `${m!.levelMin}–${m!.levelMax}`}</span></button></li>)}
-          </ul>
-          {mons.length > 24 && <p className="mt-1 text-xs text-faint">et {mons.length - 24} autres</p>}
-        </div>
-      )}
-      {markers.length > 0 && (
-        <div>
-          <h3 className="mb-1 text-xs font-medium uppercase tracking-wide text-faint">Repères</h3>
-          <ul className="text-xs text-muted">{markers.map((m) => <li key={m.id}>{m.name} <span className="text-faint">· {CATEGORIES[m.categoryId]?.label ?? m.category} [{m.x}, {m.y}]</span></li>)}</ul>
-        </div>
-      )}
-      {quests.length > 0 && (
-        <div>
-          <h3 className="mb-1 text-xs font-medium uppercase tracking-wide text-faint">Quêtes qui commencent ici ({quests.length})</h3>
-          <ul className="text-xs">{quests.slice(0, 12).map((n) => (
-            <li key={n.quest.id}><Link className="text-accent hover:underline" href={`${regionPath(n.quest.category)}#quest:${n.quest.id}`}>{n.quest.name}</Link> <span className="text-faint">· {n.name}</span></li>
-          ))}</ul>
-          {quests.length > 12 && <p className="mt-1 text-xs text-faint">et {quests.length - 12} autres</p>}
-        </div>
-      )}
-      <Link href="/guides" className="inline-flex items-center gap-1 text-xs text-muted underline"><BookOpen size={12} aria-hidden /> Guides</Link>
     </div>
   );
 }
 
-function RoutePanel({ planned, zoneById, stops, setStops, useZaaps, setUseZaaps, routeName, setRouteName, onSave, saved, canSave, onLoad, onDelete, onFocus }: {
+function RoutePanel({ planned, zoneById, stops, setStops, useZaaps, setUseZaaps, routeName, setRouteName, onSave, saved, canSave, onLoad, onDelete, onFocus, onAddHighlighted, highlighted }: {
   planned: ReturnType<typeof orderStops<{ id: number; x: number; y: number }>>; zoneById: Map<number, WorldZone>; stops: number[];
   setStops: (s: number[]) => void; useZaaps: boolean; setUseZaaps: (v: boolean) => void; routeName: string; setRouteName: (s: string) => void;
   onSave: () => void; saved: { id: string; name: string; stops: number[] }[]; canSave: boolean;
   onLoad: (r: { id: string; name: string; stops: number[] }) => void; onDelete: (id: string) => void; onFocus: (id: number) => void;
+  onAddHighlighted: () => void; highlighted: number;
 }) {
-  const field = 'w-full rounded-md border border-line bg-bg px-2.5 py-1.5 text-sm text-text';
   return (
-    <div className="flex flex-col gap-4 p-4 text-sm">
+    <div className="flex flex-col gap-3 text-sm">
+      {highlighted > 0 && <button className="self-start text-xs text-accent underline" onClick={onAddHighlighted}>Ajouter les {highlighted} zones en surbrillance à l’itinéraire</button>}
       {stops.length === 0 ? (
-        <p className="text-muted">Ajoutez des zones depuis leurs détails, ou toutes les zones d’une ressource depuis l’onglet Calques.</p>
+        <p className="text-muted">Ajoutez des zones depuis les détails d’une carte, ou toutes les zones des ressources sélectionnées.</p>
       ) : (
         <>
           <label className="flex items-center gap-2"><input type="checkbox" checked={useZaaps} onChange={(e) => setUseZaaps(e.target.checked)} className="accent-[var(--color-brand)]" /> Passer par les zaaps quand c’est plus court</label>
@@ -424,9 +307,9 @@ function RoutePanel({ planned, zoneById, stops, setStops, useZaaps, setUseZaaps,
               );
             })}
           </ol>
-          <p className="text-xs text-muted">Total estimé : ≈ {Math.round(planned.total)} cartes entre les centres des zones. Estimation en ligne droite (une carte par pas, quatre directions) : l’eau, les murs et les passages ne sont pas dans les données.</p>
+          <p className="text-xs text-muted">Total estimé : ≈ {Math.round(planned.total)} cartes entre les centres des zones (une carte par pas, sans tenir compte de l’eau, des murs ni des passages, absents des données).</p>
           <div className="flex gap-2">
-            <input aria-label="Nom de l’itinéraire" className={field} placeholder="Nom de l’itinéraire" value={routeName} onChange={(e) => setRouteName(e.target.value)} maxLength={60} />
+            <input aria-label="Nom de l’itinéraire" className="w-full rounded-md border border-line bg-bg px-2.5 py-1.5 text-sm" placeholder="Nom de l’itinéraire" value={routeName} onChange={(e) => setRouteName(e.target.value)} maxLength={60} />
             <button onClick={onSave} disabled={!canSave} title={canSave ? 'Enregistrer sur ce personnage' : 'Créez un personnage pour enregistrer'}
               className="inline-flex shrink-0 items-center gap-1 rounded-md bg-cta px-3 py-1.5 text-sm text-white hover:bg-cta-hi disabled:opacity-50"><Save size={14} aria-hidden /> Enregistrer</button>
           </div>
@@ -435,7 +318,7 @@ function RoutePanel({ planned, zoneById, stops, setStops, useZaaps, setUseZaaps,
       )}
       {saved.length > 0 && (
         <section>
-          <h2 className="mb-1 text-xs font-medium uppercase tracking-wide text-faint">Itinéraires de ce personnage</h2>
+          <h2 className="mb-1 text-[11px] font-medium uppercase tracking-wide text-faint">Itinéraires de ce personnage</h2>
           <ul className="flex flex-col gap-1">
             {saved.map((r) => (
               <li key={r.id} className="flex items-center gap-2">
@@ -450,4 +333,3 @@ function RoutePanel({ planned, zoneById, stops, setStops, useZaaps, setUseZaaps,
     </div>
   );
 }
-

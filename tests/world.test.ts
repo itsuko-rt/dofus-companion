@@ -90,3 +90,44 @@ test('professions: lumberjack tiers match the game unlocks, recipes cite ingredi
   assert.ok(kinds.has('gathered') && kinds.has('crafted'));
   assert.equal(loadJob(db!, 'pas-un-metier'), null);
 });
+
+// ---------- map: coordinates, /travel, clustering, layers (2026-11-20)
+import { cluster, isMineOrCave, parseCoords, travelCommand } from '../src/world-shared.ts';
+
+test('coordinates are read in the forms players type', () => {
+  assert.deepEqual(parseCoords('5,-18'), { x: 5, y: -18 });
+  assert.deepEqual(parseCoords('[ -26 , 37 ]'), { x: -26, y: 37 });
+  assert.deepEqual(parseCoords('12 -5'), { x: 12, y: -5 });
+  assert.deepEqual(parseCoords('/travel 4,-19'), { x: 4, y: -19 });
+  assert.equal(parseCoords('Astrub'), null);
+  assert.equal(parseCoords('5'), null);
+  assert.equal(travelCommand(5, -18), '/travel 5,-18');
+});
+
+test('clustering groups by bucket and key, never mixes layers', () => {
+  const pts = [{ x: 0.5, y: 0.5, key: 'zaap' }, { x: 1.5, y: 1.5, key: 'zaap' }, { x: 1.5, y: 1.5, key: 'dungeon' }, { x: 9.5, y: 0.5, key: 'zaap' }];
+  const g = cluster(pts, 4);
+  assert.equal(g.length, 3);
+  assert.equal(g.find((c) => c.key === 'zaap' && c.items.length === 2)!.x, 1);
+  assert.equal(cluster(pts, 1).length, 4);
+});
+
+test('mines and caves come from official marker names, dungeons and workshops excluded', () => {
+  assert.ok(isMineOrCave({ name: "Mine d'Astrub", category: 'Divers' }));
+  assert.ok(isMineOrCave({ name: 'Souterrains', category: 'Divers' }));
+  assert.ok(!isMineOrCave({ name: 'Atelier des mineurs', category: 'Ateliers' }));
+  assert.ok(!isMineOrCave({ name: 'Grotte Hesque', category: 'Donjons' }));
+  assert.ok(!isMineOrCave({ name: 'Domaine sauvage', category: 'Divers' }));
+});
+
+test('map data: artwork geometry, dungeon entrances and quest givers at real coordinates', { skip: !db && 'no game database' }, () => {
+  const w = loadWorld(db!, 1);
+  if (!w || !w.dungeons) return;
+  assert.deepEqual([w.map.originX, w.map.originY, w.map.mapW, w.map.mapH, w.map.totalW, w.map.totalH], [6480, 4944, 69.5, 49.7, 10000, 9664]);
+  const cells = new Set(w.cells.map(([x, y]) => `${x},${y}`));
+  assert.ok(w.dungeons.length > 40);
+  assert.ok(w.dungeons.every((d) => cells.has(`${d.x},${d.y}`)), 'every dungeon entrance is on a map of this world');
+  assert.ok(w.npcs.length > 300 && w.npcs.every((n) => Number.isInteger(n.x) && Number.isInteger(n.y)));
+  // Astrub's zaap is at [5, -18] in the game
+  assert.ok(w.zaaps.some((z) => z.x === 5 && z.y === -18));
+});

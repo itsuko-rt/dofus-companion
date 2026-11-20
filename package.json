@@ -12,7 +12,7 @@
     "import": "node --max-old-space-size=8192 scripts/import.ts",
     "test": "node --test \"tests/*.test.ts\"",
     "typecheck": "tsc",
-    "assets": "node scripts/fetch-assets.ts",
+    "assets": "node scripts/fetch-assets.ts && node scripts/fetch-worldmap.ts",
     "e2e": "playwright test",
     "security-probe": "node scripts/security-probe.mjs"
   },

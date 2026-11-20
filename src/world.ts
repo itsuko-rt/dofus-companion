@@ -1,5 +1,6 @@
 // World map and professions: read side (tables written by scripts/world-import.ts) and the pure
 // helpers the UI shares with the tests (cell outlines, route ordering, profession brackets).
+import { existsSync, readFileSync } from 'node:fs';
 import { withDb } from './load.ts';
 import { jobSlug } from './world-shared.ts';
 
@@ -9,11 +10,19 @@ import type { WorldData, WorldZone, WorldMarker, WorldMonster, JobSummary, Gathe
 const hasWorld = (db: import('node:sqlite').DatabaseSync) => !!db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'world_cell'").get();
 
 
+/** Tile scales of the official artwork for a world, when scripts/fetch-worldmap.ts has copied them. */
+function tilesFor(mapId: number): WorldData['tiles'] {
+  const f = /*turbopackIgnore: true*/ 'public/ankama/worldmap/index.json';
+  if (!existsSync(f)) return null;
+  try { return (JSON.parse(readFileSync(f, 'utf8')).worlds?.[mapId]?.scales as WorldData['tiles']) ?? null; } catch { return null; }
+}
+
 export function loadWorld(path: string, mapId: number): WorldData | null {
   return withDb(path, (db) => {
     if (!hasWorld(db)) return null;
-    const map = db.prepare('SELECT id, name FROM world_map WHERE id = ?').get(mapId) as { id: number; name: string } | undefined;
-    if (!map) return null;
+    const row = db.prepare('SELECT id, name, origin_x, origin_y, map_w, map_h, total_w, total_h FROM world_map WHERE id = ?').get(mapId) as Record<string, any> | undefined;
+    if (!row) return null;
+    const map = { id: row.id as number, name: row.name as string, originX: row.origin_x, originY: row.origin_y, mapW: row.map_w, mapH: row.map_h, totalW: row.total_w, totalH: row.total_h };
     const version = (db.prepare('SELECT id FROM game_version').get() as { id: string }).id;
     const src = db.prepare("SELECT url, retrieved_at FROM data_source WHERE dataset = 'world_map'").get() as { url: string; retrieved_at: string } | undefined;
     const gathered = new Map((db.prepare(`SELECT g.item_id, MIN(g.level_min) lv, MIN(g.job_id) job, i.name, i.icon_id FROM gather_skill g
@@ -32,12 +41,12 @@ export function loadWorld(path: string, mapId: number): WorldData | null {
     const monIds = [...new Set(zones.flatMap((z) => z.monsters))];
     const monsters = monIds.length ? (db.prepare(`SELECT id, name, level_min levelMin, level_max levelMax FROM monster WHERE id IN (${monIds.map(() => '?').join(',')})`)
       .all(...monIds) as Record<string, any>[]).map((m) => ({ ...m })) as WorldMonster[] : [];
-    const zoneByName = new Map(zones.map((z) => [z.name, z.id]));
-    const npcs = (db.prepare(`SELECT s.npc_name, s.subarea_name, q.id, q.name, q.category_id FROM quest_start s JOIN quest q ON q.id = s.quest_id
-      WHERE s.npc_name IS NOT NULL AND s.subarea_name IS NOT NULL`).all() as Record<string, any>[])
-      .flatMap((r) => (zoneByName.has(r.subarea_name) ? [{ name: r.npc_name, zone: zoneByName.get(r.subarea_name)!, quest: { id: r.id, name: r.name, category: r.category_id } }] : []));
+    const npcs = (db.prepare(`SELECT n.npc_id, n.name, n.x, n.y, q.id, q.name qname, q.category_id FROM world_npc n JOIN quest q ON q.id = n.quest_id
+      WHERE n.world_map = ? AND n.name IS NOT NULL`).all(mapId) as Record<string, any>[])
+      .map((r) => ({ npcId: r.npc_id, name: r.name, x: r.x, y: r.y, quest: { id: r.id, name: r.qname, category: r.category_id } }));
     return {
-      version, retrievedAt: src?.retrieved_at ?? null, source: src?.url ?? null, map,
+      version, retrievedAt: src?.retrieved_at ?? null, source: src?.url ?? null, map, tiles: tilesFor(mapId),
+      dungeons: (db.prepare('SELECT id, name, level, x, y FROM world_dungeon WHERE world_map = ? ORDER BY level').all(mapId) as Record<string, any>[]).map((d) => ({ ...d })) as WorldData['dungeons'],
       maps: (db.prepare('SELECT id, name, cells FROM world_map ORDER BY cells DESC').all() as Record<string, any>[]).map((m) => ({ ...m })) as WorldData['maps'],
       cells: (db.prepare('SELECT x, y, subarea_id s FROM world_cell WHERE world_map = ?').all(mapId) as { x: number; y: number; s: number }[]).map((c) => [c.x, c.y, c.s]),
       zones,

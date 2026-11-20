@@ -13,7 +13,7 @@ type Row = Record<string, any>;
 const arr = (x: any): any[] => x?.Array ?? [];
 
 export const WORLD_FILES = ['mapsinformationdata', 'areasdata', 'superareasdata', 'worldmapsdata', 'hintsdata', 'hintcategoriesdata',
-  'waypointsdata', 'jobsdata', 'skillsdata', 'recipesdata'] as const;
+  'waypointsdata', 'jobsdata', 'skillsdata', 'recipesdata', 'npcsdata', 'dungeonsdata', 'questsdata'] as const;
 
 /** Minimum cells for a world map to be offered (tiny instance maps are left out). */
 const MIN_CELLS = 20;
@@ -26,8 +26,13 @@ export function importWorld(db: DatabaseSync, rawDir: string, sourceUrl: string,
   db.exec(`
     DROP TABLE IF EXISTS world_map; DROP TABLE IF EXISTS world_area; DROP TABLE IF EXISTS world_subarea; DROP TABLE IF EXISTS world_cell;
     DROP TABLE IF EXISTS world_hint; DROP TABLE IF EXISTS world_zaap; DROP TABLE IF EXISTS job; DROP TABLE IF EXISTS gather_skill;
-    DROP TABLE IF EXISTS recipe; DROP TABLE IF EXISTS monster;
-    CREATE TABLE world_map(id INTEGER PRIMARY KEY, name TEXT, cells INTEGER);
+    DROP TABLE IF EXISTS recipe; DROP TABLE IF EXISTS monster; DROP TABLE IF EXISTS world_dungeon; DROP TABLE IF EXISTS world_npc;
+    -- origin / map_w / map_h / total_*: pixel geometry of the official world-map artwork (worldmapsdata)
+    CREATE TABLE world_map(id INTEGER PRIMARY KEY, name TEXT, cells INTEGER, origin_x REAL, origin_y REAL, map_w REAL, map_h REAL, total_w INTEGER, total_h INTEGER);
+    -- dungeon entrances (dungeonsdata.entranceMapId → map coordinates)
+    CREATE TABLE world_dungeon(id INTEGER PRIMARY KEY, name TEXT, level INTEGER, x INTEGER, y INTEGER, world_map INTEGER, subarea_id INTEGER);
+    -- quest givers at their starting map (questsdata.startPosition)
+    CREATE TABLE world_npc(npc_id INTEGER, name TEXT, quest_id INTEGER, x INTEGER, y INTEGER, world_map INTEGER, PRIMARY KEY(npc_id, quest_id, x, y));
     CREATE TABLE world_area(id INTEGER PRIMARY KEY, name TEXT, super_area TEXT);
     -- one zone of the map; harvestables / monsters: JSON id lists from the game data
     CREATE TABLE world_subarea(id INTEGER PRIMARY KEY, name TEXT, area_id INTEGER, world_map INTEGER, level INTEGER,
@@ -73,7 +78,8 @@ export function importWorld(db: DatabaseSync, rawDir: string, sourceUrl: string,
   for (const c of cells) perWorld.set(c[0], (perWorld.get(c[0]) ?? 0) + 1);
   const worlds = read('worldmapsdata').filter((w) => (perWorld.get(w.id) ?? 0) >= MIN_CELLS);
   const worldIds = new Set(worlds.map((w) => w.id as number));
-  insert('world_map', ['id', 'name', 'cells'], worlds.map((w) => [w.id, t(w.nameId), perWorld.get(w.id)]));
+  insert('world_map', ['id', 'name', 'cells', 'origin_x', 'origin_y', 'map_w', 'map_h', 'total_w', 'total_h'],
+    worlds.map((w) => [w.id, t(w.nameId), perWorld.get(w.id), w.origineX, w.origineY, w.mapWidth, w.mapHeight, w.totalWidth, w.totalHeight]));
   const kept = cells.filter((c) => worldIds.has(c[0]));
   insert('world_cell', ['world_map', 'x', 'y', 'subarea_id'], kept);
 
@@ -104,6 +110,20 @@ export function importWorld(db: DatabaseSync, rawDir: string, sourceUrl: string,
     const m = mapPos.get(w.mapId);
     return m ? [[w.mapId, m.posX, m.posY, m.worldMap, w.subAreaId]] : [];
   }));
+
+  // ---- dungeon entrances and quest givers, at the coordinates of their map
+  insert('world_dungeon', ['id', 'name', 'level', 'x', 'y', 'world_map', 'subarea_id'], read('dungeonsdata').flatMap((d) => {
+    const m = mapPos.get(d.entranceMapId);
+    return m && worldIds.has(m.worldMap) ? [[d.id, t(d.nameId), d.optimalPlayerLevel ?? d.minLevel, m.posX, m.posY, m.worldMap, m.subAreaId]] : [];
+  }));
+  const npcName = new Map(read('npcsdata').map((n) => [n.id as number, t(n.nameId)]));
+  const npcRows = new Map<string, unknown[]>();
+  for (const q of read('questsdata')) for (const p of arr(q.startPosition) as Row[]) {
+    const m = mapPos.get(p.mapId);
+    if (!m || !worldIds.has(m.worldMap) || !p.npcId) continue;
+    npcRows.set(`${p.npcId}|${q.id}|${m.posX}|${m.posY}`, [p.npcId, npcName.get(p.npcId) ?? null, q.id, m.posX, m.posY, m.worldMap]);
+  }
+  insert('world_npc', ['npc_id', 'name', 'quest_id', 'x', 'y', 'world_map'], [...npcRows.values()]);
 
   // ---- professions
   const skills = read('skillsdata');
