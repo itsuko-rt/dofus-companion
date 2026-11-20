@@ -148,7 +148,7 @@ export function loadQuestDetails(path: string, questId: number): QuestDetails | 
   }
 }
 
-function withDb<T>(path: string, fn: (db: DatabaseSync) => T): T {
+export function withDb<T>(path: string, fn: (db: DatabaseSync) => T): T {
   const db = new DatabaseSync(path, { readOnly: true });
   try { return fn(db); } finally { db.close(); }
 }

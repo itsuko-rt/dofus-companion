@@ -3,9 +3,9 @@
 // One shared store so every component on the page (nav, map, guide) sees the same character instantly.
 import { useMemo, useSyncExternalStore } from 'react';
 import type { Profile, Progress } from '../src/criteria.ts';
-import { newCharacterId, sanitizeCharacter, type ChangeSource, type Character, type HistoryEntry, type Playstyle, type SavedBuild } from '../src/character.ts';
+import { newCharacterId, sanitizeCharacter, type ChangeSource, type Character, type HistoryEntry, type Playstyle, type SavedBuild, type SavedRoute } from '../src/character.ts';
 
-export type { ChangeSource, Character, HistoryEntry, Playstyle, SavedBuild };
+export type { ChangeSource, Character, HistoryEntry, Playstyle, SavedBuild, SavedRoute };
 export type Mark = 'done' | 'active' | null;
 export type SyncState = 'local' | 'syncing' | 'synced' | 'error';
 
@@ -238,6 +238,17 @@ export function useCharacter() {
       currentBuild: wear ? b.id : c.currentBuild,
     })),
     removeBuild: (id: string) => update((c) => ({ ...c, builds: c.builds.filter((x) => x.id !== id), currentBuild: c.currentBuild === id ? undefined : c.currentBuild })),
+    /** Profession level (1–200) of the active character; null forgets it. */
+    setJobLevel: (jobId: number, level: number | null) => update((c) => {
+      const jobs = { ...c.jobs };
+      if (level == null) delete jobs[jobId]; else jobs[jobId] = Math.min(200, Math.max(1, Math.round(level)));
+      return { ...c, jobs };
+    }),
+    saveRoute: (route: Omit<SavedRoute, 'id' | 'savedAt'> & { id?: string }) => update((c) => {
+      const id = route.id ?? `r${Date.now().toString(36)}`;
+      return { ...c, routes: [...c.routes.filter((x) => x.id !== id), { ...route, id, savedAt: new Date().toISOString() }].slice(-20) };
+    }),
+    removeRoute: (id: string) => update((c) => ({ ...c, routes: c.routes.filter((x) => x.id !== id) })),
     wearBuild: (id: string | undefined) => update((c) => ({ ...c, currentBuild: id })),
     create: (c: Pick<Character, 'name' | 'level' | 'element' | 'playstyle' | 'profile'>) => {
       const created = sanitizeCharacter({ ...c, id: newCharacterId(), updatedAt: new Date().toISOString() }, newCharacterId())!;

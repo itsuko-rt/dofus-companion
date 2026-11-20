@@ -11,6 +11,6 @@ export default defineConfig({
   use: { baseURL: process.env.E2E_BASE_URL ?? 'http://127.0.0.1:3100', channel: process.env.E2E_CHANNEL ?? 'msedge' },
   projects: [
     { name: 'desktop', use: { viewport: { width: 1280, height: 800 } } },
-    { name: 'mobile', use: { viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true }, testMatch: /ui\.spec/ },
+    { name: 'mobile', use: { viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true }, testMatch: /(ui|world)\.spec/ },
   ],
 });

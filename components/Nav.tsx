@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Compass, Home, Shirt, Swords, UserRound, CircleUser } from 'lucide-react';
+import { Compass, Home, Map as MapIcon, Pickaxe, Shirt, Swords, UserRound, CircleUser } from 'lucide-react';
 import { BRAND } from '../src/brand.ts';
 import { SUPPORTED_BREEDS } from './breeds';
 import { useCharacter } from './useCharacter';
@@ -11,6 +11,8 @@ import { useSession } from './account/useSession';
 const LINKS = [
   { href: '/', label: 'Accueil', icon: Home, match: (p: string) => p === '/' },
   { href: '/progression/quetes', label: 'Progression', icon: Compass, match: (p: string) => p.startsWith('/progression') },
+  { href: '/carte', label: 'Carte', icon: MapIcon, match: (p: string) => p.startsWith('/carte') },
+  { href: '/metiers', label: 'Métiers', icon: Pickaxe, match: (p: string) => p.startsWith('/metiers') },
   { href: '/builds', label: 'Builds', icon: Swords, match: (p: string) => p.startsWith('/builds') },
   { href: '/equipement', label: 'Équipement', icon: Shirt, match: (p: string) => p.startsWith('/equipement') },
   { href: '/personnage', label: 'Personnages', icon: UserRound, match: (p: string) => p.startsWith('/personnage') },
@@ -37,7 +39,7 @@ export default function Nav() {
         const active = l.match(path);
         return (
           <Link key={l.href} href={l.href} aria-current={active ? 'page' : undefined} aria-label={l.label} className={link(active)}>
-            <Icon size={15} aria-hidden /> <span className="hidden md:inline">{l.label}</span>
+            <Icon size={15} aria-hidden /> <span className="hidden xl:inline">{l.label}</span>
           </Link>
         );
       })}

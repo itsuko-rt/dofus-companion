@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { useRef, useState } from 'react';
 import { Download, Plus, Trash2, Upload } from 'lucide-react';
 import { ELEMENTS, type Element } from '../../src/spells.ts';
@@ -159,6 +160,25 @@ export default function CharacterProfile() {
             <textarea className={`${field} min-h-24`} maxLength={4000} value={c.notes} placeholder="Objectifs, idées de stuff, rappels…"
               onChange={(e) => ch.setInfo({ notes: e.target.value })} />
           </label>
+        </Card>
+
+        <Card>
+          <SectionTitle hint={`${Object.keys(c.jobs).length} métier(s) · ${c.routes.length} itinéraire(s)`}>Métiers et itinéraires</SectionTitle>
+          {Object.keys(c.jobs).length === 0 ? (
+            <p className="text-sm text-muted">Aucun niveau de métier renseigné. <Link className="text-accent underline" href="/metiers">Ouvrir le carnet des métiers</Link></p>
+          ) : (
+            <p className="text-sm text-muted">Niveaux renseignés pour {Object.keys(c.jobs).length} métier(s) : <Link className="text-accent underline" href="/metiers">voir le carnet</Link></p>
+          )}
+          {c.routes.length > 0 && (
+            <ul className="mt-3 flex flex-col gap-1 text-sm">
+              {c.routes.map((r) => (
+                <li key={r.id} className="flex items-center justify-between gap-2 rounded-md border border-line px-3 py-1.5">
+                  <Link href={`/carte?itineraire=${r.id}`} className="truncate hover:underline">{r.name} <span className="text-xs text-muted">{r.stops.length} zones</span></Link>
+                  <button className="text-xs text-muted hover:text-red-200" onClick={() => ch.removeRoute(r.id)}>Supprimer</button>
+                </li>
+              ))}
+            </ul>
+          )}
         </Card>
 
         {backup}
