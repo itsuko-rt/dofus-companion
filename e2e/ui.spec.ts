@@ -175,3 +175,12 @@ test('quest drawer shows where objective monsters live and where items come from
   await expect(page.getByText(/butin : Sanglier agressif/)).toBeVisible();
   expectNoErrors(errors);
 });
+
+test('equipment cards say how to obtain the item (recipe or drops)', async ({ page }) => {
+  await seedLocal(page); // level 50: the level-20 item passes the « portable à mon niveau » filter
+  await page.goto('/equipement');
+  await page.getByPlaceholder('Nom d’un objet…').fill('Coiffe du Bouftou');
+  const card = page.locator('li', { has: page.getByRole('heading', { name: 'Coiffe du Bouftou', exact: true }) });
+  await expect(card.getByText(/fabriqué par/)).toBeVisible();
+  await expect(card.getByRole('link', { name: /Tailleur niv\. 20/ })).toBeVisible();
+});

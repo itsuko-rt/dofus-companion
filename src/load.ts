@@ -283,8 +283,18 @@ export const searchItems = (path: string, s: ItemSearch) => withDb(path, (db) =>
   const rows = db.prepare(`SELECT i.id, i.name, t.name AS type, i.level, s.name AS setName, i.effects
     FROM item i JOIN item_type t ON t.id = i.type_id LEFT JOIN item_set s ON s.id = i.set_id
     WHERE ${where.join(' AND ')} ORDER BY i.level DESC, i.name LIMIT ?`).all(...args, Math.min(s.limit ?? 60, 120)) as Record<string, any>[];
-  return rows.map((r) => ({ id: r.id, name: r.name, type: r.type, level: r.level, setName: r.setName,
-    effects: (JSON.parse(r.effects) as { text: string | null; characteristic: number | null }[]).filter((e) => e.text && !/^(Échangeable|Attitude|Effet non documenté)/.test(e.text)).map((e) => e.text!) }));
+  // how to obtain it, from the game data: the recipe (profession, level, ingredients) or the monsters that drop it
+  const source = itemSources(db);
+  const recipe = db.prepare('SELECT r.ingredients FROM recipe r WHERE r.result_id = ? ORDER BY r.level LIMIT 1');
+  const itemName = db.prepare('SELECT name FROM item WHERE id = ?');
+  return rows.map((r) => {
+    const rec = recipe.get(r.id) as { ingredients: string } | undefined;
+    return { id: r.id, name: r.name, type: r.type, level: r.level, setName: r.setName,
+      effects: (JSON.parse(r.effects) as { text: string | null; characteristic: number | null }[]).filter((e) => e.text && !/^(Échangeable|Attitude|Effet non documenté)/.test(e.text)).map((e) => e.text!),
+      obtain: source(r.id) as IngredientSource,
+      ingredients: rec ? (JSON.parse(rec.ingredients) as [number, number][]).map(([id, qty]) => ({ qty, name: (itemName.get(id) as { name: string } | undefined)?.name ?? `objet n°${id}` })) : [],
+    };
+  });
 });
 
 export function loadGraph(path: string): Graph {

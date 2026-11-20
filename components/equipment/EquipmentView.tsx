@@ -1,10 +1,12 @@
 'use client';
+import type { IngredientSource } from '../../src/professions-shared.ts';
+import SourceLabel from '../professions/SourceLabel';
 import { useEffect, useState } from 'react';
 import { Search, Shirt } from 'lucide-react';
 import { useCharacter } from '../useCharacter';
 import { Card, EmptyState, PageHero, SECTION } from '../ui';
 
-interface ItemRow { id: number; name: string; type: string; level: number; setName: string | null; effects: string[] }
+interface ItemRow { id: number; name: string; type: string; level: number; setName: string | null; effects: string[]; obtain: IngredientSource; ingredients: { qty: number; name: string }[] }
 
 export default function EquipmentView({ types }: { types: { id: number; name: string; count: number }[] }) {
   const ch = useCharacter();
@@ -59,6 +61,12 @@ export default function EquipmentView({ types }: { types: { id: number; name: st
                     <h2 className="font-medium leading-snug">{it.name}</h2>
                     <p className="text-xs text-muted">{it.type} · niveau {it.level}{it.setName ? ` · ${it.setName}` : ''}</p>
                     <ul className="mt-2 grid gap-0.5 text-[13px] text-text">{it.effects.slice(0, 12).map((e, i) => <li key={i}>{e}</li>)}</ul>
+                    {(it.obtain.kind !== 'other' || it.obtain.drops.length > 0) && (
+                      <p className="mt-2 border-t border-line pt-2 text-xs text-muted">
+                        <span className="font-semibold text-text">Obtention :</span> {it.obtain.kind === 'crafted' ? 'fabriqué par ' : it.obtain.kind === 'gathered' ? 'récolté par ' : ''}<SourceLabel source={it.obtain} />
+                        {it.ingredients.length > 0 && <span className="block text-faint">{it.ingredients.map((g) => `${g.qty} × ${g.name}`).join(', ')}</span>}
+                      </p>
+                    )}
                   </Card>
                 </li>
               ))}
