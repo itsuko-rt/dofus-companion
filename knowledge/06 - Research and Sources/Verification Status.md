@@ -8,6 +8,7 @@
 | **UNVERIFIED** | Not independently confirmed | The scanner's OCR accuracy on real screenshots |
 | **OUTDATED** | Was valid, may be obsolete (older game version) | Facts from 3.7.14.18 after a new patch, until re-imported |
 | **HYPOTHESIS** | An idea that needs testing | Meaning of condition code `BT` |
+| **NEEDS VERIFICATION** | Technical marker, not a research label: a claim about the code, tooling or infrastructure that has not been checked yet | Production deployment, Bases view rendering |
 
 Ankama's own statements are separate from game files (see [[Official Sources]]), and both are separate from community advice ([[Community Sources]]).
 

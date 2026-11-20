@@ -5,7 +5,8 @@ DOFUS 3 companion (Next.js 16, React 19, TypeScript 7, `node:sqlite`). The proje
 ## Before a task (targeted reading, never the whole vault)
 1. Read `knowledge/10 - Claude Code/Project Context.md` and `knowledge/00 - Dashboard/Current Status.md`.
 2. Use the task → notes table in `knowledge/10 - Claude Code/Operating Instructions.md` to read only the relevant notes (architecture, feature, game research).
-3. Check `knowledge/09 - Development Memory/Architecture Decision Records/` and `Bug History/` for the area you touch.
+3. Check `knowledge/09 - Development Memory/Architecture Decision Records/` and `Bug History/` for the area you touch, and the *Known limitations* section of `Current Status`.
+4. For game facts, reuse the research notes and `knowledge/06 - Research and Sources/` (labels in `Verification Status`) before searching again.
 
 ## During and after significant work
 Significant means a new feature, a data source, a schema, API or security change, a new dependency, or a removed feature. For that work:

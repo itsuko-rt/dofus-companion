@@ -5,10 +5,11 @@
 ## Where we are
 **Pre-launch.** The site runs locally. All checks pass: typecheck, 72 unit tests, 22 E2E tests, production build, `npm audit` with 0 vulnerabilities.
 
-## Latest changes (committed locally on 2026-11-20, not pushed)
+## Latest changes (2026-11-20, pushed to `main`)
 - **In-site map removed:** `/carte` is now a directory of DofusDB and Dofus Maps ([[ADR-0005 Remove the in-site map]]).
 - **Security audit and fixes:** reset links kept out of production logs, password hashing capped, JSON-LD escape fixed ([[Security Audit]]).
 - **This knowledge base** and the project `CLAUDE.md`.
+- **Obsidian set up** (branch docs/obsidian-setup): vault registered in Obsidian 1.15.1, dashboard rebuilt, Bases view of research notes ([[Setup Report]]).
 
 ## Blocking a public launch
 From [[Release Checklist]]:

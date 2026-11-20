@@ -28,6 +28,23 @@ flowchart LR
 | Routes | `app/` (App Router) | Mostly static pages; dynamic: `/api/auth`, `/api/characters`, `/api/builds` |
 | UI | `components/` (per section) and `components/ui.tsx` (shared) | See [[Components]] |
 
+## Installed versions (from `node_modules`, 2026-11-20)
+next 16.4.6 · react 19.3.1 · typescript 7.0.2 · tailwindcss 4.3.5 · @xyflow/react 13.0.2 · tesseract.js 6.0.1 · Node 26.13.1 on the dev PC.
+
+## Pages (`app/**/page.tsx`)
+| Section | Routes |
+|---|---|
+| Home, about, legal | `/`, `/a-propos`, `/mentions-legales`, `/confidentialite` |
+| Progression | `/progression/quetes`, `/progression/quetes/[region]`, `/progression/succes`, `/progression/dofus`, `/progression/scan` |
+| Character | `/personnage`, `/personnage/sorts`, `/personnage/sorts/[id]` |
+| Builds, equipment | `/builds`, `/equipement` |
+| Professions | `/metiers`, `/metiers/[slug]` |
+| Maps | `/carte` (external links only) |
+| Guides | `/guides`, `/guides/quetes`, `/guides/quetes/[region]`, `/guides/dofus`, `/guides/dofus/[slug]` |
+| Account | `/compte`, `/compte/reinitialiser` |
+
+API routes: [[API Documentation]].
+
 ## How quest prerequisites work
 1. **Conditions:** each quest has a `startCriterion` expression in the game files, such as `PL>129&(Qf=272|Qf=273)&Qa!496`.
 2. **Parsing:** `src/criteria.ts` turns it into a boolean tree, and `src/graph.ts` compiles that into nodes and edges:
