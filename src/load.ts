@@ -4,6 +4,8 @@ import { Graph, type GEdge, type NodeInput } from './graph.ts';
 import type { RenderedEffect } from './effects.ts';
 import type { Item, ItemSet } from './stats.ts';
 import { objectiveTargets } from './objective-targets.ts';
+import { classAchievements, classQuests } from './class-quests.ts';
+import { regionSlugMap } from './regions.ts';
 import { itemSources } from './professions.ts';
 import type { IngredientSource } from './professions-shared.ts';
 
@@ -300,4 +302,24 @@ export const searchItems = (path: string, s: ItemSearch) => withDb(path, (db) =>
 export function loadGraph(path: string): Graph {
   const d = loadGraphData(path);
   return new Graph(d.nodes, d.extraEdges);
+}
+
+export interface ClassExtras {
+  description: string | null; complexity: number | null;
+  quests: { id: string; name: string; level: number | null; href: string }[];
+  achievements: { name: string; why: 'quests' | 'name' }[];
+}
+/** Game data tied to a class, for its class page: official description, class quests (PG condition), linked achievements. */
+export function loadClassExtras(path: string, breedId: number, breedName: string): ClassExtras {
+  const g = loadGraph(path);
+  const data = loadGraphData(path);
+  const slugs = regionSlugMap(data.categories);
+  const info = withDb(path, (db) => db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'breed_info'").get()
+    ? db.prepare('SELECT description, complexity FROM breed_info WHERE breed_id = ?').get(breedId) as { description: string | null; complexity: number | null } | undefined : undefined);
+  const ach = classAchievements(g, loadObjectiveIndex(path), breedId, breedName);
+  return {
+    description: info?.description ?? null, complexity: info?.complexity ?? null,
+    quests: classQuests(g, breedId).map((n) => ({ id: n.id, name: n.label, level: n.level ?? null, href: `/progression/quetes/${slugs.get(n.category ?? -1) ?? n.category}#${n.id}` })),
+    achievements: [...ach.linked.map((n) => ({ name: n.label, why: 'quests' as const })), ...ach.named.map((n) => ({ name: n.label, why: 'name' as const }))],
+  };
 }

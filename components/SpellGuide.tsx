@@ -1,6 +1,7 @@
 'use client';
 import { useMemo, useState } from 'react';
-import type { ClassData, SpellInfo } from '../src/load.ts';
+import Link from 'next/link';
+import type { ClassData, ClassExtras, SpellInfo } from '../src/load.ts';
 import type { RenderedEffect } from '../src/effects.ts';
 import { ELEMENTS, classStates, gradeAt, spellElements, type Element } from '../src/spells.ts';
 import { useCharacter } from './useCharacter';
@@ -9,7 +10,7 @@ import { SUPPORTED_BREEDS } from './breeds';
 
 const ELEMENT_STYLE = ELEMENT_CLASS;
 
-export default function SpellGuide({ data }: { data: ClassData }) {
+export default function SpellGuide({ data, extras }: { data: ClassData; extras?: ClassExtras }) {
   const ch = useCharacter();
   const info = SUPPORTED_BREEDS.find((b) => b.id === data.breed.id);
   const level = ch.character.level;
@@ -31,6 +32,7 @@ export default function SpellGuide({ data }: { data: ClassData }) {
         <p className="text-sm text-white/80">{data.spells.length} sorts · 22 emplacements, 2 variantes chacun (une seule active à la fois) · données {data.version}</p>
       </PageHero>
       <div className="mx-auto max-w-6xl px-4 py-6">
+        {extras && <ClassOverview name={data.breed.name} extras={extras} />}
         <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
           <label className="flex items-center gap-2 text-xs text-muted">
             Mon niveau
@@ -151,5 +153,37 @@ function Effects({ list }: { list: RenderedEffect[] }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+/** What the game files tie to the class: official description and complexity, its class quests, linked achievements. */
+function ClassOverview({ name, extras }: { name: string; extras: ClassExtras }) {
+  return (
+    <section aria-label={`La classe ${name}`} className="mb-6 grid gap-4 md:grid-cols-[1.4fr_1fr]">
+      <div className="rounded-md border border-line bg-surface p-4 text-sm">
+        {extras.description && <p className="text-text">{extras.description}</p>}
+        <p className="mt-2 text-xs text-muted">
+          {extras.complexity != null && <>Complexité selon le jeu : {extras.complexity}/5 · </>}
+          <Link href="/builds" className="text-accent hover:underline">Builds de la communauté</Link>
+        </p>
+        {extras.achievements.length > 0 && (
+          <p className="mt-2 text-xs text-muted">
+            <span className="font-semibold text-text">Succès liés :</span>{' '}
+            {extras.achievements.map((a) => `${a.name} (${a.why === 'quests' ? 'demande vos quêtes de classe' : 'porte le nom de la classe'})`).join(', ')}
+          </p>
+        )}
+      </div>
+      {extras.quests.length > 0 && (
+        <div className="rounded-md border border-line bg-surface p-4">
+          <h2 className="font-display text-base text-text">Quêtes de classe</h2>
+          <p className="text-xs text-faint">Celles dont la condition de départ demande d’être {name}.</p>
+          <ul className="mt-2 flex flex-col gap-1 text-sm">
+            {extras.quests.map((q) => (
+              <li key={q.id}><Link href={q.href} className="text-accent hover:underline">{q.name}</Link>{q.level != null && <span className="text-xs text-muted"> · niv. {q.level}</span>}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </section>
   );
 }

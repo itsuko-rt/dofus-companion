@@ -184,3 +184,11 @@ test('equipment cards say how to obtain the item (recipe or drops)', async ({ pa
   await expect(card.getByText(/fabriqué par/)).toBeVisible();
   await expect(card.getByRole('link', { name: /Tailleur niv\. 20/ })).toBeVisible();
 });
+
+test('class page: official description, class quests with links, linked achievements', async ({ page }) => {
+  await page.goto('/personnage/sorts/huppermage');
+  const overview = page.getByRole('region', { name: 'La classe Huppermage' });
+  await expect(overview.getByText(/vénèrent la Balance Krosmique/)).toBeVisible(); // official description
+  await expect(overview.getByRole('link', { name: "Les paroles s'envolent, les aigris restent" })).toHaveAttribute('href', /#quest:1677$/);
+  await expect(overview.getByText(/Dopeul Huppermage/)).toBeVisible();
+});

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound, permanentRedirect } from 'next/navigation';
 import { pageMeta } from '../../../../src/seo.ts';
-import { latestDb, loadClass } from '../../../../src/load.ts';
+import { latestDb, loadClass, loadClassExtras } from '../../../../src/load.ts';
 import { SUPPORTED_BREEDS } from '../../../../components/breeds';
 import SpellGuide from '../../../../components/SpellGuide';
 
@@ -16,8 +16,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const b = find((await params).id);
   if (!b) return {};
   return pageMeta({
-    title: `Sorts du ${b.name} (${b.title})`, path: `/personnage/sorts/${b.slug}`,
-    description: `Les sorts du ${b.name} dans DOFUS : niveau d'obtention, coût en PA, portée et effets de chaque variante, lus dans les fichiers du jeu. Rôles : ${b.roles.join(', ')}.`,
+    title: `${b.name} (${b.title}) : sorts et quêtes de classe`, path: `/personnage/sorts/${b.slug}`,
+    description: `Le ${b.name} dans DOFUS : ses sorts (niveau, PA, portée, effets de chaque variante), ses quêtes de classe et ses succès liés, lus dans les fichiers du jeu. Rôles : ${b.roles.join(', ')}.`,
   });
 }
 
@@ -27,6 +27,6 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   if (b && id !== b.slug) permanentRedirect(`/personnage/sorts/${b.slug}`);
   const db = latestDb();
   const data = db && b ? loadClass(db, b.id) : null;
-  if (!data) notFound();
-  return <SpellGuide data={data} />;
+  if (!data || !b) notFound();
+  return <SpellGuide data={data} extras={loadClassExtras(db!, b.id, b.name)} />;
 }

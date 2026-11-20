@@ -18,6 +18,7 @@
 - **Class-aware progression:** class quests panel and hiding of other classes' exclusive quests; "Pour votre classe" achievements (linked by class quests, or named after the class); fix of [[Server-only objectives counted as met]].
 - **Professions:** XP calculator on every profession page ([[ADR-0007 Profession XP comes from the player's screen]]); loot ingredients show up to 3 monsters that drop them, with the base chance.
 - **Que faire à mon niveau** (`/progression/niveau`): game suggestions, zones and monsters (base XP, drops, harvests) and dungeons for a level. No rates or prices.
+- **Class pages** (`/personnage/sorts/<classe>`): official description and complexity, class quests with links, linked achievements, then the spells.
 - **Equipment « Obtention »:** each item card shows its recipe (profession, level, ingredients) or the monsters that drop it.
 - **Quest drawer « Où trouver »:** zones of objective monsters, sources of objective items.
 - **First Quêtes visit:** graph and graph view warmed on idle from other pages (730 → 580 ms at 4× CPU).
