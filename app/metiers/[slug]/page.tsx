@@ -6,7 +6,7 @@ import { KIND_LABEL } from '../../../components/professions/jobIcons';
 import { PageHero } from '../../../components/ui';
 import { latestDb } from '../../../src/load.ts';
 import { pageMeta } from '../../../src/seo.ts';
-import { loadJob, loadJobs } from '../../../src/world.ts';
+import { loadJob, loadJobs } from '../../../src/professions.ts';
 
 export const dynamicParams = false;
 export function generateStaticParams() {
@@ -22,7 +22,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   return pageMeta({
     title: `${d.job.name} : guide du métier`, path: `/metiers/${d.job.slug}`,
     description: d.tiers.length
-      ? `Monter ${d.job.name} dans DOFUS : ${d.tiers.length} ressources de ${first}… jusqu’au niveau 200, les zones de récolte sur la carte et ${d.recipes.length} recettes.`
+      ? `Monter ${d.job.name} dans DOFUS : ${d.tiers.length} ressources de ${first}… jusqu’au niveau 200, les zones de récolte et ${d.recipes.length} recettes.`
       : `${d.job.name} dans DOFUS : ${d.recipes.length} recettes avec le niveau requis et l’origine de chaque ingrédient (récolte, fabrication ou butin).`,
   });
 }

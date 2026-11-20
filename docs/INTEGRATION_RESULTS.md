@@ -1,5 +1,7 @@
 # Integration results — 2026-11-20
 
+> **Historical (2026-11-20):** the in-site world map described here was removed; see MAP_REMOVAL_REPORT.md. The professions part still applies (import now in scripts/professions-import.ts).
+
 ## Shipped
 - **Interactive world map** (`/carte`):
   - drawn from the game's own coordinates, 26 worlds;

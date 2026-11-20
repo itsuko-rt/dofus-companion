@@ -18,7 +18,7 @@ for (const b of SUPPORTED_BREEDS) {
 const db = latestDb();
 if (db) {
   const d = new DatabaseSync(db, { readOnly: true });
-  // Dofus eggs, and the resources each gathering profession harvests (profession guides, world map)
+  // Dofus eggs, and the resources each gathering profession harvests (profession guides)
   const hasJobs = !!d.prepare("SELECT 1 FROM sqlite_master WHERE name = 'gather_skill'").get();
   const iconSql = `SELECT i.icon_id FROM dofus x JOIN item i ON i.id = x.item_id${hasJobs ? ' UNION SELECT i.icon_id FROM gather_skill g JOIN item i ON i.id = g.item_id' : ''}`;
   for (const r of d.prepare(iconSql).all() as { icon_id: number }[]) {

@@ -3,9 +3,9 @@
 // level brackets with the zones of each resource, and the recipes with where every ingredient comes from.
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, Check, Lock, Map as MapIcon, Search } from 'lucide-react';
-import { brackets, currentBracket, MAX_JOB_LEVEL, type JobDetails, type RecipeInfo } from '../../src/world-shared.ts';
-import { jobSlug } from '../../src/world-shared.ts';
+import { Check, Lock, Map as MapIcon, Search } from 'lucide-react';
+import { brackets, currentBracket, MAX_JOB_LEVEL, type JobDetails, type RecipeInfo } from '../../src/professions-shared.ts';
+import { jobSlug } from '../../src/professions-shared.ts';
 import { useCharacter } from '../useCharacter';
 import { Button, ButtonLink, Card, ProgressBar, SectionTitle } from '../ui';
 import { ItemIcon } from './jobIcons';
@@ -48,8 +48,8 @@ export default function JobGuide({ details, recipeTotal }: { details: JobDetails
                 <p key={t.itemId} className="mt-1 flex items-center gap-2 font-medium text-text"><ItemIcon iconId={t.iconId} size={24} /> {t.name}
                   <span className="text-xs font-normal text-muted">niv. {t.levelMin} · {t.zones.length} zone(s)</span></p>
               )) : <p className="mt-1 text-sm text-muted">Aucune ressource à ce niveau.</p>}
-              <ButtonLink href={`/carte?metier=${job.id}&niveau=${level}${pos.current?.items[0] ? `&ressource=${pos.current.items[0].itemId}` : ''}`} variant="primary" className="mt-3 !py-1.5 text-xs">
-                <MapIcon size={14} aria-hidden /> Voir sur la carte
+              <ButtonLink href="/carte" variant="primary" className="mt-3 !py-1.5 text-xs">
+                <MapIcon size={14} aria-hidden /> Cartes interactives
               </ButtonLink>
             </div>
             <div className="rounded-md border border-line p-3">
@@ -87,7 +87,6 @@ export default function JobGuide({ details, recipeTotal }: { details: JobDetails
                           {t.zones.length > 5 ? ` et ${t.zones.length - 5} autres` : ''}
                         </p>
                       ) : <p className="mt-1 text-xs text-faint">Aucune zone du Monde des Douze ne la liste dans les données du jeu.</p>}
-                      {t.zones.length > 0 && <Link href={`/carte?ressource=${t.itemId}`} className="mt-1 inline-flex items-center gap-1 text-xs text-accent hover:underline">Les {t.zones.length} zones sur la carte <ArrowRight size={12} aria-hidden /></Link>}
                     </div>
                   ))}
                 </li>
@@ -128,7 +127,7 @@ function Recipes({ recipes, total, level }: { recipes: RecipeInfo[]; total: numb
               {r.ingredients.map((g) => (
                 <li key={g.id} className="rounded-sm border border-line bg-surface-2/60 px-2 py-0.5 text-xs">
                   <span className="text-text">{g.qty} × {g.name}</span>{' '}
-                  {g.source.kind === 'gathered' ? <Link className="text-accent hover:underline" href={`/carte?ressource=${g.id}`}>{g.source.jobName} niv. {g.source.levelMin} · carte</Link>
+                  {g.source.kind === 'gathered' ? <Link className="text-accent hover:underline" href={`/metiers/${jobSlug(g.source.jobName)}`}>{g.source.jobName} niv. {g.source.levelMin}</Link>
                     : g.source.kind === 'crafted' ? <Link className="text-accent hover:underline" href={`/metiers/${jobSlug(g.source.jobName)}`}>{g.source.jobName} niv. {g.source.level}</Link>
                     : <span className="text-faint">butin ou achat</span>}
                 </li>

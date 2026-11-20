@@ -1,5 +1,5 @@
 import { latestDb } from '../../../../src/load.ts';
-import { loadJob } from '../../../../src/world.ts';
+import { loadJob } from '../../../../src/professions.ts';
 
 export async function GET(_req: Request, { params }: { params: Promise<{ slug: string }> }) {
   const db = latestDb();

@@ -4,11 +4,11 @@ import ProfessionsIndex from '../../components/professions/ProfessionsIndex';
 import { PageHero } from '../../components/ui';
 import { latestDb } from '../../src/load.ts';
 import { pageMeta } from '../../src/seo.ts';
-import { loadJobs } from '../../src/world.ts';
+import { loadJobs } from '../../src/professions.ts';
 
 export const metadata: Metadata = pageMeta({
   title: 'Métiers',
-  description: 'Tous les métiers de DOFUS : ressources débloquées niveau par niveau, zones de récolte sur la carte, recettes et origine de chaque ingrédient, avec votre progression par personnage.',
+  description: 'Tous les métiers de DOFUS : ressources débloquées niveau par niveau, zones de récolte, recettes et origine de chaque ingrédient, avec votre progression par personnage.',
   path: '/metiers',
 });
 

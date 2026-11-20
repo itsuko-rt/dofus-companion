@@ -1,7 +1,7 @@
 'use client';
 // Profession journal: every profession of the game, grouped, with the active character's level in each.
 import Link from 'next/link';
-import type { JobSummary } from '../../src/world-shared.ts';
+import type { JobSummary } from '../../src/professions-shared.ts';
 import { useCharacter } from '../useCharacter';
 import { ProgressBar } from '../ui';
 import { jobIcon, KIND_LABEL } from './jobIcons';

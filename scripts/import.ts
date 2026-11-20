@@ -9,7 +9,7 @@ import { renderEffect, type RawEffect } from '../src/effects.ts';
 import { renderObjective } from '../src/objectives.ts';
 import { matchGuides } from '../src/guides.ts';
 import { statSync } from 'node:fs';
-import { importWorld, WORLD_FILES } from './world-import.ts';
+import { importProfessions, PROFESSION_FILES } from './professions-import.ts';
 
 const REPO = 'ledouxm/dofus-sqlite';
 const FILES = [
@@ -20,8 +20,8 @@ const FILES = [
   'spellsdata', 'spellvariantsdata', 'spelllevelsdata', 'effectsdata', 'spellstatesdata', 'monstersdata',
   'itemtypesdata', 'characteristicsdata',
   'questobjectivesdata', 'questobjectivetypesdata', 'queststeprewardsdata', 'npcsdata', 'subareasdata', 'achievementrewardsdata',
-  // world map and professions (scripts/world-import.ts)
-  ...WORLD_FILES,
+  // professions (scripts/professions-import.ts)
+  ...PROFESSION_FILES,
 ] as const;
 const DPLN_SITEMAP = 'https://www.dofuspourlesnoobs.com/sitemap.xml';
 // Items and sets come from dofusdude's release of the same game version: dofus-sqlite's JSON
@@ -371,7 +371,7 @@ async function main() {
   insert('node', ['id', 'kind', 'ref_id', 'label', 'criterion', 'points'],
     [...graph.nodes.values()].map((n) => [n.id, n.kind, n.refId, n.label, n.criterion, n.points ?? null]));
   insert('edge', ['from_node', 'to_node', 'kind'], graph.edges.map((e) => [e.from, e.to, e.kind]));
-  console.log('world map and professions', importWorld(db, rawDir, rel.html_url, monsterRows));
+  console.log('professions', importProfessions(db, rawDir, rel.html_url));
   db.exec('COMMIT');
   db.close();
 

@@ -11,7 +11,7 @@ import { useSession } from './account/useSession';
 const LINKS = [
   { href: '/', label: 'Accueil', icon: Home, match: (p: string) => p === '/' },
   { href: '/progression/quetes', label: 'Progression', icon: Compass, match: (p: string) => p.startsWith('/progression') },
-  { href: '/carte', label: 'Carte', icon: MapIcon, match: (p: string) => p.startsWith('/carte') },
+  { href: '/carte', label: 'Cartes', icon: MapIcon, match: (p: string) => p.startsWith('/carte') },
   { href: '/metiers', label: 'Métiers', icon: Pickaxe, match: (p: string) => p.startsWith('/metiers') },
   { href: '/builds', label: 'Builds', icon: Swords, match: (p: string) => p.startsWith('/builds') },
   { href: '/equipement', label: 'Équipement', icon: Shirt, match: (p: string) => p.startsWith('/equipement') },

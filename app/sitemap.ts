@@ -3,7 +3,7 @@ import { SUPPORTED_BREEDS } from '../components/breeds';
 import { dofusSlugs, guideContext, regions } from '../src/guides-data.ts';
 import { SITE_URL } from '../src/site.ts';
 import { latestDb } from '../src/load.ts';
-import { loadJobs } from '../src/world.ts';
+import { loadJobs } from '../src/professions.ts';
 
 // Only pages with real content: guides, tools, class pages. Account and profile pages are left out (noindex).
 export default function sitemap(): MetadataRoute.Sitemap {

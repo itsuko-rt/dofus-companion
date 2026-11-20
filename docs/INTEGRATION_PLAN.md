@@ -1,5 +1,7 @@
 # Integration plan — world map and professions
 
+> **Historical (2026-11-20):** the in-site world map described here was removed; see MAP_REMOVAL_REPORT.md. The professions part still applies (import now in scripts/professions-import.ts).
+
 ## Principle
 Every map feature and every profession figure comes from the official game files, from the same release as the rest of the site (dofus-sqlite `v6.0_3.7.14.18`). When the files do not hold a fact, the interface says so instead of filling the gap.
 
