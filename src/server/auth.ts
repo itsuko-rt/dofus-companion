@@ -7,7 +7,24 @@ import type { DatabaseSync } from 'node:sqlite';
 import { sanitizeCharacter, type Character } from '../character.ts';
 import { SITE_URL } from '../site.ts';
 
-const scrypt = promisify(scryptCb) as (pw: string, salt: Buffer, len: number, opts: object) => Promise<Buffer>;
+const scryptRaw = promisify(scryptCb) as (pw: string, salt: Buffer, len: number, opts: object) => Promise<Buffer>;
+// Each hash takes ~16 MB and tens of ms of CPU. Logins with ever-new addresses are not throttled per account,
+// so concurrent hashes are capped: a few run, a bounded queue waits, the rest get "busy" (no memory blow-up).
+const HASH_CONCURRENCY = 4, HASH_QUEUE = 32;
+let hashing = 0;
+const waiting: (() => void)[] = [];
+export class Busy extends Error {}
+async function scrypt(pw: string, salt: Buffer, len: number, opts: object): Promise<Buffer> {
+  if (hashing >= HASH_CONCURRENCY) {
+    if (waiting.length >= HASH_QUEUE) throw new Busy('busy');
+    await new Promise<void>((r) => waiting.push(r)); // the finishing hash hands its slot over (hashing unchanged)
+  } else hashing++;
+  try { return await scryptRaw(pw, salt, len, opts); } finally { const next = waiting.shift(); if (next) next(); else hashing--; }
+}
+/** Response for a request refused because the hashing queue is full. */
+export const busyResponse = () => json({ error: 'Serveur occupé, réessayez dans un instant.' }, 503, { 'retry-after': '5' });
+/** Test hook: hashes running and waiting. */
+export const hashLoad = () => ({ running: hashing, waiting: waiting.length });
 const SCRYPT = { N: 16384, r: 8, p: 1, maxmem: 64 * 1024 * 1024 };
 export const SESSION_COOKIE = 'adz_session';
 const SESSION_DAYS = 30;

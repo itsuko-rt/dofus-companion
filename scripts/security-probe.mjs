@@ -30,6 +30,22 @@ log('javascript: build url kept', listA.characters[0]?.builds.length);
 log('no session list', (await call('/api/characters')).status);
 log('forged cookie list', (await call('/api/characters', { headers: { cookie: 'adz_session=AAAA' } })).status);
 
+
+// IDOR by overwrite: B PUTs the same character id; A's copy must be untouched (rows are keyed by owner + id)
+await call('/api/characters/cprobe', { method: 'PUT', headers: { cookie: A }, body: JSON.stringify({ ...ch, name: 'A-original', updatedAt: new Date().toISOString() }) });
+const over = await call('/api/characters/cprobe', { method: 'PUT', headers: { cookie: Bc }, body: JSON.stringify({ ...ch, name: 'B-hijack', updatedAt: new Date(Date.now() + 864e5).toISOString() }) });
+const aAfter = await (await call('/api/characters', { headers: { cookie: A } })).json();
+log('B PUT same id (creates B own copy)', over.status + '; A name after: ' + JSON.stringify(aAfter.characters.find((c) => c.id === 'cprobe')?.name));
+log('A delete-account without password', (await call('/api/auth/delete', { method: 'POST', headers: { cookie: A }, body: '{}' })).status);
+log('B delete-account with A cookie but B password (wrong owner)', (await call('/api/auth/delete', { method: 'POST', headers: { cookie: A }, body: JSON.stringify({ password: 'not-' + pw }) })).status);
+// logout really ends the session (the old cookie value is refused afterwards)
+const lc = cookieOf(await call('/api/auth/login', { method: 'POST', body: JSON.stringify({ email: ea, password: pw }) }));
+log('logout', (await call('/api/auth/logout', { method: 'POST', headers: { cookie: lc } })).status);
+log('old cookie after logout -> characters', (await call('/api/characters', { headers: { cookie: lc } })).status);
+log('logout from evil origin', (await call('/api/auth/logout', { method: 'POST', headers: { cookie: A, origin: 'https://evil.example' } })).status);
+log('reset with forged token', (await call('/api/auth/reset', { method: 'POST', body: JSON.stringify({ token: 'x'.repeat(43), password: pw }) })).status);
+log('register weak password', (await call('/api/auth/register', { method: 'POST', body: JSON.stringify({ email: 'w' + ea, password: 'short' }) })).status);
+
 // CSRF / CORS
 log('PUT from evil origin', (await call('/api/characters/cprobe', { method: 'PUT', headers: { cookie: A, origin: 'https://evil.example' }, body: JSON.stringify(ch) })).status);
 const pre = await call('/api/characters/cprobe', { method: 'OPTIONS', headers: { origin: 'https://evil.example', 'access-control-request-method': 'PUT' } });

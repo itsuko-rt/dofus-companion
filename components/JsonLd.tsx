@@ -1,4 +1,6 @@
-// Structured data block. JSON is escaped so a "</script>" in game text cannot break out.
+import { jsonLdText } from '../src/jsonld.ts';
+
+// Structured data block, escaped by jsonLdText (tests/security.test.ts).
 export default function JsonLd({ data }: { data: object }) {
-  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(data).replace(/</g, '\u003c') }} />;
+  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLdText(data) }} />;
 }

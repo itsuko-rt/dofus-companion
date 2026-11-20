@@ -23,7 +23,7 @@ export default function Page() {
       <PageHero color="var(--color-sec-account)" kicker={BRAND.name} title="Confidentialité et cookies" />
       <article className="mx-auto flex max-w-3xl flex-col gap-6 px-4 py-6 text-sm leading-relaxed text-muted">
         <Breadcrumbs trail={[['Accueil', '/'], ['Confidentialité et cookies', '/confidentialite']]} />
-        <p className="text-xs text-faint">Dernière mise à jour : 19 novembre 2026.</p>
+        <p className="text-xs text-faint">Dernière mise à jour : 20 novembre 2026.</p>
 
         <section>
           <h2 className="mb-1 font-display text-base text-text">En résumé</h2>
@@ -72,6 +72,7 @@ export default function Page() {
           <ul className="list-disc pl-5">
             <li><b className="text-text">Dofus Fashionista</b> : les builds de la communauté sont récupérés par notre serveur ; votre navigateur ne les contacte pas.</li>
             <li><b className="text-text">Dofus Pour Les Noobs</b> : uniquement si vous cliquez sur un lien de tutoriel.</li>
+            <li><b className="text-text">DofusDB et Dofus Maps</b> : uniquement si vous ouvrez leur lien depuis la page Cartes ; le site s’ouvre dans un nouvel onglet, sans transmettre la page d’origine, et ses propres règles de confidentialité s’appliquent.</li>
             <li><b className="text-text">Tesseract.js / jsDelivr</b> : uniquement si vous utilisez le scanner.</li>
           </ul>
         </section>
