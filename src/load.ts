@@ -186,18 +186,28 @@ export const loadAchievements = (path: string, categoryIds: number[]) => withDb(
   if (!ids.length) return [];
   const rows = db.prepare(
     `SELECT id, name, description, level, points, category_id, rewards FROM achievement WHERE category_id IN (${ids.map(() => '?').join(',')}) ORDER BY level, name`).all(...ids) as Record<string, any>[];
-  const obj = db.prepare('SELECT id, name, criterion_raw AS criterion FROM achievement_objective WHERE achievement_id = ? ORDER BY ordinal');
-  const guide = db.prepare('SELECT site, url, checked_at FROM achievement_guide WHERE achievement_id = ? LIMIT 1');
+  // one query per table for the whole page (not one per achievement: Donjons has 743)
+  const inCats = `IN (SELECT id FROM achievement WHERE category_id IN (${ids.map(() => '?').join(',')}))`;
+  const objectives = new Map<number, { id: number; name: string; criterion: string }[]>();
+  for (const o of db.prepare(`SELECT achievement_id, id, name, criterion_raw AS criterion FROM achievement_objective WHERE achievement_id ${inCats} ORDER BY achievement_id, ordinal`).all(...ids) as Record<string, any>[]) {
+    const list = objectives.get(o.achievement_id) ?? [];
+    list.push({ id: o.id, name: o.name, criterion: o.criterion });
+    objectives.set(o.achievement_id, list);
+  }
+  const guides = new Map<number, Record<string, any>>();
+  for (const g of db.prepare(`SELECT achievement_id, site, url, checked_at FROM achievement_guide WHERE achievement_id ${inCats}`).all(...ids) as Record<string, any>[]) {
+    if (!guides.has(g.achievement_id)) guides.set(g.achievement_id, g); // first row, like the former LIMIT 1
+  }
   const dofusByAch = new Map<number, string[]>();
   for (const d of db.prepare('SELECT name, achievement_ids FROM dofus').all() as Record<string, any>[]) {
     for (const a of JSON.parse(d.achievement_ids) as number[]) dofusByAch.set(a, [...(dofusByAch.get(a) ?? []), d.name]);
   }
   return rows.map((a): AchievementInfo => {
-    const g = guide.get(a.id) as Record<string, any> | undefined;
+    const g = guides.get(a.id);
     return {
       id: a.id, name: a.name, description: cleanGameText(a.description)?.replace(/\s*\[challenge,\d+\]/g, '') ?? null,
       level: a.level, points: a.points, categoryId: a.category_id,
-      objectives: plainRows(obj.all(a.id)),
+      objectives: objectives.get(a.id) ?? [],
       rewards: mergeRewards(a.rewards),
       guide: g ? { site: g.site, url: g.url, checkedAt: g.checked_at } : null,
       dofus: dofusByAch.get(a.id) ?? [],

@@ -99,7 +99,8 @@ export default function BuildsView() {
   const saved = (id: string) => ch.character.builds.some((b) => b.id === id);
   const control = 'rounded-lg border border-line bg-surface px-3 py-2 text-sm';
 
-  const BuildCard = ({ b }: { b: ApiBuild }) => {
+  // a render function, not a component: a component declared in render remounts every card on each render
+  const buildCard = (b: ApiBuild) => {
     const wearable = b.level <= lvl;
     const isOpen = open === b.id;
     const isSaved = saved(b.id);
@@ -152,7 +153,7 @@ export default function BuildsView() {
     <section className="mt-6">
       <h2 className="font-display text-base font-semibold">{title} <span className="text-sm font-normal text-muted">({builds.length})</span></h2>
       <p className={`mb-3 text-sm ${warn ? 'text-check' : 'text-muted'}`}>{hint}</p>
-      <ul className="grid gap-3 md:grid-cols-2">{builds.map((b) => <li key={b.id}><BuildCard b={b} /></li>)}</ul>
+      <ul className="grid gap-3 md:grid-cols-2">{builds.map((b) => <li key={b.id}>{buildCard(b)}</li>)}</ul>
     </section>
   ) : null;
 

@@ -41,7 +41,8 @@ function load(): Store {
     const c = old ? sanitizeCharacter({ ...JSON.parse(old), name: 'Mon personnage' }, 'c0') : null;
     if (c) return { activeId: c.id, characters: [c], sync: 'local', owner: null };
   } catch { /* private mode or corrupt value: start empty */ }
-  return EMPTY_STORE;
+  // a new object, not EMPTY_STORE: React re-renders only when the snapshot changes, and EMPTY_STORE means "not loaded yet"
+  return { ...EMPTY_STORE };
 }
 
 let store: Store = EMPTY_STORE;
@@ -204,7 +205,7 @@ export function useCharacter() {
   };
 
   return {
-    ready: loaded,
+    ready: s !== EMPTY_STORE,
     sync: s.sync,
     characters: s.characters,
     hasCharacter: active !== null,
