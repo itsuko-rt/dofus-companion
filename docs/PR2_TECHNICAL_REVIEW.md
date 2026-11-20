@@ -284,19 +284,87 @@ The owner approved fixing the pre-merge blockers (§10). The fixes are on `devel
 
 The tests were checked against the old code: with the H1 and H2/H3 production changes reverted, the new real-data tests fail (Almanax test 0/1; level tests 0/2). With the fixes, they pass.
 
-### 12.2 Verification after the fixes (commit below, same machine)
+### 12.2 Verification after the fixes
 
-| Command | Exit | Result |
+Two full runs on the same machine (production build, `next start -p 3101`, Edge, 2 workers):
+- **Run A:** working tree just before commit `25f2a8a`.
+- **Run B:** the committed `25f2a8a` itself, clean tree (`git status` empty).
+
+| Command | Run A | Run B (commit `25f2a8a`) |
 |---|---|---|
-| `npm run typecheck` | 0 | clean |
-| `npm test` | 0 | **90 / 90** pass, 0 skipped (88 before + 2 new real-data tests; other new checks extend existing tests) |
-| `npm run build` | 0 | compiled, all routes generated |
-| `E2E_BASE_URL=http://127.0.0.1:3101 npx playwright test` (desktop + mobile, 2 workers) | 0 | **47 passed, 1 skipped, 0 failed** (4.1 min). The skip is the pre-existing desktop-only class test on mobile. |
-| `PRAGMA integrity_check` | — | ok |
-| Reference checks (drops, recipes, ingredients, bosses, Almanax items) | — | 0 dangling, unchanged |
-| Server log during E2E | — | no error |
+| `npm run typecheck` | exit 0 | exit 0 |
+| `npm test` | exit 0: 90 tests, 90 pass, 0 fail, 0 skipped | exit 0: 90 tests, 90 pass, 0 fail, 0 skipped |
+| `npm run build` | exit 0 | exit 0 |
+| `E2E_BASE_URL=http://127.0.0.1:3101 npx playwright test` (desktop + mobile) | exit 0: **47 passed, 1 skipped, 0 failed**, 4.1 min | exit 0: **47 passed, 1 skipped, 0 failed**, 5.4 min |
+| Sitemap batches (12 tests) | 7.4–45.9 s each | 18.2–53.9 s each (budget 120 s) |
+| Server log during E2E | no error | no error |
+| `PRAGMA integrity_check` | ok | ok (database not rewritten) |
+| Reference checks (drops, recipes, ingredients, bosses, Almanax items) | 0 dangling | 0 dangling |
 
-No dependency was added (`package.json` unchanged). No new SQL was written with user input: the only new SQL is constant (`NULLIF`), and the race filter runs in JavaScript on game data.
+The one skip is the pre-existing `class-aware progression` test on the **mobile** project (`e2e/ui.spec.ts:216`). It skips itself on mobile by design and runs on desktop, where it passed.
+
+Unit tests: 88 before the fixes, plus 2 new tests: the season-tie unit test (`tests/almanax.test.ts`) and the real-data Almanax season test (`tests/data.test.ts`). The H2 and H3 checks extend the existing level-page and craft-demand tests.
+
+The final commit after `25f2a8a` adds:
+- a summons assertion to the level-page test;
+- the review documents;
+- a whitespace fix in `src/zones.ts` (`=(` → `= (`).
+
+On that final tree: `npm run typecheck` exit 0, `npm test` exit 0 with 90/90. Build and E2E were not re-run, because no runtime code changed.
+
+No dependency was added (`package.json` and the lockfile are unchanged). The only new SQL is constant (`NULLIF`), and the race filter runs in JavaScript on game data, so no user input reaches a new query.
+
+### 12.2b Detailed confirmations
+
+**Almanax coverage (H1).** The real-data test `Almanax season entries never replace the day's own offering` walks 730 consecutive days, 1 January 2026 → 31 December 2027 (365 + 365, neither year is a leap year). For each day it:
+- checks the winner against the calendar itself: an exact-year entry if one exists, otherwise the day's own single-date entry. All 730 days have one, so none is left unchecked;
+- checks that the offering is not repeated as a period bonus.
+
+It also checks:
+- 1 March and 21 December 2026 by name, with every competing season present among the period bonuses;
+- 15 January 2026, where a month-wide season stays a period bonus;
+- the 122 competing days of 2026, the 81 that were wrong before among them.
+
+No expected offering is written into production code; the only literal item name is one assertion in the test (1 March).
+
+**Monsters (H2).**
+- *Summons:* `NOT_REGULAR` matches all 25 "Invocations…" race names of the data (285 monsters). No summon was placed in a world-map zone in 3.7.14.18, so for summons the rule is preventive. A test asserts every summon race is matched and no summon appears in a zone list.
+- *Ordinary monsters remain:* Bouftou is in "Coin des Bouftous" with a known XP, and the zone is found at level 26 ± 5 (Bouftou grades: 22–30 in the data).
+- *No records deleted:* the exclusion is a read-time filter in `loadZoneData`. No import script changed, and `data/game-3.7.14.18.sqlite` was not rewritten (last modified 2026-11-20 09:49, before the review). Counts are unchanged: monster 5,135, grades 26,851, drops 13,567, monster zones 3,305, Almanax 376, items 21,622, recipes 4,743. 3,395 monsters of the excluded races are still in the database.
+
+**H3: what was changed and what was deliberately not.** H3 *was* fixed: the ranking now sees every unconditional drop. The brief also suggested computing ranking candidates server-side to avoid a bigger payload. That variant was measured and **not** adopted:
+
+| `/api/zones` payload (3.7.14.18, after the H2 exclusions) | Raw | Gzip | Drop entries |
+|---|---|---|---|
+| All unconditional drops (chosen) | 355 KB | 47 KB | 1,671 |
+| Top 3 per monster (old behaviour, wrong ranking) | 343 KB | 46 KB | 1,455 |
+| Top 3 + only drops used by recipes (server-side variant) | 345 KB | 47 KB | 1,500 |
+| Before this PR's fixes (top 3, races included) | 469 KB | 64 KB | — |
+
+The server-side variant saves 10 KB raw and under 1 KB gzipped, but needs a second data shape and code path. The chosen version is simpler, and its payload is still 114 KB smaller than before the fixes. Zone loot display keeps its limit (8 per zone).
+
+**E2E bottleneck (M9).** Measured with one browser on the production build, crawling the 180 sitemap pages the way the test does:
+
+| Run | Desktop | Mobile | Notes |
+|---|---|---|---|
+| Server only (HTML fetch, all 180 pages) | 13.2 s total | | slowest 298 ms (`/guides/quetes/ile-de-nowel`) |
+| Browser crawl, run 1 | 65.1 s (mean 362 ms) | 87.3 s (mean 485 ms) | spikes of 2–5 s on profession pages |
+| Browser crawl, run 2, quest-graph prefetch blocked | 88.1 s | 50.7 s | spikes moved to other pages |
+| Profession pages alone | 76–277 ms each | | spikes are not the page itself |
+| Old single test in the full suite (2 workers) | timed out at 240 s | 3.9 min (just under 240 s) | |
+| 6 batches in the full suite | 12.8–45.9 s per batch | 7.4–45.9 s per batch | budget 120 s each |
+
+Conclusions:
+- The cost is browser time (navigation and hydration), not the server.
+- It varies by up to about ±40% between identical runs on this machine.
+- The idle quest-graph prefetch is not the cause.
+
+One 180-page test under parallel load therefore had no safety margin. Six batches of `ceil(180 / 6) = 30` pages each:
+- run in parallel and keep every page on desktop and mobile;
+- grow with the sitemap, so no page can fall out;
+- stay at most 46 s against a 120 s budget, a margin of more than 2.5×.
+
+Raising the single test's timeout would have hidden the variance instead of reducing it, and retries or skips were ruled out.
 
 ### 12.3 Status of every finding
 

@@ -19,10 +19,14 @@ The owner asked for trustworthy data before merging PR #2 and before building th
 `src/almanax-shared.ts`, `src/zones.ts`, `src/zones-shared.ts`, `components/progression/LevelView.tsx`, `e2e/ui.spec.ts`, `tests/almanax.test.ts`, `tests/data.test.ts`, `docs/PR2_TECHNICAL_REVIEW.md`, `docs/GAME_DATA_INVENTORY.md`, [[Current Status]], [[Feature Backlog]].
 
 ## Tests performed and results
-- Typecheck clean. `npm test` 90/90. Build OK.
-- E2E: 47 passed, 1 skipped (mobile skip by design), 0 failed.
-- Integrity check ok; 0 dangling references.
+Two full runs, the second on the clean commit `25f2a8a`:
+- Typecheck exit 0. `npm test` 90/90. Build exit 0.
+- E2E: 47 passed, 1 skipped (mobile skip by design), 0 failed, 4.1 and 5.4 min. Sitemap batches took at most 53.9 s against a 120 s budget.
+- Integrity check ok; 0 dangling references; database not rewritten, counts unchanged.
 - The new real-data tests fail on the old code and pass on the new.
+- The Almanax test covers all 730 days of 2026–2027, including 21 December and the period bonuses.
+- Summons: all 25 "Invocations…" races are matched, and no summon appears in a zone (preventive in 3.7.14.18: none was placed in a world zone).
+- Exact commands and both runs: `docs/PR2_TECHNICAL_REVIEW.md` §12.2; H3 payload and E2E measurements: §12.2b.
 
 ## Remaining issues
 - **Not verified in game:** monster XP meaning (M6), the profession progress % (M5).

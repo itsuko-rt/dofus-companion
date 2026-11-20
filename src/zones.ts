@@ -7,7 +7,7 @@ export * from './zones-shared.ts';
  *  (quests, achievements and item sources still use them); only the level page's zone lists leave them out. */
 export const NOT_REGULAR = /^(Archimonstres|Monstres de quête|Avis de recherche|Dopeuls|Invocations)/;
 
-export const loadZoneData =(path: string) => withDb(path, (db): ZoneData | null => {
+export const loadZoneData = (path: string) => withDb(path, (db): ZoneData | null => {
   if (!db.prepare("SELECT 1 FROM sqlite_master WHERE name = 'activity'").get()) return null; // creatures import not run
   const all = <T>(sql: string) => (db.prepare(sql).all() as Record<string, any>[]).map((r) => ({ ...r })) as T[];
   const version = (db.prepare('SELECT id FROM game_version').get() as { id: string }).id;

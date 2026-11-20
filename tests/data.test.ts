@@ -122,6 +122,11 @@ test('real data: level suggestions, zones and dungeons for a level come only fro
   // the excluded races exist in those zones in the game data (so the rule is doing something) and stay in the database
   assert.ok([...race.values()].filter((r) => NOT_REGULAR.test(r)).length > 1000);
   assert.equal(race.size, 5135);
+  // summons: every "Invocations…" race is matched (285 monsters in 3.7.14.18), and none appears in a zone list
+  const summons = [...race].filter(([, r]) => r.startsWith('Invocations'));
+  assert.ok(summons.length > 200 && summons.every(([, r]) => NOT_REGULAR.test(r)));
+  const shown = new Set(data.zones.flatMap((z) => z.monsters.map((m) => m.id)));
+  assert.ok(summons.every(([id]) => !shown.has(id)));
   // ordinary monsters remain: Bouftous live in "Coin des Bouftous" with a known base XP
   const coin = data.zones.find((z) => z.name === 'Coin des Bouftous')!;
   assert.ok(coin.monsters.some((m) => m.name === 'Bouftou' && m.xpMax != null && m.xpMax > 0));
