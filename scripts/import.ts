@@ -10,6 +10,7 @@ import { renderObjective } from '../src/objectives.ts';
 import { matchGuides } from '../src/guides.ts';
 import { statSync } from 'node:fs';
 import { importProfessions, PROFESSION_FILES } from './professions-import.ts';
+import { importCreatures, CREATURE_FILES } from './creatures-import.ts';
 
 const REPO = 'ledouxm/dofus-sqlite';
 const FILES = [
@@ -22,6 +23,8 @@ const FILES = [
   'questobjectivesdata', 'questobjectivetypesdata', 'queststeprewardsdata', 'npcsdata', 'subareasdata', 'achievementrewardsdata',
   // professions (scripts/professions-import.ts)
   ...PROFESSION_FILES,
+  // classes, monsters, character XP (scripts/creatures-import.ts)
+  ...CREATURE_FILES,
 ] as const;
 const DPLN_SITEMAP = 'https://www.dofuspourlesnoobs.com/sitemap.xml';
 // Items and sets come from dofusdude's release of the same game version: dofus-sqlite's JSON
@@ -109,6 +112,9 @@ async function main() {
       status TEXT NOT NULL, checked_at TEXT NOT NULL);
     CREATE TABLE achievement_objective(id INTEGER PRIMARY KEY, achievement_id INTEGER NOT NULL, ordinal INTEGER,
       name TEXT, criterion_raw TEXT);
+    CREATE INDEX achievement_category_idx ON achievement(category_id);
+    CREATE INDEX achievement_objective_ach ON achievement_objective(achievement_id, ordinal);
+    CREATE INDEX achievement_guide_ach ON achievement_guide(achievement_id);
     CREATE TABLE dungeon(id INTEGER PRIMARY KEY, name TEXT, min_level INTEGER, optimal_level INTEGER,
       difficulty INTEGER, entrance_map_id INTEGER, required_objects TEXT);
     CREATE TABLE dungeon_boss(dungeon_id INTEGER, monster_id INTEGER, PRIMARY KEY(dungeon_id, monster_id));
@@ -372,6 +378,7 @@ async function main() {
     [...graph.nodes.values()].map((n) => [n.id, n.kind, n.refId, n.label, n.criterion, n.points ?? null]));
   insert('edge', ['from_node', 'to_node', 'kind'], graph.edges.map((e) => [e.from, e.to, e.kind]));
   console.log('professions', importProfessions(db, rawDir, rel.html_url));
+  console.log('creatures', importCreatures(db, rawDir, rel.html_url));
   db.exec('COMMIT');
   db.close();
 
