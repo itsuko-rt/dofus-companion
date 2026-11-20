@@ -60,11 +60,12 @@ I could not see the Obsidian window (no screen access in this session). Please c
 3. *Templates: Insert template* (command palette) lists the five templates and fills in `{{date}}`.
 
 Also:
-- **The vault lives in a folder the app made for this session.** Deleting the session deletes it. The repository on GitHub is the durable copy. For permanent use, clone it to a folder of your choice and open that `knowledge/` folder as the vault (on Windows, run `git config core.longpaths true` first).
-- This work is on branch docs/obsidian-setup and not yet merged or pushed.
+- **Permanent location (since 2026-11-20):** the repository is cloned to `Documents\Atlas-des-Douze` on the owner's PC (with `core.longpaths true`). Obsidian's only registered vault is its `knowledge` folder. The local-only files (`data/`, `public/ankama/`) were copied there; they are git-ignored. The first copy, in a temporary Claude session folder, is no longer used.
+- `.gitattributes` keeps the vault in LF line endings, so Obsidian's rewrites of `.obsidian/*.json` no longer show as changes on Windows.
+- The setup commit reached `main` through PR #1. Later commits (line endings, this location note) are on branch docs/obsidian-setup until merged.
 
 ## 9. How to open and use the vault
-- **Open it:** start Obsidian. It reopens `knowledge` automatically; to switch vaults, use the vault icon at the bottom left.
+- **Open it:** start Obsidian. It reopens `Documents\Atlas-des-Douze\knowledge` automatically; to switch vaults, use the vault icon at the bottom left.
 - **Start here:** [[Home]] (also bookmarked).
 - **New note from a template:** create a note, then run *Templates: Insert template* from the command palette (Ctrl+P).
 - **Find by label:** open `Research.base`, or search `verification: COMMUNITY`.

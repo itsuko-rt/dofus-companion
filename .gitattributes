@@ -1,0 +1,2 @@
+# Obsidian writes LF; keep the vault LF on every OS so its files never show as modified
+knowledge/** text eol=lf
