@@ -110,4 +110,7 @@ body {
 /* content that arrives after a fetch fades in instead of popping (opacity only, no layout shift) */
 @keyframes appear { from { opacity: 0; } to { opacity: 1; } }
 .appear { animation: appear 160ms ease-out both; }
+/* mobile drawers slide in from the left */
+@keyframes drawer-in { from { transform: translateX(-100%); } to { transform: none; } }
+.drawer-in { animation: drawer-in 200ms ease-out both; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0s !important; animation-duration: 0s !important; } }

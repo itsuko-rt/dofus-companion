@@ -1,28 +1,38 @@
 'use client';
 // Achievement journal. A first-time visitor lands on "Pour vous" (what to confirm, what is nearly done, what fits the
-// class and level, each with its reason); categories are grouped into families (main progression first, Temporis and
-// events apart); one search covers names, objectives (monsters, quests, places), dungeons and categories.
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Compass, History, LayoutList, ScanLine, Search, Sparkles, Trophy, X } from 'lucide-react';
+// class and level, each with its reason); categories are grouped into collapsible families (main progression first,
+// Temporis and events apart); one search covers names, objectives (monsters, quests, places), dungeons and categories.
+// Wide screens (≥ 1280 px) show the selected achievement in a side panel; narrower ones unfold it under its entry,
+// and the category list becomes a drawer on phones.
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { ChevronDown, CircleDashed, Compass, History, LayoutList, MousePointerClick, ScanLine, Search, Shield, Sparkles, Star, TrendingUp, Trophy, X, type LucideIcon } from 'lucide-react';
 import { SUPPORTED_BREEDS } from '../breeds';
 import { classAchievements } from '../../src/class-quests.ts';
 import type { AchievementCategory, AchievementInfo, AchievementMatch } from '../../src/load.ts';
 import { achievementProgress, type AchievementState } from '../../src/achievements.ts';
-import { DISPLAY, FAMILIES, ROOT_HINT, displayState, familyOf, isLevelOnly, recommend, rootOrder, type AchNode, type AchProgress, type Rec } from '../../src/achievement-guide.ts';
+import { DISPLAY, FAMILIES, ROOT_HINT, displayState, familyOf, isLevelOnly, recommend, rootOrder, type AchNode, type AchProgress, type DisplayState, type Family, type Rec } from '../../src/achievement-guide.ts';
 import type { HistoryEntry } from '../../src/character.ts';
 import { useAchievementProgress } from './useAchievementProgress';
-import AchievementCard, { type CardCtx } from './AchievementCard';
-import { Button, ButtonLink, EmptyState, PageHero, ProgressBar, SECTION } from '../ui';
+import AchievementCard, { AchievementDetails, Emblem, rootIcon, type CardCtx } from './AchievementCard';
+import { Button, ButtonLink, EmptyState, ProgressBar } from '../ui';
 
 type View = { kind: 'foryou' } | { kind: 'cat'; root: number; sub: number | null };
 type Filter = 'all' | AchievementState;
 type Sort = 'level' | 'progress' | 'points';
+type Count = { done: number; total: number; points: number; maxPoints: number };
+type CardFn = (a: AchievementInfo, extra?: { path?: boolean; note?: string }) => ReactNode;
 const FILTERS: { id: Filter; label: string }[] = [
   { id: 'all', label: 'Tous' }, { id: 'not_started', label: 'À faire' }, { id: 'in_progress', label: 'En cours' },
   { id: 'ready', label: 'À confirmer' }, { id: 'obtained', label: 'Obtenus' },
 ];
 const MATCH_LABEL: Record<AchievementMatch, string> = { name: 'nom', dungeon: 'donjon', objective: 'objectif', category: 'catégorie', description: 'description' };
 const PAGE = 100;
+const ZERO: Count = { done: 0, total: 0, points: 0, maxPoints: 0 };
+const fmt = (n: number) => n.toLocaleString('fr-FR');
+const pctOf = (done: number, total: number) => {
+  const x = total ? (done / total) * 100 : 0;
+  return `${x.toLocaleString('fr-FR', { maximumFractionDigits: x > 0 && x < 10 ? 1 : 0 })} %`;
+};
 
 // responses cached for the page's lifetime: going back to a category or a search is instant
 const listCache = new Map<string, Promise<AchievementInfo[]>>();
@@ -54,12 +64,19 @@ const viewFromUrl = (): View => {
 };
 const urlOf = (v: View) => (v.kind === 'cat' ? `?c=${v.root}${v.sub ? `&s=${v.sub}` : ''}` : location.pathname);
 
+const WIDE = '(min-width: 1280px)';
+const subscribeWide = (cb: () => void) => { const m = matchMedia(WIDE); m.addEventListener('change', cb); return () => m.removeEventListener('change', cb); };
+const useWide = () => useSyncExternalStore(subscribeWide, () => matchMedia(WIDE).matches, () => false);
+
 export default function AchievementsView({ categories }: { categories: AchievementCategory[] }) {
   const { graph, ch, index, error, progress, recent } = useAchievementProgress();
+  const wide = useWide();
   const [view, setView] = useState<View>({ kind: 'foryou' });
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState<number | null>(null);
-  const [navOpen, setNavOpen] = useState(false); // mobile category picker
+  const [openA, setOpenA] = useState<AchievementInfo | null>(null); // the opened entry, when it was clicked (saves a fetch)
+  const [navOpen, setNavOpen] = useState(false); // mobile category drawer
+  const [collapsed, setCollapsed] = useState<Set<Family>>(() => new Set(['seasonal']));
 
   // the view lives in the URL (?c=root&s=sub) so the browser's back button moves between categories
   useEffect(() => {
@@ -92,18 +109,25 @@ export default function AchievementsView({ categories }: { categories: Achieveme
       .filter((f) => f.roots.length);
   }, [categories, childrenOf]);
 
-  // progress per category (sub-category ids) and per root
-  const counts = useMemo(() => {
-    const m = new Map<number, { done: number; total: number; points: number }>();
-    const bump = (k: number, done: boolean, pts: number) => { const c = m.get(k) ?? { done: 0, total: 0, points: 0 }; c.total++; if (done) { c.done++; c.points += pts; } m.set(k, c); };
+  // progress per category (sub-category ids), per root and overall (-1)
+  const { counts, ready } = useMemo(() => {
+    const m = new Map<number, Count>();
+    let ready = 0;
+    const bump = (k: number, done: boolean, pts: number) => {
+      const c = m.get(k) ?? { ...ZERO };
+      c.total++; c.maxPoints += pts;
+      if (done) { c.done++; c.points += pts; }
+      m.set(k, c);
+    };
     for (const [id, p] of progress) {
       const pts = graph?.nodes.get(`ach:${id}`)?.points ?? 0;
       const done = p.state === 'obtained';
+      if (p.state === 'ready') ready++;
       bump(p.category, done, pts);
       if (rootOf(p.category) !== p.category) bump(rootOf(p.category), done, pts);
-      bump(-1, done, pts); // everything
+      bump(-1, done, pts);
     }
-    return m;
+    return { counts: m, ready };
   }, [progress, graph, rootOf]);
 
   const classReasons = useMemo(() => {
@@ -142,89 +166,57 @@ export default function AchievementsView({ categories }: { categories: Achieveme
     go({ kind: 'cat', root: r, sub: r === cat ? null : cat }, achId);
   }, [progress, rootOf, go]);
 
-  const ctx: CardCtx | null = graph ? { graph, progress: ch.progress, setMark: ch.setMark, goTo, provenance } : null;
-  const card = (a: AchievementInfo, extra: { path?: boolean; note?: string } = {}) => {
-    const p = progress.get(a.id) ?? achievementProgress(a.id, [], ch.progress);
-    return (
-      <AchievementCard key={a.id} a={a} p={p} display={displayState(p.state, a.level, ch.character.level, ch.hasCharacter)}
-        path={extra.path ? pathOf(a.categoryId) : undefined} note={extra.note}
-        open={open === a.id} onToggle={() => setOpen(open === a.id ? null : a.id)} ctx={ctx!} />
-    );
-  };
-
-  const all = counts.get(-1) ?? { done: 0, total: 0, points: 0 };
-  const hero = (
-    <PageHero color={SECTION.achievements} kicker="Journal de l’aventurier" title={<span className="inline-flex items-center gap-3"><Trophy size={26} className="text-[#ffe2a6]" aria-hidden /> Succès</span>}>
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="min-w-56 flex-1">
-          <p className="text-sm text-white/85">{ch.hasCharacter ? `${ch.character.name} · niv. ${ch.character.level}${classReasons.breed ? ` · ${classReasons.breed.name}` : ''}` : 'Aucun personnage : la progression reste dans ce navigateur.'}</p>
-          {all.total > 0 && (
-            <div className="mt-2 max-w-md">
-              <p className="mb-1 text-xs text-white/75"><b className="text-white">{all.done}</b> obtenus sur {all.total} · <b className="text-white">{all.points}</b> points</p>
-              <ProgressBar value={all.done} max={all.total} label={`${all.done} succès obtenus sur ${all.total}`} />
-            </div>
-          )}
-        </div>
-        <ButtonLink href="/progression/scan" variant="primary"><ScanLine size={16} aria-hidden /> Scanner ma progression</ButtonLink>
-      </div>
-    </PageHero>
+  const all = counts.get(-1) ?? ZERO;
+  const loaded = !error && !!graph && !!index;
+  const header = (
+    <Dashboard loaded={loaded} all={all} ready={ready} query={query} setQuery={setQuery}
+      who={ch.hasCharacter ? `${ch.character.name} · niveau ${ch.character.level}${classReasons.breed ? ` · ${classReasons.breed.name}` : ''}` : 'Aucun personnage : la progression reste dans ce navigateur.'} />
   );
   // the title is server-rendered even while the data loads (search engines, screen readers)
-  if (error || !graph || !index || !ctx) return (
+  if (!loaded) return (
     <div className="h-full overflow-y-auto">
-      {hero}
-      <p className="p-8 text-sm text-muted">{error ? `Impossible de charger les succès : ${error}` : 'Chargement des succès…'}</p>
+      {header}
+      <div className="mx-auto max-w-[1500px] px-4 py-6">
+        {error ? <p className="text-sm text-muted">Impossible de charger les succès : {error}</p> : <ListSkeleton label="Chargement des succès…" />}
+      </div>
     </div>
+  );
+
+  const ctx: CardCtx = { graph, progress: ch.progress, setMark: ch.setMark, goTo, provenance };
+  const pOf = (a: AchievementInfo) => progress.get(a.id) ?? achievementProgress(a.id, [], ch.progress);
+  const dOf = (a: AchievementInfo): DisplayState => displayState(pOf(a).state, a.level, ch.character.level, ch.hasCharacter);
+  const detail = (a: AchievementInfo, onClose?: () => void) => (
+    <AchievementDetails a={a} p={pOf(a)} display={dOf(a)} root={rootName(a.categoryId)} where={pathOf(a.categoryId)} ctx={ctx} onClose={onClose} inline={!onClose} />
+  );
+  const card: CardFn = (a, extra = {}) => (
+    <AchievementCard key={a.id} a={a} p={pOf(a)} display={dOf(a)} root={rootName(a.categoryId)}
+      path={extra.path ? pathOf(a.categoryId) : undefined} note={extra.note} open={open === a.id} inline={!wide}
+      onToggle={() => { if (open === a.id) setOpen(null); else { setOpen(a.id); setOpenA(a); } }}
+      details={!wide && open === a.id ? detail(a) : null} />
   );
 
   const current = view.kind === 'cat' ? byId.get(view.root)?.name ?? 'Catégorie' : 'Pour vous';
   const nav = (
-    <nav aria-label="Catégories de succès" className="flex flex-col gap-4">
-      <button onClick={() => go({ kind: 'foryou' })} aria-current={view.kind === 'foryou' ? 'page' : undefined}
-        className={`flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium ${view.kind === 'foryou' ? 'bg-accent/15 text-text ring-1 ring-accent/50' : 'text-muted hover:bg-surface hover:text-text'}`}>
-        <Sparkles size={16} className="text-accent" aria-hidden /> Pour vous
-      </button>
-      {families.map((f) => (
-        <div key={f.id}>
-          <h2 className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wider text-faint">{f.label}</h2>
-          <ul className="flex flex-col gap-0.5">
-            {f.roots.map((c) => {
-              const n = counts.get(c.id) ?? { done: 0, total: 0, points: 0 };
-              const active = view.kind === 'cat' && view.root === c.id;
-              return (
-                <li key={c.id}>
-                  <button onClick={() => go({ kind: 'cat', root: c.id, sub: null })} aria-current={active ? 'page' : undefined}
-                    className={`w-full rounded-lg px-3 py-1.5 text-left text-sm ${active ? 'bg-surface-2 text-text' : 'text-muted hover:bg-surface hover:text-text'}`}>
-                    <span className="flex justify-between gap-2"><span>{c.name}</span><span className="text-xs tabular-nums text-faint">{n.done}/{n.total}</span></span>
-                    <ProgressBar value={n.done} max={n.total} className="mt-1 !h-1" label={`${c.name} : ${n.done} sur ${n.total}`} />
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      ))}
-    </nav>
+    <CategoryNav families={families} counts={counts} view={view} go={go}
+      collapsed={collapsed} toggle={(f) => setCollapsed((s) => { const n = new Set(s); if (n.has(f)) n.delete(f); else n.add(f); return n; })} />
   );
 
   return (
     <div className="h-full overflow-y-auto">
-      {hero}
-      <div className="mx-auto grid max-w-7xl gap-6 px-4 py-5 md:grid-cols-[240px_minmax(0,1fr)]">
-        {/* desktop: the whole map of categories stays visible */}
-        <aside className="hidden md:block"><div className="sticky top-4">{nav}</div></aside>
+      {header}
+      <div className="mx-auto grid max-w-[1500px] gap-5 px-4 py-5 md:grid-cols-[228px_minmax(0,1fr)] xl:grid-cols-[228px_minmax(0,1fr)_minmax(340px,400px)]">
+        {/* desktop: the whole map of categories stays at hand */}
+        <aside className="hidden md:block">
+          <div className="sticky top-4 max-h-[calc(100dvh-8rem)] overflow-y-auto pb-4 pr-1">{nav}</div>
+        </aside>
 
         <div className="min-w-0">
-          <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center">
-            {/* mobile: one button opens the category list instead of a shrunk sidebar */}
-            <button className="flex items-center justify-between gap-2 rounded-lg border border-line bg-surface px-3 py-2.5 text-sm md:hidden"
-              aria-expanded={navOpen} aria-controls="ach-nav-mobile" onClick={() => setNavOpen(!navOpen)}>
-              <span className="flex items-center gap-2"><LayoutList size={16} aria-hidden /> Parcourir : <b>{current}</b></span>
-              <span className="text-xs text-muted">{navOpen ? 'Fermer' : 'Changer'}</span>
-            </button>
-            <SearchBox value={query} onChange={setQuery} />
-          </div>
-          {navOpen && <div id="ach-nav-mobile" className="appear mb-4 rounded-lg border border-line bg-surface p-3 md:hidden">{nav}</div>}
+          {/* phones: one button opens the category drawer */}
+          <button className="mb-4 flex w-full items-center justify-between gap-2 rounded-md border border-line bg-surface px-3 py-2.5 text-sm transition-colors hover:border-faint md:hidden"
+            aria-expanded={navOpen} aria-haspopup="dialog" onClick={() => setNavOpen(true)}>
+            <span className="flex min-w-0 items-center gap-2"><LayoutList size={16} className="shrink-0 text-accent" aria-hidden /> <span className="truncate">Parcourir : <b>{current}</b></span></span>
+            <ChevronDown size={16} className="shrink-0 text-faint" aria-hidden />
+          </button>
 
           {query.trim().length >= 2 ? <SearchResults q={query.trim()} card={card} />
             : view.kind === 'foryou' ? <ForYou recs={recs} card={card} breed={classReasons.breed?.name ?? null} hasCharacter={ch.hasCharacter}
@@ -234,22 +226,89 @@ export default function AchievementsView({ categories }: { categories: Achieveme
                 if (r) go({ kind: 'cat', root: r.id, sub: null });
               }} />
             : <CategoryPanel key={view.root} view={view} cat={byId.get(view.root)} subs={childrenOf.get(view.root) ?? []} counts={counts}
-              progress={progress} level={ch.character.level} hasCharacter={ch.hasCharacter} open={open} card={card}
+              progress={progress} level={ch.character.level} hasCharacter={ch.hasCharacter} open={open} card={card} wide={wide}
               setSub={(sub) => go({ kind: 'cat', root: view.root, sub })} />}
         </div>
+
+        {wide && (
+          <aside aria-label="Succès sélectionné">
+            <div className="sticky top-4 max-h-[calc(100dvh-8rem)] overflow-y-auto pb-4">
+              {open != null ? <DetailPanel key={open} id={open} seed={openA} render={(a) => detail(a, () => setOpen(null))} /> : <PanelHint />}
+            </div>
+          </aside>
+        )}
       </div>
+      {navOpen && <Drawer onClose={() => setNavOpen(false)}>{nav}</Drawer>}
     </div>
   );
 }
 
-function SearchBox({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function Dashboard({ loaded, all, ready, who, query, setQuery }: { loaded: boolean; all: Count; ready: number; who: string; query: string; setQuery: (q: string) => void }) {
   return (
-    <label className="relative flex-1">
+    <header className="relative isolate overflow-hidden border-b border-accent/25 bg-surface">
+      <div aria-hidden className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top_left,color-mix(in_srgb,var(--color-sec-achievements)_38%,transparent),transparent_65%)]" />
+      <div className="mx-auto flex max-w-[1500px] flex-col gap-4 px-4 py-4 lg:flex-row lg:items-center lg:gap-6 lg:py-5">
+        <div className="flex min-w-0 items-center gap-4">
+          <ProgressRing value={all.done} max={all.total} loaded={loaded} />
+          <div className="min-w-0">
+            <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-[#e9c784]">Journal de l’aventurier</p>
+            <h1 className="title-hero text-2xl leading-tight text-white sm:text-[1.75rem]">Succès</h1>
+            <p className="truncate text-xs text-muted">{who}</p>
+          </div>
+        </div>
+        {loaded && (
+          <dl className="grid grid-cols-3 overflow-hidden rounded-md border border-line bg-bg/40 lg:ml-auto">
+            <Stat label="Points" value={fmt(all.points)} sub={`/ ${fmt(all.maxPoints)}`} />
+            <Stat label="Obtenus" value={fmt(all.done)} sub={`/ ${fmt(all.total)}`} />
+            <Stat label="À confirmer" value={fmt(ready)} accent={ready > 0} />
+          </dl>
+        )}
+        <div className={`flex gap-2 lg:w-[24rem] ${loaded ? '' : 'lg:ml-auto'}`}>
+          <SearchBox value={query} onChange={setQuery} disabled={!loaded} />
+          <ButtonLink href="/progression/scan" variant="primary" className="shrink-0 !px-3" title="Scanner ma progression">
+            <ScanLine size={16} aria-hidden /><span className="sr-only sm:not-sr-only">Scanner</span>
+          </ButtonLink>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+function Stat({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent?: boolean }) {
+  return (
+    <div className="border-l border-line px-3 py-2 text-left first:border-l-0">
+      <dt className="text-[10.5px] font-medium uppercase tracking-wider text-faint">{label}</dt>
+      <dd className="truncate leading-tight">
+        <span className={`font-display text-lg tabular-nums ${accent ? 'text-accent' : 'text-text'}`}>{value}</span>
+        {sub && <span className="ml-1 text-[11px] tabular-nums text-faint">{sub}</span>}
+      </dd>
+    </div>
+  );
+}
+
+function ProgressRing({ value, max, loaded }: { value: number; max: number; loaded: boolean }) {
+  const r = 27, c = 2 * Math.PI * r;
+  if (!loaded) return <span className="flex size-16 shrink-0 items-center justify-center rounded-full border-[5px] border-line text-accent"><Trophy size={22} aria-hidden /></span>;
+  return (
+    <div className="relative size-16 shrink-0" role="img" aria-label={`Progression : ${value} succès obtenus sur ${max}`}>
+      <svg viewBox="0 0 64 64" className="size-full -rotate-90" aria-hidden>
+        <circle cx="32" cy="32" r={r} fill="none" stroke="var(--color-line)" strokeWidth="5" />
+        <circle cx="32" cy="32" r={r} fill="none" stroke="var(--color-accent)" strokeWidth="5" strokeLinecap="round"
+          strokeDasharray={c} strokeDashoffset={c * (1 - (max ? value / max : 0))} className="transition-[stroke-dashoffset] duration-700 ease-out" />
+      </svg>
+      <span className="absolute inset-0 flex items-center justify-center font-display text-[13px] text-text">{pctOf(value, max)}</span>
+    </div>
+  );
+}
+
+function SearchBox({ value, onChange, disabled }: { value: string; onChange: (v: string) => void; disabled?: boolean }) {
+  return (
+    <label className="relative min-w-0 flex-1">
       <span className="sr-only">Rechercher un succès, un monstre, un donjon, une quête…</span>
       <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-faint" aria-hidden />
       <input value={value} onChange={(e) => onChange(e.target.value)} onKeyDown={(e) => e.key === 'Escape' && onChange('')}
-        type="search" placeholder="Succès, monstre, donjon, quête…"
-        className="w-full rounded-lg border border-line bg-surface py-2.5 pl-9 pr-9 text-sm placeholder:text-faint focus:border-accent" />
+        type="search" placeholder="Succès, monstre, donjon, quête…" disabled={disabled}
+        className="w-full rounded-md border border-line bg-bg/60 py-2 pl-9 pr-9 text-sm transition-colors placeholder:text-faint hover:border-faint focus:border-accent disabled:opacity-60 [&::-webkit-search-cancel-button]:appearance-none" />
       {value && (
         <button onClick={() => onChange('')} aria-label="Effacer la recherche" className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-faint hover:text-text">
           <X size={15} aria-hidden />
@@ -259,22 +318,146 @@ function SearchBox({ value, onChange }: { value: string; onChange: (v: string) =
   );
 }
 
-function SearchResults({ q, card }: { q: string; card: (a: AchievementInfo, extra?: { path?: boolean; note?: string }) => React.ReactNode }) {
-  const [hits, setHits] = useState<Hit[] | null>(null);
+function CategoryNav({ families, counts, view, go, collapsed, toggle }: {
+  families: { id: Family; label: string; roots: AchievementCategory[] }[]; counts: Map<number, Count>; view: View;
+  go: (v: View) => void; collapsed: Set<Family>; toggle: (f: Family) => void;
+}) {
+  return (
+    <nav aria-label="Catégories de succès" className="flex flex-col gap-4 text-sm">
+      <button onClick={() => go({ kind: 'foryou' })} aria-current={view.kind === 'foryou' ? 'page' : undefined}
+        className={`relative flex items-center gap-2.5 rounded-md px-2.5 py-2 text-left font-medium transition-colors ${view.kind === 'foryou' ? 'bg-accent/12 text-text ring-1 ring-accent/40' : 'text-muted hover:bg-surface hover:text-text'}`}>
+        <Sparkles size={15} className="text-accent" aria-hidden /> Pour vous
+      </button>
+      {families.map((f) => {
+        const active = view.kind === 'cat' && f.roots.some((r) => r.id === view.root);
+        const expanded = active || !collapsed.has(f.id);
+        return (
+          <div key={f.id}>
+            <button onClick={() => toggle(f.id)} aria-expanded={expanded} disabled={active}
+              className="flex w-full items-center gap-1.5 px-2.5 py-1 text-left text-[11px] font-semibold uppercase tracking-wider text-faint transition-colors enabled:hover:text-muted">
+              <ChevronDown size={12} className={`shrink-0 transition-transform duration-200 ${expanded ? '' : '-rotate-90'}`} aria-hidden />
+              <span className="flex-1 truncate">{f.label}</span>
+            </button>
+            {expanded && (
+              <ul className="mt-1 flex flex-col gap-px">
+                {f.roots.map((c) => {
+                  const n = counts.get(c.id) ?? ZERO;
+                  const on = view.kind === 'cat' && view.root === c.id;
+                  const Icon = rootIcon(c.name);
+                  return (
+                    <li key={c.id}>
+                      <button onClick={() => go({ kind: 'cat', root: c.id, sub: null })} aria-current={on ? 'page' : undefined}
+                        className={`group relative flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left transition-colors ${on ? 'bg-surface-2 text-text' : 'text-muted hover:bg-surface hover:text-text'}`}>
+                        {on && <span className="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-accent" aria-hidden />}
+                        <Icon size={15} strokeWidth={1.75} className={`shrink-0 ${on ? 'text-accent' : 'text-faint group-hover:text-muted'}`} aria-hidden />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate">{c.name}</span>
+                          <span className="mt-1 block h-0.5 overflow-hidden rounded-full bg-line" aria-hidden>
+                            <span className="block h-full bg-done" style={{ width: `${n.total ? (n.done / n.total) * 100 : 0}%` }} />
+                          </span>
+                        </span>
+                        <span className="shrink-0 text-[11px] tabular-nums text-faint">{n.done}/{n.total}</span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        );
+      })}
+    </nav>
+  );
+}
+
+function Drawer({ onClose, children }: { onClose: () => void; children: ReactNode }) {
+  const close = useRef<HTMLButtonElement>(null);
+  useEffect(() => { close.current?.focus(); }, []);
+  return (
+    <div className="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal="true" aria-label="Catégories"
+      onKeyDown={(e) => e.key === 'Escape' && onClose()}>
+      <div className="appear absolute inset-0 bg-black/60" onClick={onClose} aria-hidden />
+      <div className="drawer-in absolute inset-y-0 left-0 flex w-[min(86vw,320px)] flex-col border-r border-line bg-bg shadow-lg">
+        <div className="flex items-center justify-between border-b border-line px-4 py-3">
+          <p className="font-display text-lg">Catégories</p>
+          <button ref={close} onClick={onClose} aria-label="Fermer la liste des catégories" className="rounded p-1.5 text-muted hover:bg-surface hover:text-text"><X size={18} aria-hidden /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-3">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+function DetailPanel({ id, seed, render }: { id: number; seed: AchievementInfo | null; render: (a: AchievementInfo) => ReactNode }) {
+  const [fetched, setFetched] = useState<AchievementInfo | null>(null);
+  const has = seed?.id === id;
+  useEffect(() => {
+    if (has) return;
+    let live = true;
+    fetchList(`ids=${id}`).then((l) => live && setFetched(l[0] ?? null), () => {});
+    return () => { live = false; };
+  }, [id, has]);
+  const a = has ? seed : fetched;
+  return a ? render(a) : <div className="h-72 animate-pulse rounded-lg border border-line bg-surface" role="status"><span className="sr-only">Chargement…</span></div>;
+}
+
+function PanelHint() {
+  return (
+    <div className="rounded-lg border border-dashed border-line p-5 text-sm">
+      <p className="flex items-center gap-2 font-display text-base"><MousePointerClick size={16} className="text-accent" aria-hidden /> Choisissez un succès</p>
+      <p className="mt-1 text-muted">Ses objectifs, ce qu’il rapporte et où aller s’affichent ici.</p>
+      <ul className="mt-4 flex flex-col gap-2.5">
+        {(Object.keys(DISPLAY) as DisplayState[]).map((d) => (
+          <li key={d} className="flex items-center gap-3">
+            <Emblem root="" display={d} />
+            <span><b className="font-medium text-text">{DISPLAY[d].label}</b><span className="block text-xs text-muted">{DISPLAY[d].help}</span></span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-4 text-[11px] text-faint">« Plus tard » : niveau du succès supérieur au vôtre de plus de 10. Ce n’est pas un verrou du jeu.</p>
+    </div>
+  );
+}
+
+function ListSkeleton({ rows = 6, label = 'Chargement…' }: { rows?: number; label?: string }) {
+  return (
+    <div role="status">
+      <span className="sr-only">{label}</span>
+      <ul aria-hidden className="divide-y divide-line/70 overflow-hidden rounded-lg border border-line bg-surface/70">
+        {Array.from({ length: rows }, (_, i) => (
+          <li key={i} className="flex items-center gap-3 px-4 py-3">
+            <span className="size-10 shrink-0 animate-pulse rounded-md bg-surface-2" />
+            <span className="flex flex-1 flex-col gap-2">
+              <span className="h-3 animate-pulse rounded bg-surface-2" style={{ width: `${40 + ((i * 17) % 30)}%` }} />
+              <span className="h-2.5 w-3/5 animate-pulse rounded bg-surface-2/70" />
+            </span>
+            <span className="h-4 w-10 animate-pulse rounded bg-surface-2" />
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+const LIST = 'divide-y divide-line/70 overflow-hidden rounded-lg border border-line bg-surface/70';
+
+function SearchResults({ q, card }: { q: string; card: CardFn }) {
+  const [res, setRes] = useState<{ q: string; hits: Hit[] } | null>(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
     let live = true;
     setFailed(false);
-    const t = setTimeout(() => fetchSearch(q).then((h) => live && setHits(h), () => live && setFailed(true)), 220); // typing pause
+    const t = setTimeout(() => fetchSearch(q).then((hits) => live && setRes({ q, hits }), () => live && setFailed(true)), 220); // typing pause
     return () => { live = false; clearTimeout(t); };
   }, [q]);
   if (failed) return <EmptyState title="La recherche n’a pas pu aboutir">Réessayez dans un instant.</EmptyState>;
-  if (!hits) return <p className="text-sm text-muted" aria-live="polite">Recherche…</p>;
+  if (!res) return <ListSkeleton rows={4} label="Recherche…" />;
+  const { hits } = res;
   return (
-    <section aria-live="polite">
-      <h2 className="mb-2 font-display text-lg">{hits.length ? `${hits.length}${hits.length === 40 ? '+' : ''} résultat${hits.length > 1 ? 's' : ''} pour « ${q} »` : `Aucun succès pour « ${q} »`}</h2>
+    <section aria-live="polite" className={`flex flex-col gap-3 transition-opacity ${res.q !== q ? 'opacity-60' : ''}`}>
+      <h2 className="font-display text-lg">{hits.length ? `${hits.length}${hits.length === 40 ? '+' : ''} résultat${hits.length > 1 ? 's' : ''} pour « ${res.q} »` : `Aucun succès pour « ${res.q} »`}</h2>
       {hits.length === 0 ? <EmptyState title="Essayez un autre mot">La recherche couvre les noms, les objectifs (monstres, quêtes, lieux), les donjons et les catégories.</EmptyState> : (
-        <ul className="parchment divide-y divide-line overflow-hidden rounded-md border border-[#c4a46e]">
+        <ul className={`appear ${LIST}`} aria-label={`Résultats pour « ${res.q} »`}>
           {hits.map((h) => card(h.achievement, { path: true, note: h.match === 'name' ? undefined : `Trouvé dans : ${MATCH_LABEL[h.match]} « ${h.text.length > 90 ? `${h.text.slice(0, 90)}…` : h.text} »` }))}
         </ul>
       )}
@@ -283,7 +466,7 @@ function SearchResults({ q, card }: { q: string; card: (a: AchievementInfo, extr
 }
 
 function ForYou({ recs, card, breed, hasCharacter, level, started, recent, label, goTo, openCat }: {
-  recs: ReturnType<typeof recommend>; card: (a: AchievementInfo, extra?: { path?: boolean; note?: string }) => React.ReactNode;
+  recs: ReturnType<typeof recommend>; card: CardFn;
   breed: string | null; hasCharacter: boolean; level: number; started: boolean;
   recent: { id: string; at: string }[]; label: (id: string) => string; goTo: (id: number) => void; openCat: (rootName: string) => void;
 }) {
@@ -297,14 +480,18 @@ function ForYou({ recs, card, breed, hasCharacter, level, started, recent, label
     return () => { live = false; };
   }, [key]);
 
-  const block = (title: string, help: string, list: Rec[], empty?: string) => (list.length || empty) ? (
-    <section className="flex flex-col gap-2">
-      <div>
-        <h2 className="font-display text-lg">{title}</h2>
-        <p className="text-xs text-muted">{help}</p>
+  const block = (Icon: LucideIcon, title: string, help: string, list: Rec[], empty?: string) => (list.length || empty) ? (
+    <section className="flex flex-col gap-2.5">
+      <div className="flex items-start gap-3">
+        <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-md border border-accent/30 bg-accent/10 text-accent"><Icon size={16} aria-hidden /></span>
+        <div className="min-w-0 flex-1">
+          <h2 className="font-display text-lg leading-tight">{title}</h2>
+          <p className="text-xs text-muted">{help}</p>
+        </div>
+        {list.length > 0 && <span className="mt-1 rounded-full border border-line px-2 py-0.5 text-[11px] tabular-nums text-faint">{list.length}</span>}
       </div>
-      {list.length === 0 ? <p className="rounded-md border border-dashed border-line px-3 py-2 text-sm text-muted">{empty}</p> : !rows ? <p className="text-sm text-muted">Chargement…</p> : (
-        <ul className="parchment divide-y divide-line overflow-hidden rounded-md border border-[#c4a46e]">
+      {list.length === 0 ? <p className="rounded-md border border-dashed border-line px-3 py-2 text-sm text-muted">{empty}</p> : !rows ? <ListSkeleton rows={Math.min(list.length, 3)} /> : (
+        <ul className={`appear ${LIST}`}>
           {list.map((r) => rows.get(r.id) && card(rows.get(r.id)!, { path: true, note: r.reason }))}
         </ul>
       )}
@@ -312,32 +499,42 @@ function ForYou({ recs, card, breed, hasCharacter, level, started, recent, label
   ) : null;
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-7">
       {!started && (
-        <section className="rounded-lg border border-line bg-surface p-4">
-          <h2 className="mb-2 flex items-center gap-2 font-display text-lg"><Compass size={18} className="text-accent" aria-hidden /> Par où commencer ?</h2>
-          <ol className="flex list-decimal flex-col gap-1 pl-5 text-sm text-muted">
-            <li>Les succès récompensent ce que vous faites déjà : quêtes, zones découvertes, monstres et donjons vaincus.</li>
-            <li>Ouvrez un succès pour voir ses objectifs. Ceux liés à des quêtes se cochent seuls quand vous terminez ces quêtes dans le <a className="underline" href="/progression/quetes">suivi des quêtes</a>.</li>
-            <li>Le reste, seul le jeu le sait : cochez-le vous-même, ou importez une capture avec le scanner.</li>
+        <section className="parchment rounded-lg border border-[#c4a46e] p-4 sm:p-5">
+          <h2 className="mb-3 flex items-center gap-2 font-display text-lg"><Compass size={18} className="text-accent" aria-hidden /> Par où commencer ?</h2>
+          <ol className="grid gap-3 text-sm lg:grid-cols-3">
+            {[
+              'Les succès récompensent ce que vous faites déjà : quêtes, zones découvertes, monstres et donjons vaincus.',
+              <>Ouvrez un succès pour voir ses objectifs. Ceux liés à des quêtes se cochent seuls quand vous terminez ces quêtes dans le <a className="underline" href="/progression/quetes">suivi des quêtes</a>.</>,
+              'Le reste, seul le jeu le sait : cochez-le vous-même, ou importez une capture avec le scanner.',
+            ].map((t, i) => (
+              <li key={i} className="flex gap-2.5">
+                <span className="flex size-6 shrink-0 items-center justify-center rounded-full border border-accent/60 font-display text-xs text-accent">{i + 1}</span>
+                <span className="text-muted">{t}</span>
+              </li>
+            ))}
           </ol>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {['Quêtes', 'Exploration', 'Monstres', 'Donjons'].map((n) => <Button key={n} className="!py-1.5 text-xs" onClick={() => openCat(n)}>{n}</Button>)}
+          <div className="mt-4 flex flex-wrap gap-2">
+            {['Quêtes', 'Exploration', 'Monstres', 'Donjons'].map((n) => {
+              const I = rootIcon(n);
+              return <Button key={n} className="!py-1.5 text-xs" onClick={() => openCat(n)}><I size={14} aria-hidden /> {n}</Button>;
+            })}
           </div>
         </section>
       )}
-      {block('À confirmer', 'Tous les objectifs sont remplis d’après votre progression : vérifiez dans le jeu, puis confirmez.', recs.ready)}
-      {block('Presque terminés', 'Une partie des objectifs est déjà remplie, à 20 niveaux au plus au-dessus du vôtre.', recs.almost)}
-      {breed && block(`Pour votre classe · ${breed}`, 'Liés à votre classe par les données du jeu. Les autres succès restent tous accessibles.', recs.forClass, 'Tous les succès liés à votre classe sont obtenus.')}
-      {block(hasCharacter ? 'À votre niveau' : 'Pour débuter', hasCharacter
+      {block(Star, 'À confirmer', 'Tous les objectifs sont remplis d’après votre progression : vérifiez dans le jeu, puis confirmez.', recs.ready)}
+      {block(CircleDashed, 'Presque terminés', 'Une partie des objectifs est déjà remplie, à 20 niveaux au plus au-dessus du vôtre.', recs.almost)}
+      {breed && block(Shield, `Pour votre classe · ${breed}`, 'Liés à votre classe par les données du jeu. Les autres succès restent tous accessibles.', recs.forClass, 'Tous les succès liés à votre classe sont obtenus.')}
+      {block(TrendingUp, hasCharacter ? 'À votre niveau' : 'Pour débuter', hasCharacter
         ? `Succès non commencés de la progression principale, entre les niveaux ${Math.max(1, level - 10)} et ${Math.max(15, level + 5)} (3 au plus par catégorie).`
         : 'Succès de bas niveau de la progression principale. Créez un personnage pour des suggestions à votre niveau.', recs.forLevel, 'Rien de nouveau à votre niveau dans la progression principale.')}
       {recent.length > 0 && (
         <section>
-          <h2 className="mb-1 flex items-center gap-1.5 font-display text-lg"><History size={16} className="text-muted" aria-hidden /> Derniers obtenus</h2>
-          <ul className="flex flex-col">
+          <h2 className="mb-2 flex items-center gap-2 font-display text-lg"><History size={16} className="text-muted" aria-hidden /> Derniers obtenus</h2>
+          <ul className={LIST}>
             {recent.map((r) => (
-              <li key={r.id}><button onClick={() => goTo(Number(r.id.slice(4)))} className="flex w-full justify-between gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-surface">
+              <li key={r.id}><button onClick={() => goTo(Number(r.id.slice(4)))} className="flex w-full items-center justify-between gap-2 px-4 py-2 text-left text-sm transition-colors hover:bg-surface-2/50">
                 <span className="truncate">{label(r.id)}</span><span className="shrink-0 text-xs text-faint">{new Date(r.at).toLocaleDateString('fr-FR')}</span>
               </button></li>
             ))}
@@ -348,12 +545,11 @@ function ForYou({ recs, card, breed, hasCharacter, level, started, recent, label
   );
 }
 
-function CategoryPanel({ view, cat, subs, counts, progress, level, hasCharacter, open, card, setSub }: {
+function CategoryPanel({ view, cat, subs, counts, progress, level, hasCharacter, open, card, wide, setSub }: {
   view: { root: number; sub: number | null }; cat?: AchievementCategory; subs: AchievementCategory[];
-  counts: Map<number, { done: number; total: number; points: number }>;
+  counts: Map<number, Count>;
   progress: Map<number, { state: AchievementState; met: number; total: number }>;
-  level: number; hasCharacter: boolean; open: number | null;
-  card: (a: AchievementInfo, extra?: { path?: boolean; note?: string }) => React.ReactNode; setSub: (sub: number | null) => void;
+  level: number; hasCharacter: boolean; open: number | null; card: CardFn; wide: boolean; setSub: (sub: number | null) => void;
 }) {
   const [filter, setFilter] = useState<Filter>('all');
   const [atLevel, setAtLevel] = useState(false);
@@ -372,39 +568,51 @@ function CategoryPanel({ view, cat, subs, counts, progress, level, hasCharacter,
   useEffect(() => setLimit(PAGE), [filter, atLevel, sort]);
   useEffect(() => { if (open != null && list) document.getElementById(`ach-${open}`)?.scrollIntoView({ block: 'center' }); }, [open, list]);
 
-  const shown = useMemo(() => {
+  // per-state counts on the filter buttons follow the level filter, so each button says what it will show
+  const { shown, byState } = useMemo(() => {
     const p = (id: number) => progress.get(id);
     const ratio = (id: number) => { const x = p(id); return x?.total ? x.met / x.total : 0; };
-    const out = (list ?? []).filter((a) => (filter === 'all' || p(a.id)?.state === filter) && (!atLevel || a.level <= level + 5));
+    const inLevel = (list ?? []).filter((a) => !atLevel || a.level <= level + 5);
+    const byState = new Map<Filter, number>([['all', inLevel.length]]);
+    for (const a of inLevel) { const s = p(a.id)?.state; if (s) byState.set(s, (byState.get(s) ?? 0) + 1); }
+    const out = inLevel.filter((a) => filter === 'all' || p(a.id)?.state === filter);
     if (sort === 'progress') out.sort((a, b) => Number(p(b.id)?.state === 'ready') - Number(p(a.id)?.state === 'ready') || ratio(b.id) - ratio(a.id) || a.level - b.level);
     else if (sort === 'points') out.sort((a, b) => b.points - a.points || a.level - b.level);
-    return out;
+    return { shown: out, byState };
   }, [list, filter, atLevel, sort, progress, level]);
   // big categories (Donjons: 743) are rendered by pages of 100: all at once cost ~0.9 s of main thread on mobile
   const visible = shown.slice(0, Math.max(limit, shown.findIndex((a) => a.id === open) + 1));
-  const c = counts.get(view.sub ?? view.root) ?? { done: 0, total: 0, points: 0 };
+  const c = counts.get(view.sub ?? view.root) ?? ZERO;
   const name = cat?.name ?? '';
   const subName = subs.find((s) => s.id === view.sub)?.name;
+  const Icon = rootIcon(name);
 
   return (
-    <section aria-labelledby="cat-title" className="flex flex-col gap-3">
-      <header className="flex flex-col gap-2 rounded-lg border border-line bg-surface p-4">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 id="cat-title" className="font-display text-xl">{name}{subName ? <span className="text-muted"> › {subName}</span> : null}</h2>
-          <p className="text-sm text-muted"><b className="text-text tabular-nums">{c.done}</b> / {c.total} obtenus · {c.points} pts</p>
+    <section aria-labelledby="cat-title" className="flex flex-col gap-4">
+      <header className="overflow-hidden rounded-lg border border-line bg-surface">
+        <div className="flex items-start gap-4 p-4 sm:p-5">
+          <span className="diamond mt-1 hidden size-10 shrink-0 items-center justify-center border border-accent/40 bg-accent/10 text-accent sm:flex"><Icon size={19} strokeWidth={1.75} aria-hidden /></span>
+          <div className="min-w-0 flex-1">
+            <h2 id="cat-title" className="font-display text-xl leading-tight">{name}{subName ? <span className="text-muted"> › {subName}</span> : null}</h2>
+            {ROOT_HINT[name] && <p className="mt-0.5 text-sm text-muted">{ROOT_HINT[name]}</p>}
+            <p className="mt-1.5 text-xs tabular-nums text-faint sm:hidden"><b className="text-text">{pctOf(c.done, c.total)}</b> · {c.done}/{c.total} obtenus · {fmt(c.points)}/{fmt(c.maxPoints)} pts</p>
+          </div>
+          <div className="hidden shrink-0 text-right sm:block">
+            <p className="font-display text-xl tabular-nums leading-tight">{pctOf(c.done, c.total)}</p>
+            <p className="text-xs tabular-nums text-faint">{c.done}/{c.total} · {fmt(c.points)}/{fmt(c.maxPoints)} pts</p>
+          </div>
         </div>
-        {ROOT_HINT[name] && <p className="text-sm text-muted">{ROOT_HINT[name]}</p>}
-        <ProgressBar value={c.done} max={c.total} label={`${name} : ${c.done} sur ${c.total}`} />
+        <ProgressBar value={c.done} max={c.total} className="!h-1 !rounded-none" label={`${name} : ${c.done} sur ${c.total}`} />
         {subsWithItems.length > 0 && (
           // chips wrap on desktop and scroll sideways on mobile: every sub-category is one tap away, nothing is clipped
-          <div role="group" aria-label="Sous-catégories" className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 pt-1 sm:flex-wrap sm:overflow-visible">
+          <div role="group" aria-label="Sous-catégories" className="flex gap-1.5 overflow-x-auto border-t border-line bg-bg/30 px-4 py-3 sm:flex-wrap sm:overflow-visible">
             {[{ id: null as number | null, name: 'Toutes' }, ...subsWithItems].map((s) => {
               const n = s.id == null ? null : counts.get(s.id);
               const active = view.sub === s.id;
               return (
                 <button key={s.id ?? 'all'} onClick={() => setSub(s.id)} aria-pressed={active}
-                  className={`shrink-0 rounded-full border px-3 py-1.5 text-xs ${active ? 'border-accent bg-accent/15 text-text' : 'border-line text-muted hover:border-faint hover:text-text'}`}>
-                  {s.name}{n ? <span className="ml-1 tabular-nums text-faint">{n.done}/{n.total}</span> : null}
+                  className={`shrink-0 rounded-full border px-3 py-1 text-xs transition-colors ${active ? 'border-accent/70 bg-accent/15 text-text' : 'border-line text-muted hover:border-faint hover:text-text'}`}>
+                  {s.name}{n ? <span className="ml-1.5 tabular-nums text-faint">{n.done}/{n.total}</span> : null}
                 </button>
               );
             })}
@@ -413,15 +621,17 @@ function CategoryPanel({ view, cat, subs, counts, progress, level, hasCharacter,
       </header>
 
       <div className="flex flex-wrap items-center gap-2">
-        <div role="group" aria-label="Filtrer par état" className="flex flex-wrap gap-1">
+        <div role="group" aria-label="Filtrer par état" className="flex max-w-full gap-0.5 overflow-x-auto rounded-md border border-line bg-surface p-0.5">
           {FILTERS.map((f) => (
             <button key={f.id} onClick={() => setFilter(f.id)} aria-pressed={filter === f.id}
-              className={`rounded-md border px-2.5 py-1.5 text-xs ${filter === f.id ? 'border-brand bg-brand/15 text-text' : 'border-line text-muted hover:text-text'}`}>{f.label}</button>
+              className={`shrink-0 rounded px-2.5 py-1 text-xs transition-colors ${filter === f.id ? 'bg-surface-2 text-text ring-1 ring-accent/50' : 'text-muted hover:text-text'}`}>
+              {f.label} <span className="tabular-nums text-faint">{byState.get(f.id) ?? 0}</span>
+            </button>
           ))}
         </div>
         {hasCharacter && (
-          <label className="flex cursor-pointer items-center gap-1.5 rounded-md border border-line px-2.5 py-1.5 text-xs text-muted">
-            <input type="checkbox" checked={atLevel} onChange={(e) => setAtLevel(e.target.checked)} className="accent-[var(--color-brand)]" />
+          <label className={`flex cursor-pointer items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs transition-colors ${atLevel ? 'border-accent/60 bg-accent/10 text-text' : 'border-line text-muted hover:text-text'}`}>
+            <input type="checkbox" checked={atLevel} onChange={(e) => setAtLevel(e.target.checked)} className="accent-[var(--color-accent)]" />
             Jusqu’au niveau {level + 5}
           </label>
         )}
@@ -434,10 +644,10 @@ function CategoryPanel({ view, cat, subs, counts, progress, level, hasCharacter,
         </label>
       </div>
 
-      {list === null ? <p className="text-sm text-muted">Chargement…</p> : shown.length === 0 ? (
+      {list === null ? <ListSkeleton /> : shown.length === 0 ? (
         <EmptyState title="Aucun succès ici avec ces filtres">{filter !== 'all' || atLevel ? 'Revenez sur « Tous » ou décochez le filtre de niveau.' : null}</EmptyState>
       ) : (
-        <ul className="appear parchment divide-y divide-line overflow-hidden rounded-md border border-[#c4a46e]" aria-label={`Succès : ${name}${subName ? ` › ${subName}` : ''}`}>
+        <ul key={`${filter}-${sort}-${atLevel}`} className={`appear ${LIST}`} aria-label={`Succès : ${name}${subName ? ` › ${subName}` : ''}`}>
           {visible.map((a) => card(a, { path: view.sub == null && subs.length > 0 }))}
         </ul>
       )}
@@ -446,7 +656,7 @@ function CategoryPanel({ view, cat, subs, counts, progress, level, hasCharacter,
           Afficher les {Math.min(PAGE, shown.length - visible.length)} suivants ({shown.length - visible.length} restants)
         </Button>
       )}
-      <p className="text-[11px] text-faint">États : {Object.values(DISPLAY).map((d) => d.label).join(' · ')}. « Plus tard » : niveau du succès supérieur au vôtre de plus de 10.</p>
+      {!wide && <p className="text-[11px] text-faint">États : {Object.values(DISPLAY).map((d) => d.label).join(' · ')}. « Plus tard » : niveau du succès supérieur au vôtre de plus de 10.</p>}
     </section>
   );
 }

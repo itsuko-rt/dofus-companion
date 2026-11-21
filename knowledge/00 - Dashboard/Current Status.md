@@ -13,6 +13,8 @@ The achievement journal was rebuilt for first-time players ([[2026-11-21 Achieve
 - **clearer cards** with "Où aller" (quests and their status, dungeons, Dofus);
 - **mobile category picker**, and the browser's back button works between views.
 
+Then a visual rework ([[2026-11-21 Achievements visual redesign]]): a header dashboard (ring, points, obtained, to confirm, search), category icons with a collapsible sidebar, compact entries with emblems, a parchment detail sheet in a side panel from 1280 px, and a category drawer on phones.
+
 ## PR #2 review (2026-11-20)
 Report: `docs/PR2_TECHNICAL_REVIEW.md`, summary [[2026-11-20 PR 2 technical review]]. The four pre-merge fixes are done on `develop`, with regression tests ([[2026-11-20 PR 2 pre-merge fixes]]):
 1. Almanax: a season no longer replaces the day's offering (81 days of 2026 → 0).

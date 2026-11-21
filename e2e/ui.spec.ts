@@ -86,7 +86,7 @@ test('achievements: "Pour vous", search, grouped categories, details, completion
   const search = page.getByRole('searchbox', { name: /Rechercher un succès/ });
   await search.fill('kardorim');
   await expect(page.getByRole('heading', { name: /résultats? pour « kardorim »/ })).toBeVisible();
-  await expect(page.locator('ul.parchment li', { hasText: 'Crypte de Kardorim' }).first()).toBeVisible();
+  await expect(page.locator('li[id^="ach-"]', { hasText: 'Crypte de Kardorim' }).first()).toBeVisible();
   await search.fill('scoliopode');
   await expect(page.getByText(/Trouvé dans : objectif/).first()).toBeVisible();
   await search.press('Escape');
@@ -103,14 +103,16 @@ test('achievements: "Pour vous", search, grouped categories, details, completion
   await page.getByRole('group', { name: 'Sous-catégories' }).getByRole('button', { name: /^Niveaux 1 à 50/ }).click();
   expect(page.url()).toContain('?c=3&s=11');
 
-  const row = page.locator('ul.parchment li', { hasText: 'Crypte de Kardorim' }).first();
+  const row = page.locator('li[id^="ach-"]', { hasText: 'Crypte de Kardorim' }).first();
   await row.getByRole('button').first().click();
-  await expect(row).toContainText('Objectifs');
-  await expect(row).toContainText('Donjon : Crypte de Kardorim'); // related content from the game's dungeon data
-  await row.getByRole('button', { name: 'Je l’ai obtenu' }).click();
+  // details open in the side panel on wide screens, under the entry on narrow ones: the same labelled region either way
+  const details = page.getByRole('region', { name: /^Détails : / });
+  await expect(details).toContainText('Objectifs');
+  await expect(details).toContainText('Donjon : Crypte de Kardorim'); // related content from the game's dungeon data
+  await details.getByRole('button', { name: 'Je l’ai obtenu' }).click();
   await expect(row.getByRole('button').first()).toContainText('Obtenu');
-  await page.getByRole('button', { name: 'Obtenus', exact: true }).click();
-  await expect(page.locator('ul.parchment li').first()).toContainText('Kardorim');
+  await page.getByRole('group', { name: 'Filtrer par état' }).getByRole('button', { name: /^Obtenus 1$/ }).click(); // the count follows
+  await expect(page.locator('li[id^="ach-"]').first()).toContainText('Kardorim');
   expect((await localStore(page)).characters[0].done.some((d) => d.startsWith('ach:'))).toBe(true);
 
   // the browser's back button returns to the whole category, then to "Pour vous"
