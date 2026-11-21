@@ -3,7 +3,9 @@
 // (base XP per monster, unconditional drops, harvestable resources) and dungeons. Game values only: no prices, no XP/hour.
 import { useEffect, useMemo, useState } from 'react';
 import { Gauge } from 'lucide-react';
+import Link from 'next/link';
 import { forLevel, type ZoneData } from '../../src/zones-shared.ts';
+import { encyHref } from '../../src/encyclopedia-shared.ts';
 import { useCharacter } from '../useCharacter';
 import { Card, EmptyState, PageHero, SECTION, SectionTitle } from '../ui';
 
@@ -88,11 +90,11 @@ export default function LevelView() {
                 <div className="grid gap-3 lg:grid-cols-2">
                   {r.zones.map((z) => (
                     <Card key={z.id}>
-                      <SectionTitle hint={z.area ?? undefined}>{z.name}</SectionTitle>
+                      <SectionTitle hint={z.area ?? undefined}><Link href={encyHref('zone', z.id, z.name)} className="hover:text-accent hover:underline">{z.name}</Link></SectionTitle>
                       <ul className="flex flex-col gap-0.5 text-sm">
                         {z.monsters.slice(0, 8).map((m) => (
                           <li key={m.id} className="flex justify-between gap-2">
-                            <span className="truncate text-text">{m.name} <span className="text-xs text-muted">niv. {m.lmin === m.lmax ? m.lmin : `${m.lmin}–${m.lmax}`}</span></span>
+                            <span className="truncate text-text"><Link href={encyHref('monster', m.id, m.name)} className="hover:text-accent hover:underline">{m.name}</Link> <span className="text-xs text-muted">niv. {m.lmin === m.lmax ? m.lmin : `${m.lmin}–${m.lmax}`}</span></span>
                             <span className="shrink-0 text-xs text-muted">{m.xpMin == null || m.xpMax == null ? 'XP non renseignée' : `${m.xpMin === m.xpMax ? n(m.xpMax) : `${n(m.xpMin)}–${n(m.xpMax)}`} XP`}</span>
                           </li>
                         ))}
@@ -128,7 +130,7 @@ export default function LevelView() {
                 <ul className="grid gap-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
                   {r.dungeons.map((d) => (
                     <li key={d.id} className="rounded-md border border-line bg-surface px-3 py-2">
-                      <span className="text-text">{d.name}</span>
+                      <Link href={encyHref('dungeon', d.id, d.name)} className="text-text hover:text-accent hover:underline">{d.name}</Link>
                       <span className="block text-xs text-muted">niv. min. {d.minLevel} · conseillé {d.optimalLevel}{d.bosses.length ? ` · ${d.bosses.join(', ')}` : ''}</span>
                     </li>
                   ))}

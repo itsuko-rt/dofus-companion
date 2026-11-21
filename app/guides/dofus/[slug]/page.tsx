@@ -43,6 +43,11 @@ export default async function Page({ params }: { params: Promise<{ slug: string 
       </PageHero>
       <article className="mx-auto max-w-4xl px-4 py-6">
         <Breadcrumbs trail={[['Accueil', '/'], ['Guides', '/guides'], ['Dofus', '/guides/dofus'], [d.name, `/guides/dofus/${slug}`]]} />
+        {chains.length > 0 && (
+          <a href={`/compagnon?guide=${slug}`} className="mt-4 inline-flex items-center gap-2 rounded-md border border-accent/50 bg-accent/10 px-3 py-1.5 text-sm text-text transition-colors hover:border-accent">
+            Suivre pas à pas dans le compagnon, par-dessus le jeu
+          </a>
+        )}
         {chains.length === 0 ? (
           <p className="mt-5 text-sm text-muted">Aucune quête ni aucun succès ne donne le {d.name} dans les données du jeu : il s’obtient en butin, par échange ou lors d’un évènement.</p>
         ) : chains.map((ch) => {

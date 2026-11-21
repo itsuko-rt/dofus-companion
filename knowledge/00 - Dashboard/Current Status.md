@@ -5,6 +5,15 @@
 ## Where we are
 **Pre-launch.** The site runs locally. On branch `develop` (after the pre-merge fixes of 2026-11-20): typecheck clean, 90/90 unit tests, production build OK, E2E 47 passed and 1 skipped by design, 0 failed. Not deployed.
 
+## Connected ecosystem (2026-11-21, branch feature/atlas-ecosystem)
+Research and the first ecosystem features ([[2026-11-21 Ecosystem research and encyclopaedia]]):
+- **Research:** [[Competitor Analysis]], [[Teckium Tool Analysis]], [[Desktop Companion Research]].
+- **Encyclopaedia** `/encyclopedie`: monster, item, dungeon, zone and set sheets, linked both ways, with one search ([[Ecosystem Architecture]]).
+- **Atelier** `/metiers/atelier`: a craft list adding up the resources from the game recipes.
+- **Drop odds:** exact probability from the game's base rates.
+- **Companion window** `/compagnon`: an always-on-top window with a step-by-step Dofus guide, pinned achievements and search ([[Companion Window]], [[ADR-0008 Companion window in the browser]]).
+- Checks: typecheck clean, 106/106 unit tests, E2E 59 passed and 1 skipped by design, 0 failed. Not merged, not deployed.
+
 ## Succès redesign (2026-11-21, on `develop`)
 The achievement journal was rebuilt for first-time players ([[2026-11-21 Achievements redesign]]):
 - **"Pour vous"** landing: to confirm, nearly done, class and level suggestions, each with its reason;

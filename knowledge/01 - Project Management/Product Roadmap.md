@@ -16,5 +16,7 @@ This is the original five-phase plan from `docs/RAPPORT_ARCHITECTURE.md` §9 (20
 - **Professions guide:** done.
 - **In-site world map:** built, then **removed** on 2026-11-20 ([[ADR-0005 Remove the in-site map]]).
 
+- **Connected encyclopaedia, atelier, drop odds and companion window:** done on 2026-11-21 on branch feature/atlas-ecosystem ([[Ecosystem Architecture]], [[Companion Window]]). This closes the « no dedicated dungeon view » gap of phase 3.
+
 ## Next
-See [[Priorities]] and [[Feature Backlog]].
+See [[Ecosystem Architecture]] (next steps), [[Priorities]] and [[Feature Backlog]].

@@ -1,6 +1,7 @@
 'use client';
 // Profession journal: every profession of the game, grouped, with the active character's level in each.
 import Link from 'next/link';
+import { ChevronRight, ListChecks } from 'lucide-react';
 import type { JobSummary } from '../../src/professions-shared.ts';
 import { useCharacter } from '../useCharacter';
 import { ProgressBar } from '../ui';
@@ -12,6 +13,11 @@ export default function ProfessionsIndex({ jobs }: { jobs: JobSummary[] }) {
   const ch = useCharacter();
   return (
     <div className="flex flex-col gap-6">
+      <Link href="/metiers/atelier" className="group flex items-center gap-3 rounded-xl border border-accent/40 bg-accent/10 px-4 py-3 transition-colors hover:border-accent/70">
+        <ListChecks size={20} className="shrink-0 text-accent" aria-hidden />
+        <span className="min-w-0 flex-1"><span className="block font-medium text-text">Atelier de craft</span><span className="block text-xs text-muted">Une liste d’objets à fabriquer, le total des ressources, sous-crafts compris.</span></span>
+        <ChevronRight size={16} className="shrink-0 text-faint transition-transform group-hover:translate-x-0.5" aria-hidden />
+      </Link>
       {ORDER.map((kind) => {
         const list = jobs.filter((j) => j.kind === kind);
         if (!list.length) return null;

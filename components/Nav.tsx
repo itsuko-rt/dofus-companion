@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Compass, Home, Map as MapIcon, Pickaxe, Shirt, Swords, UserRound, CircleUser } from 'lucide-react';
+import { BookOpen, Compass, Home, Pickaxe, Shirt, Swords, UserRound, CircleUser } from 'lucide-react';
 import { BRAND } from '../src/brand.ts';
 import { SUPPORTED_BREEDS } from './breeds';
 import { useCharacter } from './useCharacter';
@@ -13,7 +13,7 @@ import { warmGame } from './quests/useGame';
 const LINKS = [
   { href: '/', label: 'Accueil', icon: Home, match: (p: string) => p === '/' },
   { href: '/progression/quetes', label: 'Progression', icon: Compass, match: (p: string) => p.startsWith('/progression') },
-  { href: '/carte', label: 'Cartes', icon: MapIcon, match: (p: string) => p.startsWith('/carte') },
+  { href: '/encyclopedie', label: 'Encyclopédie', icon: BookOpen, match: (p: string) => p.startsWith('/encyclopedie') || p.startsWith('/carte') },
   { href: '/metiers', label: 'Métiers', icon: Pickaxe, match: (p: string) => p.startsWith('/metiers') },
   { href: '/builds', label: 'Builds', icon: Swords, match: (p: string) => p.startsWith('/builds') },
   { href: '/equipement', label: 'Équipement', icon: Shirt, match: (p: string) => p.startsWith('/equipement') },

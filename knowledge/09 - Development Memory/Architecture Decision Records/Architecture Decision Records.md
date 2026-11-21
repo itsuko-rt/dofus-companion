@@ -11,5 +11,6 @@ One note per decision, never rewritten. A change of mind is a new ADR that super
 | [[ADR-0005 Remove the in-site map]] | 2026-11-20 | accepted |
 | [[ADR-0006 No ads or analytics without consent]] | 2026-11-19 | accepted |
 | [[ADR-0007 Profession XP comes from the player's screen]] | 2026-11-20 | accepted |
+| [[ADR-0008 Companion window in the browser]] | 2026-11-21 | accepted |
 
-Next number: ADR-0007.
+Next number: ADR-0009.

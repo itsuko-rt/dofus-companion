@@ -20,7 +20,9 @@ import { parse, reference } from '../../src/criteria.ts';
 import type { Graph, Status } from '../../src/graph.ts';
 import type { Progress } from '../../src/criteria.ts';
 import { questHref } from '../quests/NextSteps';
+import { encyHref } from '../../src/encyclopedia-shared.ts';
 import { Button, StatusPill } from '../ui';
+import PinButton from '../companion/PinButton';
 
 /** Root category name (achievementcategoriesdata, 3.7.14.18) → emblem; an unknown future category gets the trophy. */
 const ROOT_ICON: Record<string, LucideIcon> = {
@@ -148,14 +150,15 @@ const PLACE: Record<ObjectivePlace['kind'], { icon: LucideIcon; label: string }>
 };
 
 /** Where an objective's monster lives, which region a zone is in, a dungeon's level: with a link to the level page. */
-function PlaceLine({ place }: { place: ObjectivePlace }) {
+function PlaceLine({ place, name }: { place: ObjectivePlace; name: string }) {
   const P = PLACE[place.kind];
   const shown = place.zones.slice(0, 3);
   const mid = place.level ? Math.round((place.level[0] + place.level[1]) / 2) : null;
   return (
     <span className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11.5px] text-muted">
       <P.icon size={11} className="shrink-0 text-faint" aria-hidden />
-      <span>{P.label}{levelText(place.level) ? ` · ${levelText(place.level)}` : ''}</span>
+      {place.id ? <Link href={encyHref(place.kind, place.id, name)} className="underline decoration-faint/60 underline-offset-2 hover:text-accent">{P.label}</Link> : <span>{P.label}</span>}
+      {levelText(place.level) && <span>· {levelText(place.level)}</span>}
       {shown.length > 0 && <span className="text-faint">· {place.kind === 'monster' ? 'vit à ' : ''}{shown.join(', ')}{place.zones.length > 3 ? ` +${place.zones.length - 3}` : ''}</span>}
       {mid && <Link href={levelHref(mid)} className="inline-flex items-center gap-0.5 font-medium text-accent underline-offset-2 hover:underline">voir ce niveau<ArrowUpRight size={11} aria-hidden /></Link>}
     </span>
@@ -252,7 +255,7 @@ export function AchievementDetails({ a, p, display, root, where, ctx, onClose, i
                         {target?.kind === 'quest' && <span className="text-faint">· Quête</span>}
                         {target?.kind === 'achievement' && <span className="text-faint">· Succès</span>}
                       </span>
-                      {place && <PlaceLine place={place} />}
+                      {place && <PlaceLine place={place} name={o.name ?? ''} />}
                     </span>
                     {s !== 'inferred' && (
                       <label className={`flex shrink-0 cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1 text-xs transition-colors ${s === 'confirmed' ? 'border-done/40 text-done' : 'border-line text-muted hover:border-faint hover:text-text'}`}>
@@ -285,9 +288,9 @@ export function AchievementDetails({ a, p, display, root, where, ctx, onClose, i
               ))}
               {a.dungeons.map((d) => (
                 <li key={d.name}>
-                  <Link href={levelHref(d.level)} className={goRow}>
+                  <Link href={encyHref('dungeon', d.id, d.name)} className={goRow}>
                     <Castle size={16} className="shrink-0 text-accent" aria-hidden />
-                    <span className="min-w-0 flex-1">Donjon : {d.name}<span className="block text-[11px] text-faint">niv. {d.level} · zones et donjons de ce niveau</span></span>
+                    <span className="min-w-0 flex-1">Donjon : {d.name}<span className="block text-[11px] text-faint">niv. {d.level} · boss, clé et succès du donjon</span></span>
                     <ChevronRight size={14} className="shrink-0 text-faint transition-transform group-hover:translate-x-0.5" aria-hidden />
                   </Link>
                 </li>
@@ -336,11 +339,14 @@ export function AchievementDetails({ a, p, display, root, where, ctx, onClose, i
             <Button variant="primary" className="!px-3 !py-1.5 text-xs" onClick={() => confirm('manual')}><Check size={14} aria-hidden /> Je l’ai obtenu</Button>
           </>
         )}
+        <span className="flex w-full flex-wrap items-center gap-x-4 gap-y-1">
+        <PinButton id={a.id} name={a.name} />
         {a.guide && (
-          <a href={a.guide.url} target="_blank" rel="noopener noreferrer" className="inline-flex w-full items-center gap-1.5 text-xs font-medium text-accent underline-offset-2 hover:underline">
+          <a href={a.guide.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 text-xs font-medium text-accent underline-offset-2 hover:underline">
             <BookOpen size={13} aria-hidden /> Guide sur {a.guide.site} <ExternalLink size={11} aria-hidden />
           </a>
         )}
+        </span>
       </footer>
     </section>
   );

@@ -205,12 +205,12 @@ export interface AchievementInfo {
   /** Dofus this achievement counts towards, with the slug of their guide page (/guides/dofus/<slug>) */
   dofus: { name: string; slug: string }[];
   /** dungeons the game ties to this achievement (dungeonsdata), with their recommended level */
-  dungeons: { name: string; level: number }[];
+  dungeons: { id: number; name: string; level: number }[];
 }
 /** What an objective's text names in the game data (exact name match): a monster (its level range and the zones it
  *  lives in), a zone (its region and level) or a dungeon (its optimal level). Several monsters or zones can share a
  *  name (variants, homonyms): their levels and zones are merged. */
-export interface ObjectivePlace { kind: 'monster' | 'zone' | 'dungeon'; level: [number, number] | null; zones: string[] }
+export interface ObjectivePlace { kind: 'monster' | 'zone' | 'dungeon'; level: [number, number] | null; zones: string[]; /** encyclopaedia sheet: the first monster or zone of that name, or the dungeon */ id?: number }
 const mergeRewards = (json: string | null): AchievementReward | null => {
   const rs = JSON.parse(json ?? '[]') as AchievementReward[];
   if (!rs.length) return null;
@@ -250,27 +250,29 @@ function placeIndex(db: DatabaseSync, path: string) {
     p.level = p.level ? [Math.min(p.level[0], lo), Math.max(p.level[1], hi)] : [lo, hi];
   };
   const zones = new Map<string, ObjectivePlace>();
-  for (const z of db.prepare('SELECT s.name, s.level, a.name area FROM world_subarea s LEFT JOIN world_area a ON a.id = s.area_id WHERE s.name IS NOT NULL').all() as Record<string, any>[]) {
-    const p = zones.get(z.name) ?? { kind: 'zone' as const, level: null, zones: [] };
+  for (const z of db.prepare('SELECT s.id, s.name, s.level, a.name area FROM world_subarea s LEFT JOIN world_area a ON a.id = s.area_id WHERE s.name IS NOT NULL ORDER BY s.id').all() as Record<string, any>[]) {
+    const p = zones.get(z.name) ?? ({ kind: 'zone', level: null, zones: [], id: z.id } as ObjectivePlace);
     range(p, z.level || null, z.level || null);
     if (z.area && !p.zones.includes(z.area)) p.zones.push(z.area);
     zones.set(z.name, p);
   }
   const monsters = new Map<string, ObjectivePlace>();
-  for (const m of db.prepare('SELECT m.name, MIN(g.level) lo, MAX(g.level) hi FROM monster m LEFT JOIN monster_grade g ON g.monster_id = m.id WHERE m.name IS NOT NULL GROUP BY m.id').all() as Record<string, any>[]) {
-    const p = monsters.get(m.name) ?? { kind: 'monster' as const, level: null, zones: [] };
+  for (const m of db.prepare('SELECT m.id, m.name, MIN(g.level) lo, MAX(g.level) hi FROM monster m LEFT JOIN monster_grade g ON g.monster_id = m.id WHERE m.name IS NOT NULL GROUP BY m.id ORDER BY m.id').all() as Record<string, any>[]) {
+    const p = monsters.get(m.name) ?? ({ kind: 'monster', level: null, zones: [], id: m.id } as ObjectivePlace);
     range(p, m.lo, m.hi);
     monsters.set(m.name, p);
   }
-  for (const z of db.prepare('SELECT m.name, s.name zone FROM monster m JOIN monster_subarea ms ON ms.monster_id = m.id JOIN world_subarea s ON s.id = ms.subarea_id ORDER BY s.level, s.name').all() as Record<string, any>[]) {
+  for (const z of db.prepare('SELECT m.id, m.name, s.name zone FROM monster m JOIN monster_subarea ms ON ms.monster_id = m.id JOIN world_subarea s ON s.id = ms.subarea_id ORDER BY s.level, s.name').all() as Record<string, any>[]) {
     const p = monsters.get(z.name);
-    if (p && z.zone && !p.zones.includes(z.zone)) p.zones.push(z.zone);
+    if (!p) continue;
+    if (!p.zones.length) p.id = z.id; // the sheet of the variant that actually lives somewhere
+    if (z.zone && !p.zones.includes(z.zone)) p.zones.push(z.zone);
   }
   // a name shared by a dungeon and its boss or zone points to the dungeon; a monster wins over a homonymous zone
   for (const [k, v] of zones) idx.set(k, v);
   for (const [k, v] of monsters) idx.set(k, v);
-  for (const d of db.prepare('SELECT name, optimal_level level FROM dungeon WHERE name IS NOT NULL').all() as Record<string, any>[]) {
-    idx.set(d.name, { kind: 'dungeon', level: d.level ? [d.level, d.level] : null, zones: [] });
+  for (const d of db.prepare('SELECT id, name, optimal_level level FROM dungeon WHERE name IS NOT NULL').all() as Record<string, any>[]) {
+    idx.set(d.name, { kind: 'dungeon', level: d.level ? [d.level, d.level] : null, zones: [], id: d.id });
   }
   placeIndexes.set(path, idx);
   return idx;
@@ -299,10 +301,10 @@ function buildAchievements(db: DatabaseSync, path: string, idsSql: string, args:
   for (const g of db.prepare(`SELECT achievement_id, site, url, checked_at FROM achievement_guide WHERE achievement_id ${inSet}`).all(...args) as Record<string, any>[]) {
     if (!guides.has(g.achievement_id)) guides.set(g.achievement_id, g); // first row, like the former LIMIT 1
   }
-  const dungeons = new Map<number, { name: string; level: number }[]>();
-  for (const d of db.prepare(`SELECT da.achievement_id a, d.name, d.optimal_level level FROM dungeon_achievement da JOIN dungeon d ON d.id = da.dungeon_id
+  const dungeons = new Map<number, { id: number; name: string; level: number }[]>();
+  for (const d of db.prepare(`SELECT da.achievement_id a, d.id, d.name, d.optimal_level level FROM dungeon_achievement da JOIN dungeon d ON d.id = da.dungeon_id
     WHERE d.name IS NOT NULL AND da.achievement_id ${inSet} ORDER BY d.optimal_level, d.name`).all(...args) as Record<string, any>[]) {
-    dungeons.set(d.a, [...(dungeons.get(d.a) ?? []), { name: d.name, level: d.level }]);
+    dungeons.set(d.a, [...(dungeons.get(d.a) ?? []), { id: d.id, name: d.name, level: d.level }]);
   }
   const dofusByAch = new Map<number, { name: string; slug: string }[]>();
   const dofusRows = db.prepare('SELECT item_id itemId, name, achievement_ids FROM dofus').all() as Record<string, any>[];

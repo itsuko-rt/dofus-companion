@@ -83,6 +83,9 @@ export default function AchievementsView({ categories }: { categories: Achieveme
   // the view lives in the URL (?c=root&s=sub) so the browser's back button moves between categories
   useEffect(() => {
     setView(viewFromUrl());
+    // &a=<id>: opened from another page (an encyclopaedia sheet) on one achievement
+    const a = Number(new URLSearchParams(location.search).get('a'));
+    if (Number.isInteger(a) && a > 0) setOpen(a);
     const onPop = () => setView(viewFromUrl());
     addEventListener('popstate', onPop);
     return () => removeEventListener('popstate', onPop);

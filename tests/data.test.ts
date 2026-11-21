@@ -223,7 +223,8 @@ test('real data: achievements by id keep their order and carry their dungeons', 
   const { loadAchievementsByIds, loadAchievements } = await import('../src/load.ts');
   assert.deepEqual(loadAchievementsByIds(db!, [9064, 9097, 9065, 999999]).map((a) => a.id), [9064, 9097, 9065]);
   const crypt = loadAchievements(db!, [11]).find((a) => a.name === 'Crypte de Kardorim')!;
-  assert.deepEqual(crypt.dungeons, [{ name: 'Crypte de Kardorim', level: 10 }]);
+  assert.deepEqual(crypt.dungeons.map(({ name, level }) => ({ name, level })), [{ name: 'Crypte de Kardorim', level: 10 }]);
+  assert.ok(crypt.dungeons[0].id > 0); // links to the dungeon sheet
 });
 
 test('real data: objectives name their monster, zone or dungeon; Dofus carry their guide slug', { skip }, async () => {
@@ -231,7 +232,10 @@ test('real data: objectives name their monster, zone or dungeon; Dofus carry the
   const { dofusSlugs, guideContext } = await import('../src/guides-data.ts');
   const [necro, pourpre] = loadAchievementsByIds(db!, [1129, 1101]);
   // a monster named only in an objective: its level range and the zones it lives in, from the game's monster data
-  assert.deepEqual(necro.objectives.find((o) => o.name === 'Scoliopode')?.place, { kind: 'monster', level: [172, 180], zones: ['Catacombres'] });
+  const { id, ...place } = necro.objectives.find((o) => o.name === 'Scoliopode')!.place!;
+  assert.deepEqual(place, { kind: 'monster', level: [172, 180], zones: ['Catacombres'] });
+  const { loadMonster } = await import('../src/encyclopedia.ts');
+  assert.equal(loadMonster(db!, id!)?.name, 'Scoliopode'); // the link opens that monster's sheet
   assert.ok(necro.objectives.every((o) => !o.place || ['monster', 'zone', 'dungeon'].includes(o.place.kind)));
   // the slug is the one the Dofus guide pages are generated from
   const c = guideContext()!;
