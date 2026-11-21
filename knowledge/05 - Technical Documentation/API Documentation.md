@@ -11,6 +11,8 @@
 | `GET /api/achievements?ids=10,11` | positive integers, at most 100; rows returned in the order given (recommendations, deep links) | `max-age=3600` |
 | `GET /api/achievements/search?q=` | text, trimmed to 80 characters, at least 2; accent-insensitive; matches name, dungeon, objective text, category, description; at most 40 results, each with what matched and the full row | `max-age=3600` |
 | `GET /api/achievements/objectives` | — | static |
+
+Achievement rows (since 2026-11-21): each objective may carry `place` (`kind` monster, zone or dungeon; `level` range; `zones`), from an exact name match in the game's monster, zone and dungeon tables; `dofus` is a list of `{ name, slug }` (slug of `/guides/dofus/<slug>`). The page adds `v=2` to these URLs so a browser never reuses a cached response of the former shape.
 | `GET /api/items/search?q=&type=&min=&max=` | text (60 characters), integers | `max-age=3600` |
 | `GET /api/professions/:slug` | `[a-z-]{2,40}` | `max-age=3600` |
 | `GET /api/builds?breed=9` | class from an allow-list | upstream cached 1 h (see [[Integrations]]) |

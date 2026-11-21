@@ -24,7 +24,12 @@ export default function LevelView() {
   const [error, setError] = useState<string | null>(null);
   const [own, setOwn] = useState<number | null>(null);
   const [band, setBand] = useState(10);
-  useEffect(() => { fetchZones().then(setData, (e: Error) => setError(e.message)); }, []);
+  useEffect(() => {
+    fetchZones().then(setData, (e: Error) => setError(e.message));
+    // ?niveau=N: opened from another page (an achievement's monster, zone or dungeon) at that level
+    const asked = Math.round(Number(new URLSearchParams(location.search).get('niveau')));
+    if (asked >= 1 && asked <= 200) setOwn(asked);
+  }, []);
   const level = own ?? ch.character.level;
   const r = useMemo(() => (data ? forLevel(data, level, band) : null), [data, level, band]);
 

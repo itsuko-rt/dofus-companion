@@ -2,10 +2,10 @@
 // computed at build time. No text is invented: sentences are templates around real figures.
 import { DatabaseSync } from 'node:sqlite';
 import { Graph } from './graph.ts';
-import { latestDb, loadDofus, loadGraphData, type DofusInfo, type GraphData } from './load.ts';
+import { dofusSlugs, latestDb, loadDofus, loadGraphData, type DofusInfo, type GraphData } from './load.ts';
+export { dofusSlugs };
 import { groupOf, regionLayout, regionSlugMap, REGION_GROUPS, type RegionGroup } from './regions.ts';
 import { prerequisitesToComplete, preds } from './views.ts';
-import { slugify } from './site.ts';
 
 interface Ctx { data: GraphData; graph: Graph; guides: Map<number, string>; dofus: DofusInfo[]; version: string }
 let ctx: Ctx | null | undefined;
@@ -89,14 +89,6 @@ export function regionQuests(c: Ctx, regionId: number): QuestEntry[] {
       .map((rid) => c.graph.nodes.get(rid)).filter((x) => x && x.kind !== 'gate').map((x) => ({ id: x!.id, name: x!.label }));
     return { id: n.refId, name: n.label, level: n.level ?? null, requires: req, guide: c.guides.get(n.refId) ?? null, dofus: dofusQuests.has(id) };
   });
-}
-
-const baseSlug = (d: DofusInfo) => slugify(d.name.replace(/^Dofus\s+/i, '')) || slugify(d.name);
-/** item id → slug; the game has a few Dofus sharing a name (two "Dofus Cacao"…): those get their item id appended. */
-export function dofusSlugs(list: DofusInfo[]): Map<number, string> {
-  const count = new Map<string, number>();
-  for (const d of list) count.set(baseSlug(d), (count.get(baseSlug(d)) ?? 0) + 1);
-  return new Map(list.map((d) => [d.itemId, count.get(baseSlug(d))! > 1 ? `${baseSlug(d)}-${d.itemId}` : baseSlug(d)]));
 }
 
 /** Every quest/achievement a Dofus needs, upstream of its source (one alternative per choice, like the tracker). */

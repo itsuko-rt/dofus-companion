@@ -51,7 +51,11 @@ test('real data: batched achievement loading keeps every objective, in order', {
   const one = raw.prepare('SELECT id, name, criterion_raw AS criterion FROM achievement_objective WHERE achievement_id = ? ORDER BY ordinal');
   const list = loadAchievements(db!, [3, 11, 12, 13, 14, 59, 116, 15]);
   assert.ok(list.length > 700);
-  for (const a of list) assert.deepEqual(a.objectives, one.all(a.id).map((r) => ({ ...r })), `achievement ${a.id}`);
+  for (const a of list) {
+    // same rows, same order; `place` is added from the name (tested on its own below)
+    assert.deepEqual(a.objectives.map(({ id, name, criterion }) => ({ id, name, criterion })), one.all(a.id).map((r) => ({ ...r })), `achievement ${a.id}`);
+    for (const o of a.objectives) if (o.place) assert.ok(o.name, `objective ${o.id} has a place but no name`);
+  }
   raw.close();
 });
 
@@ -220,4 +224,18 @@ test('real data: achievements by id keep their order and carry their dungeons', 
   assert.deepEqual(loadAchievementsByIds(db!, [9064, 9097, 9065, 999999]).map((a) => a.id), [9064, 9097, 9065]);
   const crypt = loadAchievements(db!, [11]).find((a) => a.name === 'Crypte de Kardorim')!;
   assert.deepEqual(crypt.dungeons, [{ name: 'Crypte de Kardorim', level: 10 }]);
+});
+
+test('real data: objectives name their monster, zone or dungeon; Dofus carry their guide slug', { skip }, async () => {
+  const { loadAchievementsByIds } = await import('../src/load.ts');
+  const { dofusSlugs, guideContext } = await import('../src/guides-data.ts');
+  const [necro, pourpre] = loadAchievementsByIds(db!, [1129, 1101]);
+  // a monster named only in an objective: its level range and the zones it lives in, from the game's monster data
+  assert.deepEqual(necro.objectives.find((o) => o.name === 'Scoliopode')?.place, { kind: 'monster', level: [172, 180], zones: ['Catacombres'] });
+  assert.ok(necro.objectives.every((o) => !o.place || ['monster', 'zone', 'dungeon'].includes(o.place.kind)));
+  // the slug is the one the Dofus guide pages are generated from
+  const c = guideContext()!;
+  const slug = dofusSlugs(c.dofus).get(694);
+  assert.deepEqual(pourpre.dofus, [{ name: 'Dofus Pourpre', slug }]);
+  assert.ok(slug);
 });

@@ -8,6 +8,7 @@ import { classAchievements, classQuests } from './class-quests.ts';
 import { regionSlugMap } from './regions.ts';
 import type { AlmanaxEntry } from './almanax-shared.ts';
 import { itemSources } from './professions.ts';
+import { slugify } from './site.ts';
 import type { IngredientSource } from './professions-shared.ts';
 
 /** Latest data/game-<version>.sqlite, or null if the import has not run. */
@@ -197,14 +198,19 @@ export const loadAchievementCategories = (path: string) => withDb(path, (db) => 
 export interface AchievementReward { xp: boolean; kamas: boolean; items: { id: number; name: string | null; qty: number }[]; titles: number; emotes: number; ornaments: number; spells: number }
 export interface AchievementInfo {
   id: number; name: string; description: string | null; level: number; points: number; categoryId: number;
-  objectives: { id: number; name: string | null; criterion: string }[];
+  objectives: { id: number; name: string | null; criterion: string; place?: ObjectivePlace }[];
   /** merged over the game's reward rows (some depend on level or class) */
   rewards: AchievementReward | null;
   guide: { site: string; url: string; checkedAt: string } | null;
-  dofus: string[];
+  /** Dofus this achievement counts towards, with the slug of their guide page (/guides/dofus/<slug>) */
+  dofus: { name: string; slug: string }[];
   /** dungeons the game ties to this achievement (dungeonsdata), with their recommended level */
   dungeons: { name: string; level: number }[];
 }
+/** What an objective's text names in the game data (exact name match): a monster (its level range and the zones it
+ *  lives in), a zone (its region and level) or a dungeon (its optimal level). Several monsters or zones can share a
+ *  name (variants, homonyms): their levels and zones are merged. */
+export interface ObjectivePlace { kind: 'monster' | 'zone' | 'dungeon'; level: [number, number] | null; zones: string[] }
 const mergeRewards = (json: string | null): AchievementReward | null => {
   const rs = JSON.parse(json ?? '[]') as AchievementReward[];
   if (!rs.length) return null;
@@ -221,25 +227,72 @@ const mergeRewards = (json: string | null): AchievementReward | null => {
 export const loadAchievements = (path: string, categoryIds: number[]) => withDb(path, (db) => {
   const ids = categoryIds.filter(Number.isInteger).slice(0, 50);
   if (!ids.length) return [];
-  return buildAchievements(db, `SELECT id FROM achievement WHERE category_id IN (${ids.map(() => '?').join(',')})`, ids, 'level, name');
+  return buildAchievements(db, path, `SELECT id FROM achievement WHERE category_id IN (${ids.map(() => '?').join(',')})`, ids, 'level, name');
 });
 
 /** Achievements by id, in the order given (recommendations, search results). */
 export const loadAchievementsByIds = (path: string, achievementIds: number[]) => withDb(path, (db) => {
   const ids = [...new Set(achievementIds.filter(Number.isInteger))].slice(0, 100);
   if (!ids.length) return [];
-  const byId = new Map(buildAchievements(db, `SELECT id FROM achievement WHERE id IN (${ids.map(() => '?').join(',')})`, ids, 'id').map((a) => [a.id, a]));
+  const byId = new Map(buildAchievements(db, path, `SELECT id FROM achievement WHERE id IN (${ids.map(() => '?').join(',')})`, ids, 'id').map((a) => [a.id, a]));
   return ids.map((id) => byId.get(id)).filter((a): a is AchievementInfo => !!a);
 });
 
 // one query per table for the whole set (not one per achievement: Donjons has 743); `idsSql` selects the achievement ids
-function buildAchievements(db: DatabaseSync, idsSql: string, args: number[], order: string): AchievementInfo[] {
+// names → places, built once per database file (≈ 5 k monsters, 1 k zones, 200 dungeons)
+const placeIndexes = new Map<string, Map<string, ObjectivePlace>>();
+function placeIndex(db: DatabaseSync, path: string) {
+  let idx = placeIndexes.get(path);
+  if (idx) return idx;
+  idx = new Map();
+  const range = (p: ObjectivePlace, lo: number | null, hi: number | null) => {
+    if (lo == null || hi == null) return;
+    p.level = p.level ? [Math.min(p.level[0], lo), Math.max(p.level[1], hi)] : [lo, hi];
+  };
+  const zones = new Map<string, ObjectivePlace>();
+  for (const z of db.prepare('SELECT s.name, s.level, a.name area FROM world_subarea s LEFT JOIN world_area a ON a.id = s.area_id WHERE s.name IS NOT NULL').all() as Record<string, any>[]) {
+    const p = zones.get(z.name) ?? { kind: 'zone' as const, level: null, zones: [] };
+    range(p, z.level || null, z.level || null);
+    if (z.area && !p.zones.includes(z.area)) p.zones.push(z.area);
+    zones.set(z.name, p);
+  }
+  const monsters = new Map<string, ObjectivePlace>();
+  for (const m of db.prepare('SELECT m.name, MIN(g.level) lo, MAX(g.level) hi FROM monster m LEFT JOIN monster_grade g ON g.monster_id = m.id WHERE m.name IS NOT NULL GROUP BY m.id').all() as Record<string, any>[]) {
+    const p = monsters.get(m.name) ?? { kind: 'monster' as const, level: null, zones: [] };
+    range(p, m.lo, m.hi);
+    monsters.set(m.name, p);
+  }
+  for (const z of db.prepare('SELECT m.name, s.name zone FROM monster m JOIN monster_subarea ms ON ms.monster_id = m.id JOIN world_subarea s ON s.id = ms.subarea_id ORDER BY s.level, s.name').all() as Record<string, any>[]) {
+    const p = monsters.get(z.name);
+    if (p && z.zone && !p.zones.includes(z.zone)) p.zones.push(z.zone);
+  }
+  // a name shared by a dungeon and its boss or zone points to the dungeon; a monster wins over a homonymous zone
+  for (const [k, v] of zones) idx.set(k, v);
+  for (const [k, v] of monsters) idx.set(k, v);
+  for (const d of db.prepare('SELECT name, optimal_level level FROM dungeon WHERE name IS NOT NULL').all() as Record<string, any>[]) {
+    idx.set(d.name, { kind: 'dungeon', level: d.level ? [d.level, d.level] : null, zones: [] });
+  }
+  placeIndexes.set(path, idx);
+  return idx;
+}
+
+const baseSlug = (name: string) => slugify(name.replace(/^Dofus\s+/i, '')) || slugify(name);
+/** item id → slug; the game has a few Dofus sharing a name (two "Dofus Cacao"…): those get their item id appended. */
+export function dofusSlugs(list: { itemId: number; name: string }[]): Map<number, string> {
+  const count = new Map<string, number>();
+  for (const d of list) count.set(baseSlug(d.name), (count.get(baseSlug(d.name)) ?? 0) + 1);
+  return new Map(list.map((d) => [d.itemId, count.get(baseSlug(d.name))! > 1 ? `${baseSlug(d.name)}-${d.itemId}` : baseSlug(d.name)]));
+}
+
+function buildAchievements(db: DatabaseSync, path: string, idsSql: string, args: number[], order: string): AchievementInfo[] {
+  const places = placeIndex(db, path);
   const rows = db.prepare(`SELECT id, name, description, level, points, category_id, rewards FROM achievement WHERE id IN (${idsSql}) ORDER BY ${order}`).all(...args) as Record<string, any>[];
   const inSet = `IN (${idsSql})`;
   const objectives = new Map<number, { id: number; name: string; criterion: string }[]>();
   for (const o of db.prepare(`SELECT achievement_id, id, name, criterion_raw AS criterion FROM achievement_objective WHERE achievement_id ${inSet} ORDER BY achievement_id, ordinal`).all(...args) as Record<string, any>[]) {
     const list = objectives.get(o.achievement_id) ?? [];
-    list.push({ id: o.id, name: o.name, criterion: o.criterion });
+    const place = o.name ? places.get(o.name) : undefined;
+    list.push({ id: o.id, name: o.name, criterion: o.criterion, ...(place ? { place } : {}) });
     objectives.set(o.achievement_id, list);
   }
   const guides = new Map<number, Record<string, any>>();
@@ -251,9 +304,11 @@ function buildAchievements(db: DatabaseSync, idsSql: string, args: number[], ord
     WHERE d.name IS NOT NULL AND da.achievement_id ${inSet} ORDER BY d.optimal_level, d.name`).all(...args) as Record<string, any>[]) {
     dungeons.set(d.a, [...(dungeons.get(d.a) ?? []), { name: d.name, level: d.level }]);
   }
-  const dofusByAch = new Map<number, string[]>();
-  for (const d of db.prepare('SELECT name, achievement_ids FROM dofus').all() as Record<string, any>[]) {
-    for (const a of JSON.parse(d.achievement_ids) as number[]) dofusByAch.set(a, [...(dofusByAch.get(a) ?? []), d.name]);
+  const dofusByAch = new Map<number, { name: string; slug: string }[]>();
+  const dofusRows = db.prepare('SELECT item_id itemId, name, achievement_ids FROM dofus').all() as Record<string, any>[];
+  const slugs = dofusSlugs(dofusRows as { itemId: number; name: string }[]);
+  for (const d of dofusRows) {
+    for (const a of JSON.parse(d.achievement_ids) as number[]) dofusByAch.set(a, [...(dofusByAch.get(a) ?? []), { name: d.name, slug: slugs.get(d.itemId)! }]);
   }
   return rows.map((a): AchievementInfo => {
     const g = guides.get(a.id);

@@ -13,7 +13,7 @@ import { achievementProgress, type AchievementState } from '../../src/achievemen
 import { DISPLAY, FAMILIES, ROOT_HINT, displayState, familyOf, isLevelOnly, recommend, rootOrder, type AchNode, type AchProgress, type DisplayState, type Family, type Rec } from '../../src/achievement-guide.ts';
 import type { HistoryEntry } from '../../src/character.ts';
 import { useAchievementProgress } from './useAchievementProgress';
-import AchievementCard, { AchievementDetails, Emblem, rootIcon, type CardCtx } from './AchievementCard';
+import AchievementCard, { AchievementDetails, Medal, rootIcon, type CardCtx } from './AchievementCard';
 import { Button, ButtonLink, EmptyState, ProgressBar } from '../ui';
 
 type View = { kind: 'foryou' } | { kind: 'cat'; root: number; sub: number | null };
@@ -34,12 +34,14 @@ const pctOf = (done: number, total: number) => {
   return `${x.toLocaleString('fr-FR', { maximumFractionDigits: x > 0 && x < 10 ? 1 : 0 })} %`;
 };
 
-// responses cached for the page's lifetime: going back to a category or a search is instant
+// responses cached for the page's lifetime: going back to a category or a search is instant.
+// API_V changes with the payload shape: browsers keep these responses an hour (max-age), a new page must not read old ones
+const API_V = 'v=2';
 const listCache = new Map<string, Promise<AchievementInfo[]>>();
 const fetchList = (qs: string) => {
   let p = listCache.get(qs);
   if (!p) {
-    p = fetch(`/api/achievements?${qs}`).then((r) => (r.ok ? r.json() : Promise.reject(new Error(r.statusText)))).then((d: { achievements: AchievementInfo[] }) => d.achievements);
+    p = fetch(`/api/achievements?${qs}&${API_V}`).then((r) => (r.ok ? r.json() : Promise.reject(new Error(r.statusText)))).then((d: { achievements: AchievementInfo[] }) => d.achievements);
     p.catch(() => listCache.delete(qs));
     listCache.set(qs, p);
   }
@@ -50,7 +52,7 @@ const searchCache = new Map<string, Promise<Hit[]>>();
 const fetchSearch = (q: string) => {
   let p = searchCache.get(q);
   if (!p) {
-    p = fetch(`/api/achievements/search?q=${encodeURIComponent(q)}`).then((r) => (r.ok ? r.json() : Promise.reject(new Error(r.statusText)))).then((d: { results: Hit[] }) => d.results);
+    p = fetch(`/api/achievements/search?q=${encodeURIComponent(q)}&${API_V}`).then((r) => (r.ok ? r.json() : Promise.reject(new Error(r.statusText)))).then((d: { results: Hit[] }) => d.results);
     p.catch(() => searchCache.delete(q));
     searchCache.set(q, p);
   }
@@ -204,7 +206,7 @@ export default function AchievementsView({ categories }: { categories: Achieveme
   return (
     <div className="h-full overflow-y-auto">
       {header}
-      <div className="mx-auto grid max-w-[1500px] gap-5 px-4 py-5 md:grid-cols-[228px_minmax(0,1fr)] xl:grid-cols-[228px_minmax(0,1fr)_minmax(340px,400px)]">
+      <div className="mx-auto grid max-w-[1500px] gap-5 px-4 py-5 md:grid-cols-[236px_minmax(0,1fr)] xl:grid-cols-[236px_minmax(0,1fr)_minmax(360px,420px)]">
         {/* desktop: the whole map of categories stays at hand */}
         <aside className="hidden md:block">
           <div className="sticky top-4 max-h-[calc(100dvh-8rem)] overflow-y-auto pb-4 pr-1">{nav}</div>
@@ -318,15 +320,30 @@ function SearchBox({ value, onChange, disabled }: { value: string; onChange: (v:
   );
 }
 
+/** Small completion ring for the sidebar. */
+function MiniRing({ done, total, on }: { done: number; total: number; on: boolean }) {
+  const r = 6, c = 2 * Math.PI * r;
+  return (
+    <svg viewBox="0 0 16 16" className={`size-4 shrink-0 -rotate-90 ${done && done === total ? 'text-done' : on ? 'text-accent' : 'text-faint'}`} aria-hidden>
+      <circle cx="8" cy="8" r={r} fill="none" stroke="currentColor" strokeOpacity={0.25} strokeWidth="2" />
+      {done > 0 && <circle cx="8" cy="8" r={r} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * (1 - done / total)} />}
+    </svg>
+  );
+}
+
 function CategoryNav({ families, counts, view, go, collapsed, toggle }: {
   families: { id: Family; label: string; roots: AchievementCategory[] }[]; counts: Map<number, Count>; view: View;
   go: (v: View) => void; collapsed: Set<Family>; toggle: (f: Family) => void;
 }) {
+  const item = (on: boolean) => `group relative flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors duration-150 ${on ? 'bg-gradient-to-r from-accent/[0.13] to-accent/[0.02] text-text' : 'text-muted hover:bg-surface/80 hover:text-text'}`;
+  const tile = (on: boolean) => `flex size-7 shrink-0 items-center justify-center rounded-md transition-colors duration-150 ${on ? 'bg-accent/15 text-accent ring-1 ring-accent/35' : 'bg-surface/80 text-faint group-hover:bg-surface-2 group-hover:text-muted'}`;
+  const edge = (on: boolean) => <span className={`absolute inset-y-2 left-0 w-0.5 rounded-full bg-accent transition-opacity ${on ? 'opacity-100' : 'opacity-0'}`} aria-hidden />;
   return (
-    <nav aria-label="Catégories de succès" className="flex flex-col gap-4 text-sm">
-      <button onClick={() => go({ kind: 'foryou' })} aria-current={view.kind === 'foryou' ? 'page' : undefined}
-        className={`relative flex items-center gap-2.5 rounded-md px-2.5 py-2 text-left font-medium transition-colors ${view.kind === 'foryou' ? 'bg-accent/12 text-text ring-1 ring-accent/40' : 'text-muted hover:bg-surface hover:text-text'}`}>
-        <Sparkles size={15} className="text-accent" aria-hidden /> Pour vous
+    <nav aria-label="Catégories de succès" className="flex flex-col gap-5 text-[13.5px]">
+      <button onClick={() => go({ kind: 'foryou' })} aria-current={view.kind === 'foryou' ? 'page' : undefined} className={item(view.kind === 'foryou')}>
+        {edge(view.kind === 'foryou')}
+        <span className={tile(view.kind === 'foryou')}><Sparkles size={15} aria-hidden /></span>
+        <span className="font-medium">Pour vous</span>
       </button>
       {families.map((f) => {
         const active = view.kind === 'cat' && f.roots.some((r) => r.id === view.root);
@@ -334,29 +351,30 @@ function CategoryNav({ families, counts, view, go, collapsed, toggle }: {
         return (
           <div key={f.id}>
             <button onClick={() => toggle(f.id)} aria-expanded={expanded} disabled={active}
-              className="flex w-full items-center gap-1.5 px-2.5 py-1 text-left text-[11px] font-semibold uppercase tracking-wider text-faint transition-colors enabled:hover:text-muted">
-              <ChevronDown size={12} className={`shrink-0 transition-transform duration-200 ${expanded ? '' : '-rotate-90'}`} aria-hidden />
-              <span className="flex-1 truncate">{f.label}</span>
+              className="flex w-full items-center gap-1.5 px-2 pb-1.5 text-left text-[10.5px] font-semibold uppercase tracking-[0.14em] text-faint transition-colors enabled:hover:text-muted">
+              <span className="flex-1">{f.label}</span>
+              {!active && <ChevronDown size={12} className={`shrink-0 transition-transform duration-200 ${expanded ? '' : '-rotate-90'}`} aria-hidden />}
             </button>
             {expanded && (
-              <ul className="mt-1 flex flex-col gap-px">
+              <ul className="appear flex flex-col gap-0.5">
                 {f.roots.map((c) => {
                   const n = counts.get(c.id) ?? ZERO;
                   const on = view.kind === 'cat' && view.root === c.id;
                   const Icon = rootIcon(c.name);
+                  // "La Source : L'Héritage des Dofus": the subtitle goes on its own line instead of being cut
+                  const [main, sub] = c.name.split(' : ');
                   return (
                     <li key={c.id}>
-                      <button onClick={() => go({ kind: 'cat', root: c.id, sub: null })} aria-current={on ? 'page' : undefined}
-                        className={`group relative flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left transition-colors ${on ? 'bg-surface-2 text-text' : 'text-muted hover:bg-surface hover:text-text'}`}>
-                        {on && <span className="absolute inset-y-1.5 left-0 w-0.5 rounded-full bg-accent" aria-hidden />}
-                        <Icon size={15} strokeWidth={1.75} className={`shrink-0 ${on ? 'text-accent' : 'text-faint group-hover:text-muted'}`} aria-hidden />
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate">{c.name}</span>
-                          <span className="mt-1 block h-0.5 overflow-hidden rounded-full bg-line" aria-hidden>
-                            <span className="block h-full bg-done" style={{ width: `${n.total ? (n.done / n.total) * 100 : 0}%` }} />
-                          </span>
+                      <button onClick={() => go({ kind: 'cat', root: c.id, sub: null })} aria-current={on ? 'page' : undefined} className={item(on)}>
+                        {edge(on)}
+                        <span className={tile(on)}><Icon size={15} strokeWidth={1.75} aria-hidden /></span>
+                        <span className="min-w-0 flex-1 leading-tight">
+                          <span className={on ? 'font-medium' : ''}>{main}</span>
+                          {sub && <span className="block text-[11px] text-faint">{sub}</span>}
                         </span>
-                        <span className="shrink-0 text-[11px] tabular-nums text-faint">{n.done}/{n.total}</span>
+                        <span className="flex shrink-0 items-center gap-1.5 text-[10.5px] tabular-nums text-faint" title={`${n.done} obtenus sur ${n.total}`}>
+                          {n.done}/{n.total}<MiniRing done={n.done} total={n.total} on={on} />
+                        </span>
                       </button>
                     </li>
                   );
@@ -409,7 +427,7 @@ function PanelHint() {
       <ul className="mt-4 flex flex-col gap-2.5">
         {(Object.keys(DISPLAY) as DisplayState[]).map((d) => (
           <li key={d} className="flex items-center gap-3">
-            <Emblem root="" display={d} />
+            <Medal root="" display={d} met={d === 'in_progress' ? 1 : 0} total={d === 'in_progress' ? 2 : 0} size={36} />
             <span><b className="font-medium text-text">{DISPLAY[d].label}</b><span className="block text-xs text-muted">{DISPLAY[d].help}</span></span>
           </li>
         ))}
@@ -439,7 +457,7 @@ function ListSkeleton({ rows = 6, label = 'Chargement…' }: { rows?: number; la
   );
 }
 
-const LIST = 'divide-y divide-line/70 overflow-hidden rounded-lg border border-line bg-surface/70';
+const LIST = 'divide-y divide-line/60 overflow-hidden rounded-xl border border-line/80 bg-surface/60 shadow-[0_1px_2px_rgb(0_0_0/0.25)]';
 
 function SearchResults({ q, card }: { q: string; card: CardFn }) {
   const [res, setRes] = useState<{ q: string; hits: Hit[] } | null>(null);
@@ -589,7 +607,7 @@ function CategoryPanel({ view, cat, subs, counts, progress, level, hasCharacter,
 
   return (
     <section aria-labelledby="cat-title" className="flex flex-col gap-4">
-      <header className="overflow-hidden rounded-lg border border-line bg-surface">
+      <header className="overflow-hidden rounded-xl border border-line/80 bg-surface shadow-[0_1px_2px_rgb(0_0_0/0.25)]">
         <div className="flex items-start gap-4 p-4 sm:p-5">
           <span className="diamond mt-1 hidden size-10 shrink-0 items-center justify-center border border-accent/40 bg-accent/10 text-accent sm:flex"><Icon size={19} strokeWidth={1.75} aria-hidden /></span>
           <div className="min-w-0 flex-1">

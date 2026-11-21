@@ -107,7 +107,7 @@ test('achievements: "Pour vous", search, grouped categories, details, completion
   await row.getByRole('button').first().click();
   // details open in the side panel on wide screens, under the entry on narrow ones: the same labelled region either way
   const details = page.getByRole('region', { name: /^Détails : / });
-  await expect(details).toContainText('Objectifs');
+  await expect(details).toContainText('Ce qu’il faut faire'); // the objectives
   await expect(details).toContainText('Donjon : Crypte de Kardorim'); // related content from the game's dungeon data
   await details.getByRole('button', { name: 'Je l’ai obtenu' }).click();
   await expect(row.getByRole('button').first()).toContainText('Obtenu');
@@ -192,6 +192,14 @@ test('class-aware progression: an Iop sees its class quests and achievements, no
   await expect(page.getByRole('button', { name: /Dopeul Iop/ })).toBeVisible();
   await expect(page.getByText('Porte le nom de votre classe (Iop) ; ouvert à tous.').first()).toBeVisible(); // the reason is shown
   await expect(page.getByRole('button', { name: /Dopeul Crâ/ })).toHaveCount(0);
+  expectNoErrors(errors);
+});
+
+test('level page opens at the level an achievement links to (?niveau=)', async ({ page }) => {
+  const errors = collectErrors(page);
+  await page.goto('/progression/niveau?niveau=176'); // "voir ce niveau" next to the Scoliopode objective
+  await expect(page.getByLabel('Niveau', { exact: true })).toHaveValue('176');
+  await expect(page.getByText('Catacombres').first()).toBeVisible({ timeout: 20_000 }); // where the Scoliopode lives
   expectNoErrors(errors);
 });
 
