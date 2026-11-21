@@ -64,7 +64,7 @@ See [[Companion Window]] and [[ADR-0008 Companion window in the browser]].
 See the « Do not build » list in [[Competitor Analysis]]: prices, breaking and runes, the profession XP formula ([[ADR-0007 Profession XP comes from the player's screen]]), breeding, maps, multi-account tools.
 
 ## Next steps (planned)
-1. **Sitemap and SEO:** the encyclopaedia has about 28,000 sheets. Add dungeons, zones and sets to the sitemap first; items and monsters need a sitemap index.
+1. **Sitemap and SEO:** dungeons and zones are in the sitemap since 2026-11-21 (624 URLs, every one crawled by the E2E suite). Sets, items and monsters (about 27,000) need a sitemap index and a sampled crawl.
 2. **Encyclopaedia filters:** items by type and level, like the equipment page, and that page's rows linked to sheets.
 3. **More companion guides:** a region's quests, a dungeon's achievements, the atelier list as a checklist.
 4. **Archmonster and wanted-poster checklists** per character, from the `monster` races and zones in the data.

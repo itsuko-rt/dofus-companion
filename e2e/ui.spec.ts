@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { character, collectErrors, expectNoErrors, localStore, seedLocal, STORE } from './helpers';
 
-// The sitemap (180 pages) is checked in 6 equal batches so each test stays far from its timeout when workers run in
+// The sitemap (≈ 620 pages since the encyclopaedia dungeons and zones) is checked in 6 equal batches so each test stays far from its timeout when workers run in
 // parallel; the batch size follows the sitemap, so a growing sitemap never leaves pages unchecked.
 const SITEMAP_BATCHES = 6;
 for (let b = 0; b < SITEMAP_BATCHES; b++) {
