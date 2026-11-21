@@ -8,3 +8,4 @@
 | 2026-11-19 | Restraint pass: flat panels, one elevation, no glassmorphism, no hover lifts, purposeful icons | Remove "AI-slop" decoration | `docs/DESIGN_SYSTEM.md` |
 | 2026-11-19 | Item rarity not shown | Dofus 3 data defines none | `docs/RAPPORT_DEVELOPPEMENT.md` §2 |
 | 2026-11-20 | `/carte` is a simple two-card directory, monograms instead of logos | External tools; no copying of branding | [[ADR-0005 Remove the in-site map]] |
+| 2026-11-21 | Succès opens on "Pour vous"; the 15 game root categories are grouped in 3 families (main progression first, Temporis and events apart); 5 card states with icon + label (Obtenu, À confirmer, En cours, À faire, Plus tard); a category picker on mobile instead of a sidebar | First-time players did not know where to start, and Temporis (754 achievements of a seasonal server) weighed as much as the main progression | [[2026-11-21 Achievements redesign]] |

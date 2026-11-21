@@ -72,25 +72,54 @@ test('quest tracker: search, right-click to complete, undo, persistence', async 
   expectNoErrors(errors);
 });
 
-test('achievements: categories, filters, search, objectives and manual completion', async ({ page }) => {
-  await seedLocal(page);
+test('achievements: "Pour vous", search, grouped categories, details, completion, filters, back button', async ({ page, isMobile }) => {
+  await seedLocal(page); // a level-50 Crâ
   const errors = collectErrors(page);
   await page.goto('/progression/succes');
-  const list = page.locator('ul.parchment');
-  await expect(list).toBeVisible({ timeout: 20_000 });
-  // search across categories suggests matches
-  await page.getByPlaceholder('Rechercher dans tous les succès…').fill('Kardorim');
-  await expect(page.locator('ul.absolute li', { hasText: 'Kardorim' }).first()).toBeVisible();
-  await page.getByPlaceholder('Rechercher dans tous les succès…').fill('');
-  const row = list.locator('li', { hasText: 'Crypte de Kardorim' }).first();
-  await expect(row).toContainText('Kardorim');
+  // a first visit lands on "Pour vous": where to start, and suggestions at the character's level with their reason
+  await expect(page.getByRole('heading', { name: 'Par où commencer ?' })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('heading', { name: 'À votre niveau' })).toBeVisible();
+  await expect(page.getByText(/proche du vôtre \(50\)/).first()).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Pour votre classe · Crâ' })).toBeVisible();
+
+  // one search covers names and objectives (a monster named only in objectives), without accents
+  const search = page.getByRole('searchbox', { name: /Rechercher un succès/ });
+  await search.fill('kardorim');
+  await expect(page.getByRole('heading', { name: /résultats? pour « kardorim »/ })).toBeVisible();
+  await expect(page.locator('ul.parchment li', { hasText: 'Crypte de Kardorim' }).first()).toBeVisible();
+  await search.fill('scoliopode');
+  await expect(page.getByText(/Trouvé dans : objectif/).first()).toBeVisible();
+  await search.press('Escape');
+  await expect(search).toHaveValue('');
+
+  // categories are grouped; on mobile they open from one "Parcourir" button
+  const openCategory = async (name: string) => {
+    if (isMobile) await page.getByRole('button', { name: /Parcourir/ }).click();
+    await page.getByRole('navigation', { name: 'Catégories de succès' }).locator('visible=true').getByRole('button', { name: new RegExp(`^${name}`) }).click();
+  };
+  await openCategory('Donjons');
+  await expect(page.getByRole('heading', { name: 'Donjons' })).toBeVisible();
+  await expect(page.getByText('Vaincre les donjons, rangés par tranche de niveaux.')).toBeVisible();
+  await page.getByRole('group', { name: 'Sous-catégories' }).getByRole('button', { name: /^Niveaux 1 à 50/ }).click();
+  expect(page.url()).toContain('?c=3&s=11');
+
+  const row = page.locator('ul.parchment li', { hasText: 'Crypte de Kardorim' }).first();
   await row.getByRole('button').first().click();
   await expect(row).toContainText('Objectifs');
+  await expect(row).toContainText('Donjon : Crypte de Kardorim'); // related content from the game's dungeon data
   await row.getByRole('button', { name: 'Je l’ai obtenu' }).click();
-  await expect(row).toContainText('Obtenu');
+  await expect(row.getByRole('button').first()).toContainText('Obtenu');
   await page.getByRole('button', { name: 'Obtenus', exact: true }).click();
-  await expect(list.locator('li').first()).toContainText('Kardorim');
+  await expect(page.locator('ul.parchment li').first()).toContainText('Kardorim');
   expect((await localStore(page)).characters[0].done.some((d) => d.startsWith('ach:'))).toBe(true);
+
+  // the browser's back button returns to the whole category, then to "Pour vous"
+  await page.goBack();
+  await expect(page.getByRole('group', { name: 'Sous-catégories' }).getByRole('button', { name: 'Toutes' })).toHaveAttribute('aria-pressed', 'true');
+  await page.goBack();
+  await expect(page.getByRole('heading', { name: 'À votre niveau' })).toBeVisible();
+  // nothing wider than the screen (sub-category chips scroll inside their own row on phones)
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   expectNoErrors(errors);
 });
 
@@ -159,6 +188,8 @@ test('class-aware progression: an Iop sees its class quests and achievements, no
   await page.goto('/progression/succes');
   await expect(page.getByRole('heading', { name: 'Pour votre classe · Iop' })).toBeVisible();
   await expect(page.getByRole('button', { name: /Dopeul Iop/ })).toBeVisible();
+  await expect(page.getByText('Porte le nom de votre classe (Iop) ; ouvert à tous.').first()).toBeVisible(); // the reason is shown
+  await expect(page.getByRole('button', { name: /Dopeul Crâ/ })).toHaveCount(0);
   expectNoErrors(errors);
 });
 

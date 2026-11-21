@@ -202,6 +202,8 @@ export interface AchievementInfo {
   rewards: AchievementReward | null;
   guide: { site: string; url: string; checkedAt: string } | null;
   dofus: string[];
+  /** dungeons the game ties to this achievement (dungeonsdata), with their recommended level */
+  dungeons: { name: string; level: number }[];
 }
 const mergeRewards = (json: string | null): AchievementReward | null => {
   const rs = JSON.parse(json ?? '[]') as AchievementReward[];
@@ -215,22 +217,39 @@ const mergeRewards = (json: string | null): AchievementReward | null => {
   };
   return r.xp || r.kamas || r.items.length || r.titles || r.emotes || r.ornaments || r.spells ? r : null;
 };
+/** Achievements of some categories (a category page), sorted by level. */
 export const loadAchievements = (path: string, categoryIds: number[]) => withDb(path, (db) => {
   const ids = categoryIds.filter(Number.isInteger).slice(0, 50);
   if (!ids.length) return [];
-  const rows = db.prepare(
-    `SELECT id, name, description, level, points, category_id, rewards FROM achievement WHERE category_id IN (${ids.map(() => '?').join(',')}) ORDER BY level, name`).all(...ids) as Record<string, any>[];
-  // one query per table for the whole page (not one per achievement: Donjons has 743)
-  const inCats = `IN (SELECT id FROM achievement WHERE category_id IN (${ids.map(() => '?').join(',')}))`;
+  return buildAchievements(db, `SELECT id FROM achievement WHERE category_id IN (${ids.map(() => '?').join(',')})`, ids, 'level, name');
+});
+
+/** Achievements by id, in the order given (recommendations, search results). */
+export const loadAchievementsByIds = (path: string, achievementIds: number[]) => withDb(path, (db) => {
+  const ids = [...new Set(achievementIds.filter(Number.isInteger))].slice(0, 100);
+  if (!ids.length) return [];
+  const byId = new Map(buildAchievements(db, `SELECT id FROM achievement WHERE id IN (${ids.map(() => '?').join(',')})`, ids, 'id').map((a) => [a.id, a]));
+  return ids.map((id) => byId.get(id)).filter((a): a is AchievementInfo => !!a);
+});
+
+// one query per table for the whole set (not one per achievement: Donjons has 743); `idsSql` selects the achievement ids
+function buildAchievements(db: DatabaseSync, idsSql: string, args: number[], order: string): AchievementInfo[] {
+  const rows = db.prepare(`SELECT id, name, description, level, points, category_id, rewards FROM achievement WHERE id IN (${idsSql}) ORDER BY ${order}`).all(...args) as Record<string, any>[];
+  const inSet = `IN (${idsSql})`;
   const objectives = new Map<number, { id: number; name: string; criterion: string }[]>();
-  for (const o of db.prepare(`SELECT achievement_id, id, name, criterion_raw AS criterion FROM achievement_objective WHERE achievement_id ${inCats} ORDER BY achievement_id, ordinal`).all(...ids) as Record<string, any>[]) {
+  for (const o of db.prepare(`SELECT achievement_id, id, name, criterion_raw AS criterion FROM achievement_objective WHERE achievement_id ${inSet} ORDER BY achievement_id, ordinal`).all(...args) as Record<string, any>[]) {
     const list = objectives.get(o.achievement_id) ?? [];
     list.push({ id: o.id, name: o.name, criterion: o.criterion });
     objectives.set(o.achievement_id, list);
   }
   const guides = new Map<number, Record<string, any>>();
-  for (const g of db.prepare(`SELECT achievement_id, site, url, checked_at FROM achievement_guide WHERE achievement_id ${inCats}`).all(...ids) as Record<string, any>[]) {
+  for (const g of db.prepare(`SELECT achievement_id, site, url, checked_at FROM achievement_guide WHERE achievement_id ${inSet}`).all(...args) as Record<string, any>[]) {
     if (!guides.has(g.achievement_id)) guides.set(g.achievement_id, g); // first row, like the former LIMIT 1
+  }
+  const dungeons = new Map<number, { name: string; level: number }[]>();
+  for (const d of db.prepare(`SELECT da.achievement_id a, d.name, d.optimal_level level FROM dungeon_achievement da JOIN dungeon d ON d.id = da.dungeon_id
+    WHERE d.name IS NOT NULL AND da.achievement_id ${inSet} ORDER BY d.optimal_level, d.name`).all(...args) as Record<string, any>[]) {
+    dungeons.set(d.a, [...(dungeons.get(d.a) ?? []), { name: d.name, level: d.level }]);
   }
   const dofusByAch = new Map<number, string[]>();
   for (const d of db.prepare('SELECT name, achievement_ids FROM dofus').all() as Record<string, any>[]) {
@@ -245,8 +264,49 @@ export const loadAchievements = (path: string, categoryIds: number[]) => withDb(
       rewards: mergeRewards(a.rewards),
       guide: g ? { site: g.site, url: g.url, checkedAt: g.checked_at } : null,
       dofus: dofusByAch.get(a.id) ?? [],
+      dungeons: dungeons.get(a.id) ?? [],
     };
   });
+}
+
+export type AchievementMatch = 'name' | 'dungeon' | 'objective' | 'category' | 'description';
+export interface AchievementHit { id: number; match: AchievementMatch; text: string }
+/** Lowercase without accents: "Forêt" and "foret" match. */
+export const foldText = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase();
+
+// searchable texts of every achievement, built once per database file (≈ 12 k short strings)
+const searchIndexes = new Map<string, { id: number; match: AchievementMatch; text: string; folded: string }[]>();
+function searchIndex(db: DatabaseSync, path: string) {
+  let idx = searchIndexes.get(path);
+  if (idx) return idx;
+  idx = [];
+  const add = (id: number, match: AchievementMatch, text: string | null) => { if (text) idx!.push({ id, match, text, folded: foldText(text) }); };
+  for (const a of db.prepare(`SELECT a.id, a.name, a.description, c.name cat, p.name parent FROM achievement a
+    LEFT JOIN achievement_category c ON c.id = a.category_id LEFT JOIN achievement_category p ON p.id = c.parent_id`).all() as Record<string, any>[]) {
+    add(a.id, 'name', a.name);
+    add(a.id, 'category', a.parent ? `${a.parent} › ${a.cat}` : a.cat);
+    add(a.id, 'description', cleanGameText(a.description));
+  }
+  for (const o of db.prepare('SELECT achievement_id, name FROM achievement_objective').all() as Record<string, any>[]) add(o.achievement_id, 'objective', o.name);
+  for (const d of db.prepare('SELECT da.achievement_id, d.name FROM dungeon_achievement da JOIN dungeon d ON d.id = da.dungeon_id').all() as Record<string, any>[]) add(d.achievement_id, 'dungeon', d.name);
+  searchIndexes.set(path, idx);
+  return idx;
+}
+
+const MATCH_RANK: Record<AchievementMatch, number> = { name: 0, dungeon: 1, objective: 2, category: 3, description: 4 };
+/** Achievements whose name, dungeon, objective text (monsters, quests, places…), category or description contain every word
+ *  of the query, best match first (name before dungeon before objective…), then by level. */
+export const searchAchievements = (path: string, query: string, limit = 40) => withDb(path, (db): AchievementHit[] => {
+  const words = foldText(query).split(/\s+/).filter((w) => w.length >= 2).slice(0, 6);
+  if (!words.length) return [];
+  const best = new Map<number, AchievementHit>();
+  for (const e of searchIndex(db, path)) {
+    if (!words.every((w) => e.folded.includes(w))) continue;
+    const cur = best.get(e.id);
+    if (!cur || MATCH_RANK[e.match] < MATCH_RANK[cur.match]) best.set(e.id, { id: e.id, match: e.match, text: e.text });
+  }
+  const level = new Map((db.prepare('SELECT id, level FROM achievement').all() as { id: number; level: number }[]).map((r) => [r.id, r.level]));
+  return [...best.values()].sort((a, b) => MATCH_RANK[a.match] - MATCH_RANK[b.match] || (level.get(a.id) ?? 0) - (level.get(b.id) ?? 0)).slice(0, limit);
 });
 
 /** Every achievement's objectives with their official condition, for progress across all categories. */

@@ -203,3 +203,21 @@ test('real data: craft demand ranks zone loot by how many game recipes use it', 
   assert.ok(Object.values(data.drops).some((d) => d.length > 3));
   assert.ok(forLevel(data, 60, 10).wanted.some((x) => x.item === 'Capsule Explosive')); // 4th+ drop of its monsters
 });
+
+test('real data: achievement search covers names, objectives and dungeons, without accents', { skip }, async () => {
+  const { searchAchievements } = await import('../src/load.ts');
+  const byName = searchAchievements(db!, 'kardorim');
+  assert.equal(byName[0].match, 'name');
+  assert.ok(byName.some((h) => h.text === 'Crypte de Kardorim'));
+  assert.ok(searchAchievements(db!, 'foret').some((h) => h.text.includes('Forêt'))); // "foret" finds "Forêt"
+  assert.ok(searchAchievements(db!, 'scoliopode').some((h) => h.match === 'objective')); // a monster named only in objectives
+  assert.deepEqual(searchAchievements(db!, 'x'), []); // one letter: nothing
+  for (const h of searchAchievements(db!, 'frigost')) assert.ok(h.text.toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '').includes('frigost'));
+});
+
+test('real data: achievements by id keep their order and carry their dungeons', { skip }, async () => {
+  const { loadAchievementsByIds, loadAchievements } = await import('../src/load.ts');
+  assert.deepEqual(loadAchievementsByIds(db!, [9064, 9097, 9065, 999999]).map((a) => a.id), [9064, 9097, 9065]);
+  const crypt = loadAchievements(db!, [11]).find((a) => a.name === 'Crypte de Kardorim')!;
+  assert.deepEqual(crypt.dungeons, [{ name: 'Crypte de Kardorim', level: 10 }]);
+});

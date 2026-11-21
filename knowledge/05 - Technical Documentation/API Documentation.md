@@ -8,6 +8,8 @@
 | `GET /api/graph` | — | static (built once) |
 | `GET /api/quests/:id` | numeric id | `max-age=3600` |
 | `GET /api/achievements?categories=1,2` | positive integers, at most 200 | `max-age=3600` |
+| `GET /api/achievements?ids=10,11` | positive integers, at most 100; rows returned in the order given (recommendations, deep links) | `max-age=3600` |
+| `GET /api/achievements/search?q=` | text, trimmed to 80 characters, at least 2; accent-insensitive; matches name, dungeon, objective text, category, description; at most 40 results, each with what matched and the full row | `max-age=3600` |
 | `GET /api/achievements/objectives` | — | static |
 | `GET /api/items/search?q=&type=&min=&max=` | text (60 characters), integers | `max-age=3600` |
 | `GET /api/professions/:slug` | `[a-z-]{2,40}` | `max-age=3600` |

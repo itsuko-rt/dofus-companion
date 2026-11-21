@@ -5,6 +5,14 @@
 ## Where we are
 **Pre-launch.** The site runs locally. On branch `develop` (after the pre-merge fixes of 2026-11-20): typecheck clean, 90/90 unit tests, production build OK, E2E 47 passed and 1 skipped by design, 0 failed. Not deployed.
 
+## Succès redesign (2026-11-21, on `develop`)
+The achievement journal was rebuilt for first-time players ([[2026-11-21 Achievements redesign]]):
+- **"Pour vous"** landing: to confirm, nearly done, class and level suggestions, each with its reason;
+- **categories in 3 families**, with Temporis and events kept apart;
+- **one search** over names, objectives, dungeons and categories;
+- **clearer cards** with "Où aller" (quests and their status, dungeons, Dofus);
+- **mobile category picker**, and the browser's back button works between views.
+
 ## PR #2 review (2026-11-20)
 Report: `docs/PR2_TECHNICAL_REVIEW.md`, summary [[2026-11-20 PR 2 technical review]]. The four pre-merge fixes are done on `develop`, with regression tests ([[2026-11-20 PR 2 pre-merge fixes]]):
 1. Almanax: a season no longer replaces the day's offering (81 days of 2026 → 0).
