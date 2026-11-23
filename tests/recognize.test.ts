@@ -46,3 +46,37 @@ test('a short name inside an unrelated longer sentence is not taken', () => {
   const c = buildCatalog([{ id: 'quest:5', name: 'Le village' }]);
   assert.deepEqual(matchLines([L('Retournez voir le maire dans le village de pêcheurs')], c), []);
 });
+
+test('saved without asking only when the whole line is exactly one unshared, long-enough name read clearly', async () => {
+  const { isCertain, isLikely } = await import('../src/recognize.ts');
+  const cat = buildCatalog([
+    { id: 'quest:1', name: 'Le village dans les nuages' },
+    { id: 'quest:5', name: 'Astrub' },          // a region name: also a window header
+    { id: 'quest:3', name: 'Mise à l’épreuve' }, { id: 'ach:9', name: 'Mise à l’épreuve' },
+  ]);
+  const by = (lines: { text: string; confidence: number }[]) => new Map(matchLines(lines, cat).map((m) => [m.id, m]));
+  const m = by([L('Le village dans les nuages', 72), L('Astrub', 95), L('Mise à l’épreuve', 95)]);
+  assert.equal(isCertain(m.get('quest:1')!), true);   // exact, modest OCR confidence is enough
+  assert.equal(isCertain(m.get('quest:5')!), false);  // one short word: could be a label
+  assert.equal(isCertain(m.get('quest:3')!), false);  // shared with an achievement
+  assert.equal(isLikely(m.get('quest:3')!), false);
+  const noisy = by([L('Le vilage dans les nuages', 90)]).get('quest:1')!;
+  assert.equal(noisy.exact, false);
+  assert.equal(isCertain(noisy), false);              // one letter wrong: asked, but pre-ticked
+  assert.equal(isLikely(noisy), true);
+  assert.equal(isCertain(by([L('Le village dans les nuages', 40)]).get('quest:1')!), false); // read badly
+  const inside = by([L('Le village dans les nuages niv. 12 1/3 terminé', 90)]).get('quest:1');
+  assert.equal(inside?.exact ?? false, false);         // found inside a longer line: never saved without asking
+});
+
+test('an icon read as one or two letters before the name keeps it exact; a long name with two letters misread is pre-ticked', async () => {
+  const { isCertain, isLikely } = await import('../src/recognize.ts');
+  const cat = buildCatalog([{ id: 'quest:18', name: "Wogew l'hewmite" }, { id: 'quest:849', name: 'Glugubrr est un vilain grincheux' }, { id: 'quest:1', name: 'La chapelle noire' }]);
+  const m = new Map(matchLines([L("HE Wogew l'hewmite niv. 10", 64), L('N GlugubIT est un vilain grincheux niv. 44', 76), L('La chapelle noire', 77)], cat).map((x) => [x.id, x]));
+  assert.equal(m.get('quest:18')!.exact, true);
+  assert.equal(isCertain(m.get('quest:18')!), true);
+  assert.equal(m.get('quest:1')!.exact, true); // "La" is part of the name, not a stray token
+  const g = m.get('quest:849')!;
+  assert.equal(isCertain(g), false);
+  assert.equal(isLikely(g), true);
+});

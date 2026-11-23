@@ -30,7 +30,12 @@ Goal: use Atlas while playing, without switching windows and without touching th
 ## Game integrity and Ankama's rules
 - Ankama warns against bots and automation and asks players to report tools that give kamas or items (secondary sources: JOL, Breakflip). The exact current wording of the terms about third-party software could not be retrieved (UNVERIFIED): ankama.com/fr/cgu returned 404 and searches did not surface the text.
 - **What Atlas does:** a separate browser window that the player reads and clicks. No access to the game client, its memory, packets, files or logs. No input simulation, no automation. This is the same as a guide open in a browser on a second screen ([[ADR-0001 Game data from the game files]] already excludes any interaction with the client).
-- **What Atlas will not do:** read the combat chat or log files, switch between game windows, read the screen continuously, or draw on top of the game's own surface (click-through injection).
+- **What Atlas will not do:**
+  - read the combat chat or log files;
+  - switch between game windows;
+  - read the screen in the background;
+  - draw on top of the game's own surface (click-through injection).
+- **Exception, decided 2026-11-23 at the owner's request:** the scanner may read the frames of a window the player shares in the browser's own dialog. The browser shows its sharing indicator. Frames are read only when the view changes, never more than once per 1.5 s. It stops after 10 minutes or when the player stops sharing. Pixels only: nothing is sent to the game, nothing leaves the browser ([[Character Sync OCR]]).
 - **If something deeper is wanted later:** ask Ankama support first and record the answer here.
 
 ## MVP (built 2026-11-21, see [[Companion Window]])

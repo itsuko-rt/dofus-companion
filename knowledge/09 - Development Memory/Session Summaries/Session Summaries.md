@@ -2,6 +2,7 @@
 
 One note per significant session, named `YYYY-MM-DD <topic>`, from [[Development Session]]. Newest first.
 
+- [[2026-11-23 Scanner that saves quests and achievements]]
 - [[2026-11-21 Ecosystem research and encyclopaedia]]
 - [[2026-11-21 Achievements refinement]]
 - [[2026-11-21 Achievements visual redesign]]

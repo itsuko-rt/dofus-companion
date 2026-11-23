@@ -5,6 +5,9 @@
 ## Where we are
 **Pre-launch.** The site runs locally. On branch `develop` (after the pre-merge fixes of 2026-11-20): typecheck clean, 90/90 unit tests, production build OK, E2E 47 passed and 1 skipped by design, 0 failed. Not deployed.
 
+## Scanner (2026-11-23, branch feature/atlas-ecosystem)
+A screenshot or a shared window of the « Terminées » quest list or the obtained achievements now saves what is read with certainty at once (undo in the history), and pre-ticks the rest. See [[2026-11-23 Scanner that saves quests and achievements]]. Accuracy on real DOFUS screenshots: not measured yet.
+
 ## Connected ecosystem (2026-11-21, branch feature/atlas-ecosystem)
 Research and the first ecosystem features ([[2026-11-21 Ecosystem research and encyclopaedia]]):
 - **Research:** [[Competitor Analysis]], [[Teckium Tool Analysis]], [[Desktop Companion Research]].

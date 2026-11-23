@@ -11,6 +11,10 @@ export interface Match {
   confidence: number;
   /** another entry with the same name exists (quest and achievement often share one) */
   ambiguous: boolean;
+  /** 0–1 name similarity alone, and 0–1 OCR confidence alone (game fonts often get a modest OCR confidence) */
+  similarity: number; ocr: number;
+  /** the whole line (or two wrapped lines) is exactly this name, not a name found inside a longer line */
+  exact: boolean;
 }
 
 // apostrophes become spaces too: OCR reads them as a space, a quote or nothing
@@ -79,7 +83,13 @@ export function matchLines(lines: OcrLine[], catalog: Catalog, min = 0.8): Match
 
   const best = new Map<string, Match>();
   for (const p of probes) {
-    let hits = catalog.byKey.get(p.key) ?? exactSpan(p.key, catalog);
+    // the whole line is the name, or the name with one stray token of 1–2 characters before or after it: an icon read
+    // as letters ("HE Wogew l'hewmite"), a bullet, a check mark
+    const t = p.key.split(' ');
+    const whole = catalog.byKey.get(p.key)
+      ?? (t.length > 1 && t[0].length <= 2 ? catalog.byKey.get(t.slice(1).join(' ')) : undefined)
+      ?? (t.length > 1 && t[t.length - 1].length <= 2 ? catalog.byKey.get(t.slice(0, -1).join(' ')) : undefined);
+    let hits = whole ?? exactSpan(p.key, catalog);
     let sim = 1;
     if (!hits) {
       sim = 0;
@@ -91,10 +101,21 @@ export function matchLines(lines: OcrLine[], catalog: Catalog, min = 0.8): Match
     }
     if (!hits || sim < min) continue;
     for (const h of hits) {
-      const m: Match = { id: h.id, name: h.name, read: p.raw, confidence: Math.round(sim * p.conf * 100) / 100, ambiguous: hits.length > 1 };
+      const m: Match = { id: h.id, name: h.name, read: p.raw, confidence: Math.round(sim * p.conf * 100) / 100, ambiguous: hits.length > 1,
+        similarity: Math.round(sim * 100) / 100, ocr: Math.round(p.conf * 100) / 100, exact: !!whole };
       const prev = best.get(h.id);
       if (!prev || m.confidence > prev.confidence) best.set(h.id, m); // the same name on several screenshots counts once
     }
   }
   return [...best.values()].sort((a, b) => b.confidence - a.confidence);
 }
+
+/**
+ * Saved without asking (the player can undo it in the history): the whole line is exactly one game name that no other
+ * entry shares, read clearly, and long enough not to be a window label (region headers, tab names: "Astrub", "Terminées").
+ */
+export const isCertain = (m: Match) => m.exact && !m.ambiguous && m.ocr >= 0.55
+  && (normalize(m.name).split(' ').length >= 2 || normalize(m.name).length >= 10);
+/** Pre-ticked for confirmation: almost exactly a name, read reasonably well. */
+export const isLikely = (m: Match) => !m.ambiguous && m.ocr >= 0.45
+  && m.similarity >= (normalize(m.name).length >= 15 ? 0.85 : 0.92); // a long name with one or two letters misread is still that name

@@ -1,14 +1,14 @@
 'use client';
 // "Scanner ma progression": the player shows a Dofus window (screenshot, paste or browser window capture),
 // the text is read locally, matched to game names, and nothing is saved before the player confirms.
-import { useEffect, useMemo, useState } from 'react';
-import { Camera, Check, ClipboardPaste, ImagePlus, Loader2, RotateCcw, ScanLine, ShieldCheck, X } from 'lucide-react';
-import { buildCatalog, matchLines, type Match } from '../../src/recognize.ts';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Check, ClipboardPaste, ImagePlus, Loader2, MonitorUp, RotateCcw, ScanLine, ShieldCheck, Square, X, Zap } from 'lucide-react';
+import { buildCatalog, isCertain, isLikely, matchLines, type Match } from '../../src/recognize.ts';
 import { prerequisitesToComplete } from '../../src/views.ts';
 import { CHANGE_SOURCES } from '../../src/character.ts';
 import { useGame } from '../quests/useGame';
 import { Button, Card, PageHero, SECTION, SectionTitle } from '../ui';
-import { captureFrame, readLines } from './ocr';
+import { readLines, startShare, type ShareSession } from './ocr';
 
 const MAX_PIXELS = 40e6;
 const MAX_BYTES = 25 * 1024 * 1024;
@@ -23,9 +23,11 @@ const MODES: { id: Mode; label: string; help: string }[] = [
   { id: 'quests_active', label: 'Quêtes en cours', help: 'Fenêtre des quêtes, liste des quêtes en cours.' },
   { id: 'achievements', label: 'Succès obtenus', help: 'Fenêtre des succès, en n’affichant que les succès obtenus.' },
 ];
-const AUTO_SELECT = 0.9; // pre-ticked only when the name is read almost perfectly
+const AUTO_READ_MS = 1500;        // automatic reading while sharing: at most one read per 1.5 s, only when the view changed
+const AUTO_READ_LIMIT = 10 * 60e3; // and it stops by itself after 10 minutes
+const AUTO_SAVE_KEY = 'atlas:scan:autosave';
 
-interface Shot { id: number; name: string; status: 'reading' | 'done' | 'error'; lines: number; error?: string }
+interface Shot { id: number; name: string; status: 'reading' | 'done' | 'error'; lines: number; error?: string; text?: string[] }
 
 export default function ScanView() {
   const { graph, ch } = useGame();
@@ -36,6 +38,17 @@ export default function ScanView() {
   const [deduced, setDeduced] = useState<Set<string>>(new Set());
   const [progress, setProgress] = useState<number | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
+  // names read with certainty are saved at once (undo in the history); the switch is remembered in this browser
+  const [autoSave, setAutoSave] = useState(true);
+  useEffect(() => { try { setAutoSave(localStorage.getItem(AUTO_SAVE_KEY) !== '0'); } catch { /* storage blocked */ } }, []);
+  const [autoSaved, setAutoSaved] = useState<string[]>([]);
+  const [share, setShare] = useState<ShareSession | null>(null);
+  const [autoRead, setAutoRead] = useState(false);
+  const [reads, setReads] = useState(0);
+  const [shareError, setShareError] = useState<string | null>(null);
+  const busy = useRef(false);
+  const autoSince = useRef(0); // when automatic reading was switched on (the 10-minute limit)
+  const preview = useRef<HTMLDivElement>(null);
 
   const catalog = useMemo(() => graph ? buildCatalog([...graph.nodes.values()]
     .filter((n) => (mode === 'achievements' ? n.kind === 'achievement' : n.kind === 'quest'))
@@ -46,13 +59,15 @@ export default function ScanView() {
     if (process.env.NODE_ENV === 'development' && catalog) (window as unknown as Record<string, unknown>).__scan = { readLines, matchLines, catalog };
   }, [catalog]);
 
-  const reset = () => { setShots([]); setMatches([]); setPicked(new Set()); setDeduced(new Set()); setSaved(null); };
+  const reset = () => { setShots([]); setMatches([]); setPicked(new Set()); setDeduced(new Set()); setSaved(null); setAutoSaved([]); setReads(0); };
   useEffect(reset, [mode]);
 
-  async function add(image: Promise<ImageBitmap>, name: string) {
+  /** Reads one image; `quiet`: a frame of the shared window in automatic mode (counted, not listed one by one). */
+  async function add(image: Promise<ImageBitmap>, name: string, quiet = false) {
     if (!catalog) return;
     const id = Date.now() + Math.random();
-    setShots((s) => [...s, { id, name, status: 'reading', lines: 0 }]);
+    busy.current = true;
+    if (!quiet) setShots((s) => [...s, { id, name, status: 'reading', lines: 0 }]);
     setSaved(null);
     try {
       const img = await image.catch(() => { throw new Error('Image illisible : utilisez une capture PNG, JPEG ou WebP.'); });
@@ -60,7 +75,17 @@ export default function ScanView() {
       if (img.width * img.height > MAX_PIXELS) throw new Error('Image trop grande : 40 mégapixels au plus.');
       const lines = await readLines(img, (p) => setProgress(p));
       const found = matchLines(lines, catalog);
-      setShots((s) => s.map((x) => (x.id === id ? { ...x, status: 'done', lines: lines.length } : x)));
+      if (quiet) setReads((n) => n + 1);
+      else setShots((s) => s.map((x) => (x.id === id ? { ...x, status: 'done', lines: lines.length, text: [...new Set(lines.map((l) => l.text))] } : x)));
+      const fresh = found.filter((m) => !isRecorded(m.id));
+      const sure = autoSave ? fresh.filter(isCertain) : [];
+      if (sure.length) {
+        const ids = sure.map((m) => m.id);
+        const what = MODES.find((m) => m.id === mode)!.label.toLowerCase();
+        if (mode === 'quests_active') for (const x of ids) ch.setMark(x, 'active', 'scan');
+        else ch.markDone(ids, 'scan', `Capture d’écran : ${ids.length} ${what} enregistré(e)s automatiquement`);
+        setAutoSaved((prev) => [...prev, ...sure.map((m) => m.name)]);
+      }
       setMatches((prev) => {
         const all = new Map(prev.map((m) => [m.id, m]));
         for (const m of found) if (!all.has(m.id) || all.get(m.id)!.confidence < m.confidence) all.set(m.id, m);
@@ -68,13 +93,44 @@ export default function ScanView() {
       });
       setPicked((prev) => {
         const next = new Set(prev);
-        for (const m of found) if (m.confidence >= AUTO_SELECT && !m.ambiguous && !isRecorded(m.id)) next.add(m.id);
+        for (const m of fresh) if (isLikely(m) && !sure.includes(m)) next.add(m.id);
         return next;
       });
     } catch (e) {
-      setShots((s) => s.map((x) => (x.id === id ? { ...x, status: 'error', error: (e as Error).message } : x)));
-    } finally { setProgress(null); }
+      if (!quiet) setShots((s) => s.map((x) => (x.id === id ? { ...x, status: 'error', error: (e as Error).message } : x)));
+    } finally { setProgress(null); busy.current = false; }
   }
+
+  async function beginShare() {
+    setShareError(null);
+    try {
+      const sess = await startShare();
+      sess.onEnded(() => { setShare(null); setAutoRead(false); });
+      setShare(sess);
+    } catch (e) {
+      setShareError((e as Error).name === 'NotAllowedError' ? 'Partage annulé.' : 'Le navigateur n’a pas pu partager la fenêtre.');
+    }
+  }
+  const endShare = () => { share?.stop(); setShare(null); setAutoRead(false); };
+  // show what is shared, small, so the player sees which window is read
+  useEffect(() => {
+    const box = preview.current;
+    if (!share || !box) return;
+    share.video.className = 'h-full w-full object-contain';
+    box.replaceChildren(share.video);
+    return () => { box.replaceChildren(); };
+  }, [share]);
+  useEffect(() => () => share?.stop(), [share]);
+  // automatic reading: the player scrolls the list in game, a new view is read when it appears
+  useEffect(() => {
+    if (!share || !autoRead) return;
+    const t = setInterval(() => {
+      if (Date.now() - autoSince.current > AUTO_READ_LIMIT) { setAutoRead(false); return; }
+      if (busy.current || !share.changed()) return;
+      void add(share.grab(), 'Fenêtre partagée', true);
+    }, AUTO_READ_MS);
+    return () => clearInterval(t);
+  });
 
   // Ctrl+V of a screenshot (Win+Maj+S puts one in the clipboard)
   useEffect(() => {
@@ -144,34 +200,80 @@ export default function ScanView() {
         <Card>
           <SectionTitle>2. Ajoutez une ou plusieurs captures</SectionTitle>
           <div className="flex flex-wrap gap-2">
-            <Button onClick={() => void add(captureFrame(), 'Capture de fenêtre')} disabled={typeof navigator === 'undefined' || !navigator.mediaDevices?.getDisplayMedia}>
-              <Camera size={15} /> Capturer la fenêtre Dofus
-            </Button>
+            {!share ? (
+              <Button onClick={() => void beginShare()} disabled={typeof navigator === 'undefined' || !navigator.mediaDevices?.getDisplayMedia}>
+                <MonitorUp size={15} /> Partager la fenêtre Dofus
+              </Button>
+            ) : null}
             <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-line bg-surface-2 px-3.5 py-2 text-sm hover:border-faint">
               <ImagePlus size={15} /> Choisir des images
               <input type="file" accept="image/*" multiple className="sr-only" onChange={(e) => { for (const f of e.target.files ?? []) void add(decode(f), f.name); e.target.value = ''; }} />
             </label>
-            <span className="inline-flex items-center gap-1.5 text-sm text-muted"><ClipboardPaste size={15} /> ou collez une capture (Ctrl+V)</span>
+            <span className="inline-flex items-center gap-1.5 text-sm text-muted"><ClipboardPaste size={15} /> ou collez une capture (Ctrl+V, après Win+Maj+S)</span>
           </div>
+          {shareError && <p className="mt-2 text-xs text-check" role="alert">{shareError}</p>}
+          {share && (
+            <div className="mt-3 flex flex-col gap-3 rounded-lg border border-brand/50 bg-brand/10 p-3 sm:flex-row">
+              <div ref={preview} className="aspect-video w-full shrink-0 overflow-hidden rounded-md bg-black sm:w-56" aria-label="Fenêtre partagée" />
+              <div className="flex min-w-0 flex-1 flex-col gap-2 text-sm">
+                <p className="font-medium">Fenêtre partagée</p>
+                <div className="flex flex-wrap gap-2">
+                  <Button onClick={() => void add(share.grab(), 'Fenêtre partagée')}><ScanLine size={15} /> Lire maintenant</Button>
+                  <Button variant={autoRead ? 'primary' : 'secondary'} aria-pressed={autoRead} onClick={() => { autoSince.current = Date.now(); setAutoRead(!autoRead); }}>
+                    <Zap size={15} /> {autoRead ? 'Lecture automatique en cours' : 'Lire en faisant défiler'}
+                  </Button>
+                  <Button variant="ghost" onClick={endShare}><Square size={14} /> Arrêter le partage</Button>
+                </div>
+                <p className="text-xs text-muted">
+                  {autoRead ? `Faites défiler la liste dans le jeu : chaque nouvelle vue est lue (${reads} lue${reads > 1 ? 's' : ''}). S’arrête seul au bout de 10 minutes.`
+                    : 'Ouvrez la liste dans le jeu, puis « Lire maintenant », ou la lecture automatique pour lire en faisant défiler.'}
+                </p>
+              </div>
+            </div>
+          )}
           {shots.length > 0 && (
             <ul className="mt-3 flex flex-col gap-1 text-sm">
               {shots.map((s) => (
-                <li key={s.id} className="flex items-center gap-2">
-                  {s.status === 'reading' ? <Loader2 size={14} className="animate-spin text-info" /> : s.status === 'done' ? <Check size={14} className="text-done" /> : <X size={14} className="text-red-300" />}
-                  <span className="truncate">{s.name}</span>
-                  <span className="text-xs text-muted">{s.status === 'reading' ? (progress != null ? `lecture ${Math.round(progress * 100)} %` : 'lecture…') : s.status === 'done' ? `${s.lines} lignes lues` : s.error}</span>
+                <li key={s.id}>
+                  <span className="flex items-center gap-2">
+                    {s.status === 'reading' ? <Loader2 size={14} className="animate-spin text-info" /> : s.status === 'done' ? <Check size={14} className="text-done" /> : <X size={14} className="text-red-300" />}
+                    <span className="truncate">{s.name}</span>
+                    <span className="text-xs text-muted">{s.status === 'reading' ? (progress != null ? `lecture ${Math.round(progress * 100)} %` : 'lecture…') : s.status === 'done' ? `${s.text?.length ?? s.lines} lignes lues` : s.error}</span>
+                  </span>
+                  {/* what the OCR actually read: to understand a capture where names were missed */}
+                  {s.text && s.text.length > 0 && (
+                    <details className="ml-6 mt-0.5 text-xs text-muted">
+                      <summary className="cursor-pointer text-faint hover:text-text">Voir le texte lu</summary>
+                      <p className="mt-1 max-h-40 overflow-y-auto whitespace-pre-line rounded bg-surface-2 p-2 font-mono text-[11px]">{s.text.join(String.fromCharCode(10))}</p>
+                    </details>
+                  )}
                 </li>
               ))}
             </ul>
           )}
         </Card>
 
-        {(matches.length > 0 || shots.some((s) => s.status === 'done')) && (
+        <label className="flex cursor-pointer items-start gap-2 text-sm">
+          <input type="checkbox" checked={autoSave} className="mt-0.5 accent-[var(--color-brand)]"
+            onChange={(e) => { setAutoSave(e.target.checked); try { localStorage.setItem(AUTO_SAVE_KEY, e.target.checked ? '1' : '0'); } catch { /* storage blocked */ } }} />
+          <span>Enregistrer tout de suite les noms lus avec certitude
+            <span className="block text-xs text-muted">Nom complet lu exactement, porté par un seul élément du jeu. Le reste attend votre confirmation ci-dessous. Tout est annulable dans l’historique.</span>
+          </span>
+        </label>
+        {autoSaved.length > 0 && (
+          <div role="status" className="rounded-lg border border-done/50 bg-done/10 px-3 py-2 text-sm">
+            <p className="flex flex-wrap items-center gap-2"><Check size={15} className="text-done" /> <b>{autoSaved.length}</b> enregistré(e)s automatiquement pour {ch.character.name}
+              {history[0] && <button className="inline-flex items-center gap-1 text-xs text-brand hover:underline" onClick={() => { ch.revertEntry(history[0].i); setAutoSaved([]); }}><RotateCcw size={12} /> Annuler le dernier enregistrement</button>}
+            </p>
+            <p className="mt-1 text-xs text-muted">{autoSaved.slice(-12).join(' · ')}{autoSaved.length > 12 ? ' …' : ''}</p>
+          </div>
+        )}
+        {(matches.length > 0 || shots.some((s) => s.status === 'done') || reads > 0) && (
           <Card>
             <SectionTitle hint={`${picked.size} sélectionné(s)`}>3. Vérifiez avant d’enregistrer</SectionTitle>
             {matches.length === 0 ? <p className="text-sm text-muted">Aucun nom reconnu. Essayez une capture plus nette, ou zoomée sur la liste.</p> : (
               <table className="w-full text-sm">
-                <thead><tr className="text-left text-xs text-faint"><th className="w-8 py-1" /><th>Reconnu</th><th className="hidden sm:table-cell">Texte lu</th><th className="w-20 text-right">Confiance</th></tr></thead>
+                <thead><tr className="text-left text-xs text-faint"><th className="w-8 py-1" /><th>Reconnu</th><th className="hidden sm:table-cell">Texte lu</th><th className="w-20 text-right">Nom lu</th></tr></thead>
                 <tbody>
                   {matches.map((m) => {
                     const recorded = isRecorded(m.id);
@@ -184,7 +286,7 @@ export default function ScanView() {
                           {m.ambiguous && <span className="ml-2 text-xs text-check" title="Plusieurs éléments portent ce nom">nom partagé</span>}
                         </td>
                         <td className="hidden py-1.5 text-xs text-muted sm:table-cell">« {m.read} »</td>
-                        <td className={`py-1.5 text-right tabular-nums ${m.confidence >= AUTO_SELECT ? 'text-done' : m.confidence >= 0.75 ? 'text-accent' : 'text-check'}`}>{Math.round(m.confidence * 100)} %</td>
+                        <td className={`py-1.5 text-right tabular-nums ${isLikely(m) ? 'text-done' : m.similarity >= 0.85 ? 'text-accent' : 'text-check'}`} title={`Nom : ${Math.round(m.similarity * 100)} % · lecture : ${Math.round(m.ocr * 100)} %`}>{Math.round(m.similarity * 100)} %</td>
                       </tr>
                     );
                   })}
@@ -209,7 +311,7 @@ export default function ScanView() {
             <div className="mt-4 flex flex-wrap items-center gap-2">
               <Button variant="primary" onClick={confirm} disabled={!picked.size && !deduced.size}><Check size={15} /> Enregistrer la sélection</Button>
               <Button variant="ghost" onClick={reset}>Tout rejeter</Button>
-              <span className="text-xs text-faint">Pré-cochés : noms lus à {Math.round(AUTO_SELECT * 100)} % ou plus, sans ambiguïté.</span>
+              <span className="text-xs text-faint">Pré-cochés : noms lus à 92 % ou plus, sans ambiguïté.</span>
             </div>
           </Card>
         )}
