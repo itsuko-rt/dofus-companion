@@ -38,6 +38,14 @@ The scanner was built on 2026-11-20 but had never been run on game-like lists wi
   - Grey levels: 0–3 names out of 7.
   - Thresholding at about 2.6× upscaling: 7/7, one with a single wrong letter.
 
+## Follow-up the same day: framing the shared window
+The owner reported that « Partager la fenêtre Dofus » did not really read the screen. Causes and fixes:
+- **The whole window was read** (scene, chat, every panel): slow and noisy. The player now frames the list on the preview, and only that part is read.
+- **Automatic reading never settled**, because the moving scene always counted as a change. Change detection now looks at the frame only, with a sharper detector: the old 64×64 average missed a list that scrolled.
+- **No feedback in automatic mode.** There is now a live status for each read.
+- E2E: the shared « window » has a moving scene and chat text. The test frames the list by dragging on the preview, checks there are at most 2 reads in 6 s while only the scene moves, and that the new names are read after a scroll.
+- Results: typecheck clean, `npm test` 108/108, E2E 63 passed and 1 skipped by design, 0 failed.
+
 ## Remaining issues
 - **Not measured on real DOFUS screenshots** (UNVERIFIED). The game font, transparency and the scene behind the windows may differ from the synthetic images.
 - Names made only of numbers or starting with them (« 3 500 points ») cannot be matched: the matcher drops leading numbers.

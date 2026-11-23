@@ -100,12 +100,25 @@ export async function captureFrame(): Promise<ImageBitmap> {
   }
 }
 
+/** Part of the shared window to read, as fractions of its width and height (the list the player framed). */
+export interface Region { x: number; y: number; w: number; h: number }
+export const validRegion = (r: unknown): r is Region => {
+  const o = r as Region;
+  return !!o && [o.x, o.y, o.w, o.h].every((v) => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1)
+    && o.w >= 0.03 && o.h >= 0.03 && o.x + o.w <= 1.0001 && o.y + o.h <= 1.0001;
+};
+
 /**
  * A sharing session on one window the player picks in the browser's dialog (the browser shows its own "sharing"
- * indicator). Frames are read only when asked (grab) or, in automatic mode, when the view has changed (the player
- * scrolls the list in game). Read-only pixels: nothing is sent to the game, nothing leaves the browser.
+ * indicator). Frames are read only when asked (grab) or, in automatic mode, when the framed part has changed (the
+ * player scrolls the list in game; the moving game scene outside the frame does not count). Read-only pixels:
+ * nothing is sent to the game, nothing leaves the browser.
  */
-export interface ShareSession { video: HTMLVideoElement; grab(): Promise<ImageBitmap>; changed(): boolean; stop(): void; onEnded(f: () => void): void }
+export interface ShareSession {
+  video: HTMLVideoElement;
+  grab(): Promise<ImageBitmap>; changed(): boolean; setRegion(r: Region | null): void;
+  stop(): void; onEnded(f: () => void): void;
+}
 export async function startShare(): Promise<ShareSession> {
   const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
   const video = document.createElement('video');
@@ -114,23 +127,40 @@ export async function startShare(): Promise<ShareSession> {
   video.playsInline = true;
   await video.play();
   await new Promise((r) => setTimeout(r, 300));
+  // change detection on a 200 px wide grey thumbnail of the framed part: scrolling a list moves text strokes, which a
+  // tiny thumbnail blurs away; counting the pixels that clearly changed catches it, and ignores compression noise
   const small = document.createElement('canvas');
-  small.width = 48; small.height = 48;
   const sctx = small.getContext('2d', { willReadFrequently: true })!;
   let last: Uint8ClampedArray | null = null;
+  let region: Region | null = null;
+  const box = () => {
+    const W = video.videoWidth, H = video.videoHeight;
+    if (!region) return { sx: 0, sy: 0, sw: W, sh: H };
+    const sx = Math.floor(region.x * W), sy = Math.floor(region.y * H);
+    return { sx, sy, sw: Math.max(8, Math.min(W - sx, Math.round(region.w * W))), sh: Math.max(8, Math.min(H - sy, Math.round(region.h * H))) };
+  };
   return {
     video,
-    grab: () => createImageBitmap(video),
-    /** true when the view differs from the last call's (mean grey difference on a 48×48 thumbnail) */
+    grab: () => { const b = box(); return createImageBitmap(video, b.sx, b.sy, b.sw, b.sh); },
+    /** true when at least 0.4 % of the framed part's thumbnail pixels changed by more than 24 grey levels */
     changed() {
-      sctx.drawImage(video, 0, 0, 48, 48);
-      const d = sctx.getImageData(0, 0, 48, 48).data;
-      let diff = 0;
-      if (last) for (let i = 0; i < d.length; i += 4) diff += Math.abs(d[i] - last[i]) + Math.abs(d[i + 1] - last[i + 1]) + Math.abs(d[i + 2] - last[i + 2]);
-      const moved = !last || diff / (48 * 48 * 3) > 4;
-      last = d;
+      const b = box();
+      const tw = 200, th = Math.max(8, Math.round(200 * b.sh / Math.max(1, b.sw)));
+      if (small.width !== tw || small.height !== th) { small.width = tw; small.height = th; last = null; }
+      sctx.drawImage(video, b.sx, b.sy, b.sw, b.sh, 0, 0, tw, th);
+      const d = sctx.getImageData(0, 0, tw, th).data;
+      const grey = new Uint8ClampedArray(tw * th);
+      for (let i = 0, j = 0; i < d.length; i += 4, j++) grey[j] = (d[i] * 299 + d[i + 1] * 587 + d[i + 2] * 114) / 1000;
+      let moved = !last;
+      if (last) {
+        let n = 0;
+        for (let j = 0; j < grey.length; j++) if (Math.abs(grey[j] - last[j]) > 24) n++;
+        moved = n > grey.length * 0.004;
+      }
+      last = grey;
       return moved;
     },
+    setRegion: (r) => { region = r; last = null; },
     stop: () => stream.getTracks().forEach((t) => t.stop()),
     onEnded: (f) => stream.getVideoTracks()[0]?.addEventListener('ended', f),
   };

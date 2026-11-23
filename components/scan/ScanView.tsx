@@ -8,7 +8,8 @@ import { prerequisitesToComplete } from '../../src/views.ts';
 import { CHANGE_SOURCES } from '../../src/character.ts';
 import { useGame } from '../quests/useGame';
 import { Button, Card, PageHero, SECTION, SectionTitle } from '../ui';
-import { readLines, startShare, type ShareSession } from './ocr';
+import { readLines, startShare, validRegion, type Region, type ShareSession } from './ocr';
+import FramePicker from './FramePicker';
 
 const MAX_PIXELS = 40e6;
 const MAX_BYTES = 25 * 1024 * 1024;
@@ -26,6 +27,7 @@ const MODES: { id: Mode; label: string; help: string }[] = [
 const AUTO_READ_MS = 1500;        // automatic reading while sharing: at most one read per 1.5 s, only when the view changed
 const AUTO_READ_LIMIT = 10 * 60e3; // and it stops by itself after 10 minutes
 const AUTO_SAVE_KEY = 'atlas:scan:autosave';
+const REGION_KEY = 'atlas:scan:region'; // the frame drawn on the shared window, kept for next time
 
 interface Shot { id: number; name: string; status: 'reading' | 'done' | 'error'; lines: number; error?: string; text?: string[] }
 
@@ -48,7 +50,13 @@ export default function ScanView() {
   const [shareError, setShareError] = useState<string | null>(null);
   const busy = useRef(false);
   const autoSince = useRef(0); // when automatic reading was switched on (the 10-minute limit)
-  const preview = useRef<HTMLDivElement>(null);
+  const [region, setRegionState] = useState<Region | null>(null);
+  useEffect(() => { try { const r = JSON.parse(localStorage.getItem(REGION_KEY) ?? 'null'); if (validRegion(r)) setRegionState(r); } catch { /* storage blocked */ } }, []);
+  const setRegion = (r: Region | null) => { setRegionState(r); try { localStorage.setItem(REGION_KEY, JSON.stringify(r)); } catch { /* storage blocked */ } };
+  useEffect(() => { share?.setRegion(region); }, [share, region]);
+  // what the shared window gives, read after read: the player sees it working while scrolling in game
+  const [reading, setReading] = useState(false);
+  const [lastRead, setLastRead] = useState<{ names: number; fresh: number; saved: number; lines: number } | null>(null);
 
   const catalog = useMemo(() => graph ? buildCatalog([...graph.nodes.values()]
     .filter((n) => (mode === 'achievements' ? n.kind === 'achievement' : n.kind === 'quest'))
@@ -67,6 +75,7 @@ export default function ScanView() {
     if (!catalog) return;
     const id = Date.now() + Math.random();
     busy.current = true;
+    setReading(true);
     if (!quiet) setShots((s) => [...s, { id, name, status: 'reading', lines: 0 }]);
     setSaved(null);
     try {
@@ -79,6 +88,7 @@ export default function ScanView() {
       else setShots((s) => s.map((x) => (x.id === id ? { ...x, status: 'done', lines: lines.length, text: [...new Set(lines.map((l) => l.text))] } : x)));
       const fresh = found.filter((m) => !isRecorded(m.id));
       const sure = autoSave ? fresh.filter(isCertain) : [];
+      setLastRead({ names: found.length, fresh: fresh.length, saved: sure.length, lines: lines.length });
       if (sure.length) {
         const ids = sure.map((m) => m.id);
         const what = MODES.find((m) => m.id === mode)!.label.toLowerCase();
@@ -98,7 +108,7 @@ export default function ScanView() {
       });
     } catch (e) {
       if (!quiet) setShots((s) => s.map((x) => (x.id === id ? { ...x, status: 'error', error: (e as Error).message } : x)));
-    } finally { setProgress(null); busy.current = false; }
+    } finally { setProgress(null); busy.current = false; setReading(false); }
   }
 
   async function beginShare() {
@@ -112,14 +122,6 @@ export default function ScanView() {
     }
   }
   const endShare = () => { share?.stop(); setShare(null); setAutoRead(false); };
-  // show what is shared, small, so the player sees which window is read
-  useEffect(() => {
-    const box = preview.current;
-    if (!share || !box) return;
-    share.video.className = 'h-full w-full object-contain';
-    box.replaceChildren(share.video);
-    return () => { box.replaceChildren(); };
-  }, [share]);
   useEffect(() => () => share?.stop(), [share]);
   // automatic reading: the player scrolls the list in game, a new view is read when it appears
   useEffect(() => {
@@ -214,7 +216,7 @@ export default function ScanView() {
           {shareError && <p className="mt-2 text-xs text-check" role="alert">{shareError}</p>}
           {share && (
             <div className="mt-3 flex flex-col gap-3 rounded-lg border border-brand/50 bg-brand/10 p-3 sm:flex-row">
-              <div ref={preview} className="aspect-video w-full shrink-0 overflow-hidden rounded-md bg-black sm:w-56" aria-label="Fenêtre partagée" />
+              <div className="w-full shrink-0 sm:w-[26rem]"><FramePicker video={share.video} region={region} onRegion={setRegion} /></div>
               <div className="flex min-w-0 flex-1 flex-col gap-2 text-sm">
                 <p className="font-medium">Fenêtre partagée</p>
                 <div className="flex flex-wrap gap-2">
@@ -224,6 +226,11 @@ export default function ScanView() {
                   </Button>
                   <Button variant="ghost" onClick={endShare}><Square size={14} /> Arrêter le partage</Button>
                 </div>
+                <p className="flex items-center gap-1.5 text-xs" role="status">
+                  {reading ? <><Loader2 size={13} className="animate-spin text-info" /> Lecture de la vue…{progress != null && progress < 1 ? ` (modèle ${Math.round(progress * 100)} %)` : ''}</>
+                    : lastRead ? <><Check size={13} className="text-done" /> Vue lue : {lastRead.names} nom{lastRead.names > 1 ? 's' : ''} reconnu{lastRead.names > 1 ? 's' : ''}, {lastRead.fresh} nouveau{lastRead.fresh > 1 ? 'x' : ''}{lastRead.saved ? `, ${lastRead.saved} enregistré${lastRead.saved > 1 ? 's' : ''}` : ''}{lastRead.names === 0 ? (lastRead.lines ? ` (${lastRead.lines} lignes de texte lues, aucune ne correspond : encadrez la liste)` : ' (aucun texte lu : encadrez la liste)') : ''}</>
+                    : <span className="text-muted">Prêt. Rien n’est lu tant que vous ne le demandez pas.</span>}
+                </p>
                 <p className="text-xs text-muted">
                   {autoRead ? `Faites défiler la liste dans le jeu : chaque nouvelle vue est lue (${reads} lue${reads > 1 ? 's' : ''}). S’arrête seul au bout de 10 minutes.`
                     : 'Ouvrez la liste dans le jeu, puis « Lire maintenant », ou la lecture automatique pour lire en faisant défiler.'}
