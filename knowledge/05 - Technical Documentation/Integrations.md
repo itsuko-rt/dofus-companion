@@ -19,6 +19,8 @@ type: technical
 ## npm dependencies (runtime)
 `next`, `react`, `react-dom`, `@xyflow/react` and `@dagrejs/dagre` (quest graph), `lucide-react` (icons), `tesseract.js` (scanner).
 
+Game companion (`companion/package.json`, separate from the site): `electron` 45.3.0, dev only. It reads the DOFUS window title and pixels locally and sends nothing anywhere ([[ADR-0009 Windows companion reads the window title and screen]]).
+
 Dev: `typescript`, `tailwindcss`, `@tailwindcss/postcss`, `@playwright/test`, `@types/*`.
 
 `npm audit`: 0 vulnerabilities (2026-11-20).

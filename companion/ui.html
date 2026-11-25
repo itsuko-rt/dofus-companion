@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:">
+<title>Atlas Companion</title>
+<style>
+  :root { color-scheme: dark; --bg: #17120d; --panel: #241c14; --line: #3a2e22; --text: #eadfc8; --muted: #a89676; --accent: #e8c77a; --bad: #e07a5f; --ok: #8fbf6a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 16px; background: var(--bg); color: var(--text); font: 14px/1.45 "Segoe UI", system-ui, sans-serif; }
+  h1 { font-size: 17px; margin: 0 0 12px; color: var(--accent); }
+  h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 8px; }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .muted { color: var(--muted); font-size: 12px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--bad); display: inline-block; }
+  .dot.on { background: var(--ok); }
+  button { background: #3a2e22; color: var(--text); border: 1px solid #5a4733; border-radius: 6px; padding: 7px 12px; font: inherit; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button:disabled { opacity: .5; cursor: default; }
+  button.stop { background: #5a2a20; border-color: #8a3f30; font-weight: 600; }
+  label.mode { display: flex; gap: 6px; align-items: flex-start; padding: 4px 0; }
+  input[type=number] { width: 80px; background: #17120d; color: var(--text); border: 1px solid var(--line); border-radius: 4px; padding: 4px; }
+  select { background: #17120d; color: var(--text); border: 1px solid var(--line); border-radius: 4px; padding: 4px; }
+  img { max-width: 100%; border-radius: 4px; margin-top: 8px; }
+  ul { list-style: none; margin: 0; padding: 0; max-height: 180px; overflow: auto; }
+  li { padding: 4px 0; border-bottom: 1px solid var(--line); font-size: 12px; }
+  .err { color: var(--bad); }
+  kbd { background: #17120d; border: 1px solid var(--line); border-radius: 3px; padding: 0 4px; font-size: 12px; }
+</style>
+</head>
+<body>
+<h1>Atlas Companion</h1>
+
+<section>
+  <h2>DOFUS</h2>
+  <div class="row"><span id="dot" class="dot"></span><strong id="status">Recherche de la fenêtre DOFUS…</strong></div>
+  <div id="pick" class="row" style="margin-top:8px" hidden><label>Fenêtre active <select id="windows"></select></label></div>
+  <p class="muted">Lu dans le titre de la fenêtre, par Windows. Le compagnon ne touche jamais au jeu : ni processus, ni mémoire, ni réseau, ni clavier.</p>
+</section>
+
+<section>
+  <h2>Mode</h2>
+  <label class="mode"><input type="radio" name="mode" value="observation"> <span><strong>Observation</strong> : lit et note, n’enregistre rien.</span></label>
+  <label class="mode"><input type="radio" name="mode" value="assisted"> <span><strong>Assisté</strong> : vous confirmez chaque changement.</span></label>
+  <label class="mode"><input type="radio" name="mode" value="automatic"> <span><strong>Automatique</strong> : enregistre ce qui est lu avec certitude ; le reste attend votre confirmation.</span></label>
+  <p class="muted">L’enregistrement sur le site arrive avec la synchronisation (prochaine étape). Pour l’instant, tout est noté dans l’historique local.</p>
+</section>
+
+<section>
+  <h2>Capture</h2>
+  <div class="row">
+    <button id="capture">Capturer maintenant</button>
+    <span class="muted">ou <kbd id="hk"></kbd></span>
+  </div>
+  <div class="row" style="margin-top:8px">
+    <label>Toutes les <input id="interval" type="number" min="0" max="3600" step="5"> secondes</label>
+    <span class="muted">0 = désactivé (par défaut)</span>
+  </div>
+  <p id="cap" class="muted"></p>
+  <img id="preview" alt="Dernière capture de la fenêtre DOFUS" hidden>
+  <p class="muted">L’image reste en mémoire, elle n’est jamais enregistrée ni envoyée.</p>
+</section>
+
+<section>
+  <div class="row"><button id="stop" class="stop">Arrêt d’urgence</button><span class="muted">ou <kbd id="hks"></kbd></span></div>
+</section>
+
+<section>
+  <h2>Historique</h2>
+  <ul id="events"></ul>
+  <p class="muted" id="log"></p>
+</section>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const TYPES = { 'character.seen': 'Personnage détecté', 'companion.stopped': 'Arrêt d’urgence', 'companion.resumed': 'Reprise' };
+const time = (iso) => new Date(iso).toLocaleTimeString('fr-FR');
+let s = null;
+
+window.atlas.onState((next) => { s = next; render(); });
+
+function render() {
+  const active = s.windows.find((w) => w.sourceId === s.activeId);
+  $('dot').classList.toggle('on', !!active && !s.stopped);
+  $('status').textContent = s.stopped ? 'Arrêté'
+    : !active ? 'DOFUS non détecté'
+    : active.character ? `${active.character.name} · ${active.character.className}${active.character.breedId ? '' : ' (classe inconnue)'} · ${active.version}`
+    : 'DOFUS ouvert, aucun personnage en jeu';
+  const named = s.windows.filter((w) => w.character);
+  $('pick').hidden = named.length < 2;
+  $('windows').replaceChildren(...named.map((w) => new Option(`${w.character.name} (${w.character.className})`, w.sourceId, false, w.sourceId === s.activeId)));
+  for (const r of document.querySelectorAll('input[name=mode]')) r.checked = r.value === s.settings.mode;
+  if (document.activeElement !== $('interval')) $('interval').value = s.settings.intervalSec;
+  $('hk').textContent = s.hotkeys.capture.replace('CommandOrControl', 'Ctrl');
+  $('hks').textContent = s.hotkeys.stop.replace('CommandOrControl', 'Ctrl');
+  $('capture').disabled = s.stopped || !active;
+  $('stop').textContent = s.stopped ? 'Reprendre' : 'Arrêt d’urgence';
+  const c = s.lastCapture;
+  $('cap').className = c?.error ? 'err' : 'muted';
+  $('cap').textContent = !c ? '' : c.error ? `${time(c.at)} : ${c.error}` : `${time(c.at)} : ${c.width} × ${c.height} px (${c.trigger})`;
+  $('preview').hidden = !c?.preview;
+  if (c?.preview) $('preview').src = c.preview;
+  $('events').replaceChildren(...s.events.slice(0, 30).map((e) => {
+    const li = document.createElement('li');
+    li.textContent = `${time(e.at)} · ${TYPES[e.type] ?? e.type}${e.characterKey ? ` : ${e.characterKey} (${e.className})` : ''}`;
+    return li;
+  }));
+  $('log').textContent = `Historique local : ${s.logPath}`;
+}
+
+$('capture').onclick = () => window.atlas.capture();
+$('stop').onclick = () => window.atlas.stop(!s.stopped);
+$('interval').onchange = (e) => window.atlas.set({ intervalSec: e.target.value });
+$('windows').onchange = (e) => window.atlas.set({ activeId: e.target.value });
+for (const r of document.querySelectorAll('input[name=mode]')) r.onchange = () => window.atlas.set({ mode: r.value });
+</script>
+</body>
+</html>

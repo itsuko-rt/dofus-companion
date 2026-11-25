@@ -101,6 +101,7 @@ Every note in the vault, and every long report in the repository's `docs/` folde
 | [[Companion Window]] | A narrow panel to keep over the game: a step-by-step guide, pinned achievements, and the encyclopaedia search |
 | [[Data Pipeline]] | Sections: Import (npm run import) · After a game patch · Assets |
 | [[Database Schema]] | Read from the databases on 2026-11-20 (game data 3.7.14.18) |
+| [[Game Companion Design]] | Windows companion: design, phase 3 build, install, troubleshooting |
 | [[Ecosystem Architecture]] | How the Atlas modules connect, so a player moves between related information without searching again |
 | [[Integrations]] | Sections: External services · npm dependencies (runtime) |
 
@@ -143,6 +144,7 @@ Every note in the vault, and every long report in the repository's `docs/` folde
 | [[ADR-0006 No ads or analytics without consent]] | Decision, accepted, 2026-11-19 |
 | [[ADR-0007 Profession XP comes from the player's screen]] | Decision, accepted, 2026-11-20 |
 | [[ADR-0008 Companion window in the browser]] | Decision, accepted, 2026-11-21 |
+| [[ADR-0009 Windows companion reads the window title and screen]] | Decision, accepted, 2026-11-25 |
 | [[Architecture Decision Records]] | One note per decision, never rewritten |
 | [[Blank pages on a first visit]] | Bug, high severity, fixed |
 | [[Bug History]] | Bugs worth remembering (not every small fix) |
@@ -170,6 +172,7 @@ Every note in the vault, and every long report in the repository's `docs/` folde
 | [[2026-11-21 Achievements visual redesign]] | Session summary, 2026-11-21 |
 | [[2026-11-21 Ecosystem research and encyclopaedia]] | Session summary, 2026-11-21 |
 | [[2026-11-23 Scanner that saves quests and achievements]] | Session summary, 2026-11-23 |
+| [[2026-11-25 Game companion audit and phase 3]] | Session summary, 2026-11-25 |
 | [[2026-11-25 Vault cleanup and reorganisation]] | Session summary, 2026-11-25 |
 | [[Session Summaries]] | One note per significant session, named YYYY-MM-DD <topic>, from Development Session |
 

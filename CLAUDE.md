@@ -28,5 +28,6 @@ Skip notes for trivial changes.
 - Link community sites (DPLN, Fashionista, DofusDB, Dofus Maps); never copy or scrape them.
 - Never interact with the game client.
 - Commit or push only when the owner asks. The owner's e-mail stays private.
+- The Windows game companion lives in `companion/` (Electron, its own `package.json`; `npm start` there, `npx electron . --self-test` to check it against a running DOFUS). It shares pure logic with the site by importing `src/*.ts`. It only reads the DOFUS window title and pixels; the site applies progress (ADR-0009 in `knowledge/09 - Development Memory/Architecture Decision Records/`).
 - Checks: `npm run typecheck`, `npm test`; E2E with `npx playwright test` against `next start -p 3100`.
 - Write files containing backslashes with the editor tools, not shell heredocs (see Lessons Learned in the vault).

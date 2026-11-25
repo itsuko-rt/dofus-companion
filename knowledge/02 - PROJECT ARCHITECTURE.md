@@ -31,6 +31,7 @@ flowchart LR
 | API routes | [[API Documentation]] | `app/api/` |
 | Accounts and sessions | [[Authentication]] | `src/server/auth.ts` |
 | Scanner (OCR in the browser) | [[Character Sync OCR]] | `components/scan/ocr.ts`, `src/recognize.ts` |
+| Windows game companion (phase 3 built) | [[Game Companion Design]] | `companion/main.mjs`, `src/game-window.ts` |
 | Companion window (always on top) | [[Companion Window]] | `components/companion/` |
 | Outside services and dependencies | [[Integrations]] | `package.json` |
 | Security headers, audits | [[Security Overview]] · [[Security Audit]] | `next.config.ts` |
@@ -46,5 +47,6 @@ flowchart LR
 - [[ADR-0006 No ads or analytics without consent]]
 - [[ADR-0007 Profession XP comes from the player's screen]]
 - [[ADR-0008 Companion window in the browser]]
+- [[ADR-0009 Windows companion reads the window title and screen]]
 
 Known weaknesses: [[04 - TECHNICAL DEBT]].

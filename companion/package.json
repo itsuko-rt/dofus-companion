@@ -1,0 +1,14 @@
+{
+  "name": "atlas-companion",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Atlas des Douze game companion for Windows: reads the DOFUS window title and screen, never the game itself.",
+  "main": "main.mjs",
+  "type": "module",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "45.3.0"
+  }
+}
