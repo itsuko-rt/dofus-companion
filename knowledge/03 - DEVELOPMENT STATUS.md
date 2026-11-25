@@ -12,7 +12,7 @@ A snapshot of where the project stands, checked against the code. Replace this s
 | Check | Result | When |
 |---|---|---|
 | `npm run typecheck` | clean | 2026-11-25 |
-| `npm test` | 111/111 | 2026-11-25 |
+| `npm test` | 117/117 | 2026-11-25 |
 | E2E (Playwright, desktop and mobile) | 63 passed, 1 skipped by design, 0 failed | 2026-11-23, not rerun since |
 | Production build | OK | 2026-11-23 |
 
@@ -31,7 +31,7 @@ The modules are listed in [[00 - PROJECT DASHBOARD#What is built (implemented an
 ## In progress
 - **Scanner on the real game:** built and tested on synthetic game-like images only. Waiting for the owner to try it on a real « Terminées » list and an obtained-achievements list ([[2026-11-23 Scanner that saves quests and achievements]]).
 - **Companion window above the real game:** built and tested in the browser. Not checked over a running DOFUS client ([[Companion Window]]).
-- **Windows game companion** (branch feature/game-companion): phase 3 built and tested on the real game, phases 4–9 next ([[Game Companion Design]]).
+- **Windows game companion** (branch feature/game-companion): phases 3–5 built (character from the window title, capture, quest and achievement lists read into events); phase 6, the sync with the site, is next ([[Game Companion Design]]).
 
 ## Blocking a public launch
 From [[Release Checklist]]:

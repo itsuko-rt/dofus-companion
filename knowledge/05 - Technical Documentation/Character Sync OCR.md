@@ -12,7 +12,7 @@ type: technical
 Code: `components/scan/ScanView.tsx`, `components/scan/ocr.ts`, `src/recognize.ts`.
 
 **Since 2026-11-23** ([[2026-11-23 Scanner that saves quests and achievements]]):
-- **Thresholded reading.** Each capture is thresholded (two Otsu levels: the second, on the bright side only, isolates the text) and upscaled to about 2000 px of height before the OCR. Before this, the row stripes of game lists made Tesseract skip most rows: 3 lines read out of 7 on a game-like list.
+- **Thresholded reading.** Each capture is thresholded (two Otsu levels: the second, on the bright side only, isolates the text) and upscaled to about 2000 px of height before the OCR. The thresholding is in `src/threshold.ts`, shared with the Windows companion ([[Game Companion Design]]). Before this, the row stripes of game lists made Tesseract skip most rows: 3 lines read out of 7 on a game-like list.
 - **Saved at once** (switch, on by default): the whole line is exactly one game name that no other entry shares, with at most one stray 1–2 character token (an icon read as letters), read with OCR confidence ≥ 55 %, and at least two words or ten letters. It goes into the history and can be undone.
 - **Pre-ticked** for one click: near-exact names (≥ 85 % for names of 15+ characters, ≥ 92 % otherwise).
 - **Window sharing session.** Share the DOFUS window once, then « Lire maintenant », or automatic reading while you scroll the list in game. A new view is read only when the frame changes. It stops after 10 minutes, or with « Arrêter le partage ».

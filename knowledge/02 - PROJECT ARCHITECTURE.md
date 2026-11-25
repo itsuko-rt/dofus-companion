@@ -31,7 +31,7 @@ flowchart LR
 | API routes | [[API Documentation]] | `app/api/` |
 | Accounts and sessions | [[Authentication]] | `src/server/auth.ts` |
 | Scanner (OCR in the browser) | [[Character Sync OCR]] | `components/scan/ocr.ts`, `src/recognize.ts` |
-| Windows game companion (phase 3 built) | [[Game Companion Design]] | `companion/main.mjs`, `src/game-window.ts` |
+| Windows game companion (phases 3–5 built) | [[Game Companion Design]] | `companion/main.mjs`, `companion/read.mjs`, `src/game-window.ts`, `src/companion-read.ts` |
 | Companion window (always on top) | [[Companion Window]] | `components/companion/` |
 | Outside services and dependencies | [[Integrations]] | `package.json` |
 | Security headers, audits | [[Security Overview]] · [[Security Audit]] | `next.config.ts` |

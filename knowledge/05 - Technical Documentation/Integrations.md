@@ -19,7 +19,7 @@ type: technical
 ## npm dependencies (runtime)
 `next`, `react`, `react-dom`, `@xyflow/react` and `@dagrejs/dagre` (quest graph), `lucide-react` (icons), `tesseract.js` (scanner).
 
-Game companion (`companion/package.json`, separate from the site): `electron` 45.3.0, dev only. It reads the DOFUS window title and pixels locally and sends nothing anywhere ([[ADR-0009 Windows companion reads the window title and screen]]).
+Game companion (`companion/package.json`, separate from the site): `electron` 45.3.0 (dev) and `tesseract.js` 6.0.1. On first use it downloads the French OCR model from jsDelivr (the player's IP), then keeps it in its own folder. It also reads the site's public `/api/graph` (game names only). It reads the DOFUS window title and pixels locally and sends nothing anywhere ([[ADR-0009 Windows companion reads the window title and screen]]).
 
 Dev: `typescript`, `tailwindcss`, `@tailwindcss/postcss`, `@playwright/test`, `@types/*`.
 

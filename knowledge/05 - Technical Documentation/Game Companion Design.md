@@ -7,7 +7,7 @@ date: 2026-11-25
 
 Design for a Windows companion that turns what DOFUS shows on screen into progress on the player's Atlas profiles.
 
-**Status (2026-11-25):** the design was approved, and **phase 3 is built and tested** ([[#10. Phase 3: built]]). Phases 4–9 are planned. Decision record: [[ADR-0009 Windows companion reads the window title and screen]].
+**Status (2026-11-25):** the design was approved. **Phases 3–5 are built and tested**: window and character ([[#10. Phase 3: built]]), then quest and achievement lists ([[#11. Phases 4 and 5: built (quest and achievement lists)]]). Phases 6–9 are planned. Decision record: [[ADR-0009 Windows companion reads the window title and screen]].
 
 Related:
 - what exists: [[Character Sync OCR]], [[Companion Window]];
@@ -252,3 +252,59 @@ Electron's Node (24.22) loads the site's TypeScript files directly, so `src/` co
   - a live character switch;
   - the hotkeys from inside the game.
 - The capture box is 3840 × 2160. Whether Windows scales a smaller window up to that size, or returns it at its own size, was not checked.
+
+## 11. Phases 4 and 5: built (quest and achievement lists)
+### What it does
+- **The player says which list is shown** with « Ce que j’affiche dans DOFUS »: *Quêtes terminées*, *Succès obtenus*, or *Rien à lire* (the default, capture only).
+  - This replaces the label-based screen detection planned in §3. Which tab is open in the game cannot be told reliably from pixels, and the player's declaration is the stronger evidence.
+  - The list's title (« Terminées », « Succès / Obtenus ») is still looked for and recorded as `signSeen`. When it was not read, a warning is shown.
+- **Framing:** drag on the capture preview to frame the list. Only that part is read, and the frame is kept in the settings.
+- **Reading:**
+  - the same thresholding as the browser scanner, now shared in `src/threshold.ts`;
+  - upscaling to about 2000 px (Electron's `best` resize);
+  - Tesseract 6.0.1 (French) in the background process;
+  - the site's matcher (`src/recognize.ts`).
+- **Evidence rules** (`src/companion-read.ts`, unit tested):
+  - only a declared list can prove a completion;
+  - `certain` = the scanner's `isCertain`; « likely » readings are logged as « à confirmer »;
+  - a name shared by two objects of the same kind gives nothing;
+  - absence proves nothing.
+- **Events:** `quest.completed` / `achievement.completed` with:
+  - the object id, the name, the character (from the window title), `certain` and the confidence;
+  - `evidence` (`ocr`, the declared list, the line read, `signSeen`, the version of the game data);
+  - `at` = the capture time, never a completion date.
+- **No duplicates:** an event is never logged twice for the same character, type and object. The log is reloaded at start.
+- **Without a character in game** (login screen), nothing is read.
+- **At an interval,** a list is read again only when the framed part changed. The detector is the same as the browser share's.
+- **Game names** come from the site's public `/api/graph` (setting `atlasUrl`, default `http://127.0.0.1:3101`). They are cached in `game-names.json`, so reading still works when the site is down.
+- A version mismatch between the site's data and the game is shown.
+- « Voir le texte lu » shows the raw OCR text of the last read.
+
+### Tests (2026-11-25)
+- **Unit:**
+  - `tests/companion-read.test.ts`: the evidence rules;
+  - `tests/threshold.test.ts`: the shared thresholding, in RGBA and BGRA, on dark and light captures.
+  
+  `npm test`: 117/117. Typecheck clean.
+- **Browser scanner after the refactor:** `e2e/scan.spec.ts` desktop, 4/4 passed on a fresh production build.
+- **The companion pipeline on the scanner's synthetic game lists** (`--self-test-read`):
+
+  | List | Read | Certain |
+  |---|---|---|
+  | 7 quests, PNG | 7 | 7, every id right |
+  | 5 achievements, compressed JPEG | 4 | 4 |
+
+  The missed one, « Belladone (Mains Propres) », was read « Befadone ». That puts it under the matcher's 0.8 floor, so it is not proposed, which is safe. Electron's `good` and `better` resize qualities did worse (5–6 found, 1–5 certain).
+- **Real game, whole window, quest window closed:**
+  - 109 OCR lines in 8.9 s;
+  - **0 names found, 0 events**: the scene, chat and panels gave no false completion;
+  - list title not seen, as expected.
+- **Companion window:** `--self-test-ui` renders a sample state with no renderer error. Found and fixed: the « Fenêtre active » picker showed with one window (CSS `display: flex` overrode `hidden`).
+- **Not tested yet:**
+  - a real « Terminées » list or obtained-achievements list in the game;
+  - scrolling with interval reading on the real game.
+
+### Still to come
+- Phase 6: the site reads the events (local API, pairing, pending queue, modes applied).
+- Phase 7: profiles matched by exact name.
+- Phase 8: the overlay.

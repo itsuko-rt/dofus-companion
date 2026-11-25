@@ -2,6 +2,8 @@
 // OCR step of the scan, in the browser: the screenshot never leaves the player's computer.
 // Swappable: anything returning OcrLine[] for an image can replace Tesseract here.
 import type { OcrLine } from '../../src/recognize.ts';
+import { binaryViews } from '../../src/threshold.ts';
+export { otsu } from '../../src/threshold.ts';
 
 type Worker = Awaited<ReturnType<typeof import('tesseract.js')['createWorker']>>;
 let worker: Promise<Worker> | null = null;
@@ -14,10 +16,7 @@ export function ocrWorker(onProgress?: (p: number) => void): Promise<Worker> {
 }
 
 /**
- * Black-on-white views of a capture for the OCR. Game windows mix a dark scene, panels, striped rows, icons and
- * light text: grey levels alone keep the stripes, which made Tesseract skip most rows (2026-11-23, 3 lines read out
- * of 7). Thresholding keeps only the text. A single Otsu threshold tends to split the dark tones (scene vs panel), so
- * a second one is computed on the bright side only, which isolates the text; both views are read.
+ * Black-on-white views of a capture for the OCR (thresholding in `src/threshold.ts`, shared with the companion).
  * Game text at 1080p is ~12 px high: upscaled to ~2000 px of height it reads much better (max ×3).
  */
 export function preprocess(img: CanvasImageSource & { width: number; height: number }, minHeight = 2000): HTMLCanvasElement[] {
@@ -28,48 +27,12 @@ export function preprocess(img: CanvasImageSource & { width: number; height: num
   const ctx = base.getContext('2d', { willReadFrequently: true })!;
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(img, 0, 0, w, h);
-  const d = ctx.getImageData(0, 0, w, h).data;
-  const grey = new Uint8ClampedArray(w * h);
-  const hist = new Array<number>(256).fill(0);
-  let sum = 0;
-  for (let i = 0, j = 0; i < d.length; i += 4, j++) {
-    const g = Math.round(0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]);
-    grey[j] = g; hist[g]++; sum += g;
-  }
-  // on a light screenshot the text is the dark side: mirror the histogram so "text = bright" holds
-  const dark = sum / grey.length < 128;
-  if (!dark) { hist.reverse(); for (let j = 0; j < grey.length; j++) grey[j] = 255 - grey[j]; }
-  const t1 = otsu(hist, 0, 255);
-  const t2 = otsu(hist, t1 + 1, 255);
-  const thresholds = [...new Set([t2, t1])].filter((t) => t > 0 && t < 255);
-  return thresholds.map((t) => {
+  return binaryViews(ctx.getImageData(0, 0, w, h).data).map((px) => {
     const c = document.createElement('canvas');
     c.width = w; c.height = h;
-    const out = new ImageData(w, h);
-    for (let j = 0, i = 0; j < grey.length; j++, i += 4) {
-      const v = grey[j] > t ? 0 : 255;
-      out.data[i] = out.data[i + 1] = out.data[i + 2] = v; out.data[i + 3] = 255;
-    }
-    c.getContext('2d')!.putImageData(out, 0, 0);
+    c.getContext('2d')!.putImageData(new ImageData(px as Uint8ClampedArray<ArrayBuffer>, w, h), 0, 0);
     return c;
   });
-}
-
-/** Otsu's threshold on the histogram range [from, to]: the level that best separates it into two classes. */
-export function otsu(hist: number[], from = 0, to = 255): number {
-  let total = 0, sumAll = 0;
-  for (let i = from; i <= to; i++) { total += hist[i]; sumAll += i * hist[i]; }
-  let sumB = 0, wB = 0, best = -1, t = Math.round((from + to) / 2);
-  for (let i = from; i <= to; i++) {
-    wB += hist[i];
-    if (!wB) continue;
-    const wF = total - wB;
-    if (!wF) break;
-    sumB += i * hist[i];
-    const between = wB * wF * (sumB / wB - (sumAll - sumB) / wF) ** 2;
-    if (between > best) { best = between; t = i; }
-  }
-  return t;
 }
 
 export async function readLines(img: CanvasImageSource & { width: number; height: number }, onProgress?: (p: number) => void): Promise<OcrLine[]> {

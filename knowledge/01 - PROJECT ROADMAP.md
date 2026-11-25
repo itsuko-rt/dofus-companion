@@ -42,7 +42,7 @@ It merges four notes, now archived with their full text: [[Product Roadmap]] (th
 ## Backlog
 | Feature | Status | Source or note |
 |---|---|---|
-| Windows game companion: character detection from the window title, quest and achievement recognition, sync to the site | **in progress**: phase 3 (window, character, capture) done 2026-11-25; phases 4–9 planned | [[Game Companion Design]] |
+| Windows game companion: character detection from the window title, quest and achievement recognition, sync to the site | **in progress**: phases 3–5 (window, character, capture, quest and achievement lists) done 2026-11-25; phases 6–9 (sync with the site, profiles, overlay) planned | [[Game Companion Design]] |
 | Scanner accuracy on real DOFUS screens | **in progress** (owner test) | [[Character Sync OCR]] |
 | Companion window checked above the running game | **in progress** (owner test) | [[Companion Window]] |
 | Game data foundation: quest objectives with game ids, all subareas (dungeons), drop fields, integrity gate after import | planned | M2–M4, M8 in [[04 - TECHNICAL DEBT]] |
