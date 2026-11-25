@@ -192,7 +192,7 @@ Full design, phase reports, install guide and troubleshooting: [Game companion d
 | `feature/atlas-ecosystem` | Encyclopaedia, atelier, companion window, scanner that saves | Pushed |
 | `docs/vault-cleanup` | The vault reorganisation | Pushed |
 | `feature/game-companion` | The Windows companion, phases 1–9 | Pushed |
-| `docs/project-documentation` | This page, the changelog and its workflow | Local, not pushed |
+| `docs/project-documentation` | This page, the changelog and its workflow | Pushed |
 
 Merge order: `feature/atlas-ecosystem` → `develop` → `main`, then `docs/vault-cleanup`, `feature/game-companion` and `docs/project-documentation`. The changelog workflow starts working once it reaches `main`.
 
