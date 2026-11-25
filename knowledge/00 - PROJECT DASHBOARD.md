@@ -14,6 +14,8 @@ The entry point to the vault. Atlas des Douze is a free companion site for DOFUS
 >
 > Details: [[03 - DEVELOPMENT STATUS]].
 
+**On GitHub, for readers without Obsidian:** `docs/PROJECT_OVERVIEW.md` (the project in two levels) and `CHANGELOG.md` (every commit, updated automatically: [[ADR-0010 Changelog written by a workflow on main]]).
+
 ## The seven project notes
 | Note | Answers |
 |---|---|

@@ -1,0 +1,63 @@
+# Adds every new commit pushed to main to CHANGELOG.md (scripts/changelog.ts), then commits the file back.
+# No loop:
+#   - a push made with the workflow's GITHUB_TOKEN does not start workflows (GitHub rule);
+#   - the job also skips its own commits (actor and message), and the script never logs them;
+#   - a push that only changes CHANGELOG.md is ignored.
+# No duplicates: the script adds only the commits whose SHA is not in the file yet, so several commits in one
+# push, merges, re-runs and retries are all safe.
+name: Update changelog
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: [CHANGELOG.md]
+
+# only what is needed to commit CHANGELOG.md back to main
+permissions:
+  contents: write
+
+# one run at a time on main, so two quick pushes never write the file at once
+concurrency:
+  group: update-changelog
+  cancel-in-progress: false
+
+jobs:
+  changelog:
+    if: github.actor != 'github-actions[bot]' && !startsWith(github.event.head_commit.message, 'docs(changelog):')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # the whole history: every commit of the push is reachable
+          ref: main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24        # runs scripts/changelog.ts as TypeScript directly, no install needed
+
+      - name: Add the new commits to CHANGELOG.md
+        run: node scripts/changelog.ts
+
+      - name: Commit and push if it changed
+        run: |
+          if [ -z "$(git status --porcelain -- CHANGELOG.md)" ]; then   # also sees a new, untracked file
+            echo "Nothing to add."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add CHANGELOG.md
+          git commit -m "docs(changelog): update for ${GITHUB_SHA::7} [skip ci]"
+          # someone pushed meanwhile: take their commits, re-run the script (it only adds what is missing), retry
+          for attempt in 1 2 3; do
+            if git push origin HEAD:main; then exit 0; fi
+            git fetch origin main
+            git reset --hard origin/main
+            node scripts/changelog.ts
+            [ -z "$(git status --porcelain -- CHANGELOG.md)" ] && exit 0
+            git add CHANGELOG.md
+            git commit -m "docs(changelog): update for ${GITHUB_SHA::7} [skip ci]"
+          done
+          echo "Could not push the changelog after 3 attempts." >&2
+          exit 1

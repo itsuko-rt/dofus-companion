@@ -9,13 +9,23 @@ DOFUS 3 companion (Next.js 16, React 19, TypeScript 7, `node:sqlite`). The proje
 4. For game facts, reuse the research notes and `knowledge/06 - Research and Sources/` (labels in `Verification Status`) before searching again.
 
 ## During and after significant work
-Significant means a new feature, a data source, a schema, API or security change, a new dependency, or a removed feature. For that work:
-- update the matching notes in `knowledge/`: technical docs, `03 - DEVELOPMENT STATUS`, `01 - PROJECT ROADMAP`, `04 - TECHNICAL DEBT`, `05 - DOCUMENTATION INDEX` for new notes, `Integrations`, sources;
-- record real decisions as a new ADR (never rewrite an old one; supersede it);
-- run `node scripts/check-knowledge.ts` after editing the vault (links, paths, secrets);
-- end with a session summary in `knowledge/09 - Development Memory/Session Summaries/` (template `knowledge/Templates/Development Session.md`).
+Significant means a new feature, a data source, a schema, API or security change, a new dependency, or a removed feature. For that work, in this order:
+1. Update the technical notes it touches in `knowledge/` (architecture, API, database, integrations, sources).
+2. Update `docs/PROJECT_OVERVIEW.md`, the page for readers new to the project: feature and phase status, branches, test results, limitations. Both of its levels (non-technical, technical) must stay true.
+3. Update the vault's dashboards: `00 - PROJECT DASHBOARD`, `03 - DEVELOPMENT STATUS`, `01 - PROJECT ROADMAP`, `04 - TECHNICAL DEBT`, and `05 - DOCUMENTATION INDEX` for new notes.
+4. Record real decisions as a new ADR (never rewrite an old one; supersede it), and new limitations where they belong.
+5. Run `node scripts/check-knowledge.ts` after editing the vault (links, paths, secrets).
+6. End with a session summary in `knowledge/09 - Development Memory/Session Summaries/` (template `knowledge/Templates/Development Session.md`).
+7. Check that what the documentation says matches the code and the last test run. Status marks: built and tested; built, not verified for real; planned; blocked; rejected. Never a progress percentage that was not measured.
 
-Skip notes for trivial changes.
+Skip all of this for trivial changes (typos, small refactors, a style tweak).
+
+`CHANGELOG.md` is written by the « Update changelog » workflow after each push to `main` (`scripts/changelog.ts`, ADR-0010). Do not add entries by hand. The changelog is only as good as the commit messages, so write them for a reader:
+- a clear subject;
+- then what was added, changed, removed and fixed;
+- the tests run, with their results.
+
+`node scripts/changelog.ts --check` says whether commits are missing from it.
 
 ## Memory discipline
 - Keep apart: implemented and tested, planned, research finding, assumption, decision, known limitation.

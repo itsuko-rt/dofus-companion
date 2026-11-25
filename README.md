@@ -1,6 +1,8 @@
 # Atlas des Douze
 
 Compagnon de progression Dofus : quêtes, personnage et équipement, calculés depuis les données officielles du jeu.
+
+> **New to the project?** Read the [project overview](docs/PROJECT_OVERVIEW.md) (English): what it does, what works, what is in progress. Every change is in the [changelog](CHANGELOG.md), updated automatically after each push to `main`.
 Site de fan, non affilié à Ankama. Le nom « Atlas des Douze » reste à vérifier côté marques déposées (INPI, EUIPO).
 
 ```sh

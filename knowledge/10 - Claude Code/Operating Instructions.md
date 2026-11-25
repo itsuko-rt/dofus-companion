@@ -35,6 +35,8 @@ When the change is significant (new feature, new data source, schema or API chan
 Skip all of this for trivial changes (typos, small refactors, a style tweak).
 
 ## After development
+Also keep `docs/PROJECT_OVERVIEW.md` true (the order of steps is in the repository's `CLAUDE.md`). `CHANGELOG.md` is written by a workflow: write commit messages that read well there.
+
 For significant work, add a session summary in `09 - Development Memory/Session Summaries/` named `YYYY-MM-DD <topic>.md`, from [[Development Session]]. It covers what changed and why, files affected, tests and results, remaining issues, and next steps.
 
 ## Memory discipline

@@ -13,6 +13,8 @@ Every note in the vault, and every long report in the repository's `docs/` folde
 ## Reports in `docs/` (outside the vault, the detailed sources)
 | Report | Topic | Still valid? |
 |---|---|---|
+| `docs/PROJECT_OVERVIEW.md` | The project for readers new to it, in two levels, with links to these notes (2026-11-25) | Yes: kept up to date (CLAUDE.md) |
+| `CHANGELOG.md` | Every commit, newest first, updated by a workflow on `main` | Yes ([[ADR-0010 Changelog written by a workflow on main]]) |
 | `docs/RAPPORT_ARCHITECTURE.md` | Source study, original architecture and five-phase roadmap (2026-11-19) | Sources and data: yes. Stack: partly superseded ([[ADR-0002 SQLite for game and account data]]) |
 | `docs/RAPPORT_DEVELOPPEMENT.md` | First development session | History |
 | `docs/RAPPORT_SUIVI_QUETES.md` | Quest tracker redesign | Yes. Its Almanax "blocked" is outdated: Almanax was built on 2026-11-20 |
@@ -145,6 +147,7 @@ Every note in the vault, and every long report in the repository's `docs/` folde
 | [[ADR-0007 Profession XP comes from the player's screen]] | Decision, accepted, 2026-11-20 |
 | [[ADR-0008 Companion window in the browser]] | Decision, accepted, 2026-11-21 |
 | [[ADR-0009 Windows companion reads the window title and screen]] | Decision, accepted, 2026-11-25 |
+| [[ADR-0010 Changelog written by a workflow on main]] | Decision, accepted, 2026-11-25 |
 | [[Architecture Decision Records]] | One note per decision, never rewritten |
 | [[Blank pages on a first visit]] | Bug, high severity, fixed |
 | [[Bug History]] | Bugs worth remembering (not every small fix) |
@@ -172,6 +175,7 @@ Every note in the vault, and every long report in the repository's `docs/` folde
 | [[2026-11-21 Achievements visual redesign]] | Session summary, 2026-11-21 |
 | [[2026-11-21 Ecosystem research and encyclopaedia]] | Session summary, 2026-11-21 |
 | [[2026-11-23 Scanner that saves quests and achievements]] | Session summary, 2026-11-23 |
+| [[2026-11-25 Project overview and automatic changelog]] | Session summary, 2026-11-25 |
 | [[2026-11-25 Game companion phase 9 hardening]] | Session summary, 2026-11-25 |
 | [[2026-11-25 Game companion phase 8 overlay]] | Session summary, 2026-11-25 |
 | [[2026-11-25 Game companion phase 7 characters and accounts]] | Session summary, 2026-11-25 |
