@@ -15,4 +15,4 @@ verification: VERIFIED
 
 - **187 dungeons** in 3.7.14.18 (`dungeon`): minimum and optimal level, difficulty, entrance map, required objects (keys).
 - **Links:** 141 boss links (`dungeon_boss`) and 716 dungeon → achievement links (`dungeon_achievement`). These become `in_dungeon` edges in the graph.
-- **Site:** dungeon achievements are tracked. **A dedicated dungeon view is planned** ([[Feature Backlog]]).
+- **Site:** dungeon achievements are tracked. Each dungeon has its own sheet at `/encyclopedie/donjon/[id]` since 2026-11-21: bosses, monsters, achievements and keys ([[Ecosystem Architecture]]).

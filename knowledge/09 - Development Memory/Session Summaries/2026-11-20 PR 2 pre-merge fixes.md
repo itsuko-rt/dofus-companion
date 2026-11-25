@@ -16,7 +16,7 @@ Fixed the four pre-merge blockers of the [[2026-11-20 PR 2 technical review]]. F
 The owner asked for trustworthy data before merging PR #2 and before building the equipment optimizer and progression planner on it.
 
 ## Files affected
-`src/almanax-shared.ts`, `src/zones.ts`, `src/zones-shared.ts`, `components/progression/LevelView.tsx`, `e2e/ui.spec.ts`, `tests/almanax.test.ts`, `tests/data.test.ts`, `docs/PR2_TECHNICAL_REVIEW.md`, `docs/GAME_DATA_INVENTORY.md`, [[Current Status]], [[Feature Backlog]].
+`src/almanax-shared.ts`, `src/zones.ts`, `src/zones-shared.ts`, `components/progression/LevelView.tsx`, `e2e/ui.spec.ts`, `tests/almanax.test.ts`, `tests/data.test.ts`, `docs/PR2_TECHNICAL_REVIEW.md`, `docs/GAME_DATA_INVENTORY.md`, [[03 - DEVELOPMENT STATUS]], [[Feature Backlog]].
 
 ## Tests performed and results
 Two full runs, the second on the clean commit `25f2a8a`:

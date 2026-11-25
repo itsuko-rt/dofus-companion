@@ -1,0 +1,22 @@
+filters:
+  and:
+    - '!file.inFolder("Templates")'
+    - or:
+        - note.type == "session"
+        - note.type == "adr"
+properties:
+  note.type:
+    displayName: Kind
+  note.date:
+    displayName: Date
+views:
+  - type: table
+    name: Recent sessions and decisions
+    order:
+      - file.name
+      - note.type
+      - note.date
+    sort:
+      - property: note.date
+        direction: DESC
+    limit: 10

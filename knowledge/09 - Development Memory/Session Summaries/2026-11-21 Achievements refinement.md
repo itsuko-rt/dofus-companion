@@ -39,7 +39,7 @@ The owner asked for a refinement of the new design. They wanted more compact and
 - `src/guides-data.ts`: re-export of `dofusSlugs`.
 - `tests/data.test.ts`: a new places and slug test. The batched-loading test now compares the original objective fields, because `place` is added.
 - `e2e/ui.spec.ts`: a new `?niveau=` test; the details heading is now « Ce qu’il faut faire ».
-- Vault: [[API Documentation]], [[Current Status]], [[Design Decisions]].
+- Vault: [[API Documentation]], [[03 - DEVELOPMENT STATUS]], [[Design Decisions]].
 
 ## Tests performed and results
 - Typecheck clean. `npm test`: 98/98. Production build OK.

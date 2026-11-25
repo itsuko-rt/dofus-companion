@@ -14,7 +14,7 @@ The owner asked for a rigorous check of PR #2 before merging, with special atten
 
 ## Files affected
 - `docs/PR2_TECHNICAL_REVIEW.md` (new), `docs/GAME_DATA_INVENTORY.md`.
-- Vault: [[Current Status]], this note, [[Session Summaries]], [[2026-11-20 Autonomous development session]].
+- Vault: [[03 - DEVELOPMENT STATUS]], this note, [[Session Summaries]], [[2026-11-20 Autonomous development session]].
 
 ## Tests performed and results
 - Typecheck clean. `npm test`: 88/88. Production build OK.

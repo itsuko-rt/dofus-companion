@@ -1,3 +1,6 @@
+---
+type: technical
+---
 # Database schema
 
 *Read from the databases on 2026-11-20 (game data 3.7.14.18).*

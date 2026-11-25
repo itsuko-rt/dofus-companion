@@ -3,14 +3,14 @@
 DOFUS 3 companion (Next.js 16, React 19, TypeScript 7, `node:sqlite`). The project's memory is the Obsidian vault in `knowledge/`.
 
 ## Before a task (targeted reading, never the whole vault)
-1. Read `knowledge/10 - Claude Code/Project Context.md` and `knowledge/00 - Dashboard/Current Status.md`.
+1. Read `knowledge/10 - Claude Code/Project Context.md` and `knowledge/03 - DEVELOPMENT STATUS.md`. The vault's entry point is `knowledge/00 - PROJECT DASHBOARD.md`.
 2. Use the task → notes table in `knowledge/10 - Claude Code/Operating Instructions.md` to read only the relevant notes (architecture, feature, game research).
-3. Check `knowledge/09 - Development Memory/Architecture Decision Records/` and `Bug History/` for the area you touch, and the *Known limitations* section of `Current Status`.
+3. Check `knowledge/09 - Development Memory/Architecture Decision Records/` and `Bug History/` for the area you touch, and the *Known limitations* section of `03 - DEVELOPMENT STATUS`, and `knowledge/04 - TECHNICAL DEBT.md`.
 4. For game facts, reuse the research notes and `knowledge/06 - Research and Sources/` (labels in `Verification Status`) before searching again.
 
 ## During and after significant work
 Significant means a new feature, a data source, a schema, API or security change, a new dependency, or a removed feature. For that work:
-- update the matching notes in `knowledge/`: technical docs, `Current Status`, backlog or roadmap, `Integrations`, sources;
+- update the matching notes in `knowledge/`: technical docs, `03 - DEVELOPMENT STATUS`, `01 - PROJECT ROADMAP`, `04 - TECHNICAL DEBT`, `05 - DOCUMENTATION INDEX` for new notes, `Integrations`, sources;
 - record real decisions as a new ADR (never rewrite an old one; supersede it);
 - run `node scripts/check-knowledge.ts` after editing the vault (links, paths, secrets);
 - end with a session summary in `knowledge/09 - Development Memory/Session Summaries/` (template `knowledge/Templates/Development Session.md`).

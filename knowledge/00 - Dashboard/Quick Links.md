@@ -1,3 +1,6 @@
+---
+type: reference
+---
 # Quick links
 
 ## Commands (from the repository root)

@@ -1,6 +1,10 @@
+---
+type: architecture
+updated: 2026-11-25
+---
 # Architecture
 
-*Verified against the code on 2026-11-20.*
+*Verified against the code on 2026-11-20. Pages table rechecked on 2026-11-25 (33 routes). Overview of all technical notes: [[02 - PROJECT ARCHITECTURE]].*
 
 ```mermaid
 flowchart LR
@@ -35,10 +39,12 @@ next 16.4.6 · react 19.3.1 · typescript 7.0.2 · tailwindcss 4.3.5 · @xyflow/
 | Section | Routes |
 |---|---|
 | Home, about, legal | `/`, `/a-propos`, `/mentions-legales`, `/confidentialite` |
-| Progression | `/progression/quetes`, `/progression/quetes/[region]`, `/progression/succes`, `/progression/dofus`, `/progression/scan` |
+| Progression | `/progression/quetes`, `/progression/quetes/[region]`, `/progression/succes`, `/progression/dofus`, `/progression/niveau`, `/progression/scan` |
+| Encyclopaedia (2026-11-21) | `/encyclopedie`, `/encyclopedie/monstre/[id]`, `/encyclopedie/objet/[id]`, `/encyclopedie/donjon/[id]`, `/encyclopedie/zone/[id]`, `/encyclopedie/panoplie/[id]` |
+| Companion (2026-11-21) | `/compagnon` |
 | Character | `/personnage`, `/personnage/sorts`, `/personnage/sorts/[id]` |
 | Builds, equipment | `/builds`, `/equipement` |
-| Professions | `/metiers`, `/metiers/[slug]` |
+| Professions | `/metiers`, `/metiers/[slug]`, `/metiers/atelier` |
 | Maps | `/carte` (external links only) |
 | Guides | `/guides`, `/guides/quetes`, `/guides/quetes/[region]`, `/guides/dofus`, `/guides/dofus/[slug]` |
 | Account | `/compte`, `/compte/reinitialiser` |

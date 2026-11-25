@@ -1,5 +1,7 @@
 # Feature backlog
 
+> **Archived 2026-11-25.** Kept unchanged as history. Current version: [[01 - PROJECT ROADMAP]].
+
 Status values: **planned** (agreed, not started), **idea** (not agreed), **blocked** (waiting on something). Sources are the "remaining work" sections of the reports in `docs/`.
 
 | Feature | Status | Notes / source |

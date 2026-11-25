@@ -2,7 +2,7 @@
 
 This folder is an [Obsidian](https://obsidian.md) vault, and also plain Markdown that reads fine on GitHub or in any editor. It holds the project's research, technical documentation, decisions and development memory. Claude Code reads it before significant work and updates it after.
 
-**Start here:** [[Home]].
+**Start here:** [[00 - PROJECT DASHBOARD]].
 
 ## Open it in Obsidian
 1. Install Obsidian from the official site, https://obsidian.md/download (Windows installer, or `winget install Obsidian.Obsidian`).
@@ -15,8 +15,9 @@ No community plugins are needed. [[Operating Instructions#Plugins]] explains whi
 ## Layout
 | Folder | Holds |
 |---|---|
-| `00 - Dashboard` | Entry point, overview, current status, links |
-| `01 - Project Management` | Vision, roadmap, backlog, milestones, priorities |
+| `00 - PROJECT DASHBOARD` … `06 - CLEANUP REPORT` (vault root) | Entry point, roadmap, architecture map, status, technical debt, index, cleanup report |
+| `00 - Dashboard` | Project overview, quick links |
+| `01 - Project Management` | Vision and goals (the roadmap is at the vault root) |
 | `02 - Game Knowledge` | Facts about DOFUS taken from the game files (classes, spells, quests…) |
 | `03 - Builds and Progression` | Builds, equipment, XP and kamas routes, with their sources |
 | `04 - Professions` | The eight professions the site documents |
@@ -26,6 +27,7 @@ No community plugins are needed. [[Operating Instructions#Plugins]] explains whi
 | `08 - Security and Deployment` | Security, privacy, infrastructure, release checklist |
 | `09 - Development Memory` | Decisions (ADRs), logs, bugs, lessons, session summaries |
 | `10 - Claude Code` | How Claude Code uses and maintains this vault |
+| `99 - Archive` | Notes replaced on 2026-11-25, kept unchanged as history |
 | `Templates` | Note templates |
 
 ## Rules that keep it trustworthy

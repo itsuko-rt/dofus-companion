@@ -1,3 +1,6 @@
+---
+type: technical
+---
 # Authentication
 
 Site accounts only, never Ankama accounts. Code: `src/server/auth.ts`; tests: `tests/auth.test.ts`, `tests/security.test.ts`, `e2e/account.spec.ts`.
@@ -18,4 +21,4 @@ Site accounts only, never Ankama accounts. Code: `src/server/auth.ts`; tests: `t
 - no "log out other devices";
 - no idle timeout.
 
-See [[Feature Backlog]] and [[Security Audit]].
+See [[01 - PROJECT ROADMAP]] and [[Security Audit]].

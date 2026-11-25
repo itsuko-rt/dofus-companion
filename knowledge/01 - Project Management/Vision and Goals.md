@@ -1,3 +1,6 @@
+---
+type: planning
+---
 # Vision and goals
 
 ## Vision
@@ -17,10 +20,10 @@ Help DOFUS players progress with answers computed from the game's own files, not
 |---|---|
 | Accurate quest prerequisites for all quests | Implemented (1,363 of 1,984 fully interpreted; the rest flagged) |
 | Achievement and Dofus tracking | Implemented |
-| Crâ and Pandawa: spells, builds | Implemented (spells from data; builds from Fashionista, COMMUNITY) |
+| Classes: spells, builds | Implemented for all 19 classes since 2026-11-20 (spells from data; builds from Fashionista, COMMUNITY). Crâ and Pandawa were the first two |
 | Profession guides | Implemented (from game data) |
 | Public launch | Planned (see [[Release Checklist]]) |
 | Class guides with sourced advice ("couche B") | Planned, not started |
 | Recommended routes, XP and kamas | Planned; blocked by missing verified data |
 
-Related: [[Product Roadmap]] · [[Priorities]].
+Related: [[01 - PROJECT ROADMAP]], which holds the up-to-date status of each goal.

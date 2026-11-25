@@ -47,7 +47,7 @@ for (const f of files) {
   for (const line of text.split('\n')) if (SECRET.test(line) && !/example\.com|template|\{\{/.test(line)) problems.push(`${f}: looks like a secret or personal data: ${line.trim().slice(0, 80)}`);
 }
 
-const REQUIRED = ['README.md', '00 - Dashboard/Home.md', '00 - Dashboard/Current Status.md', '10 - Claude Code/Operating Instructions.md',
+const REQUIRED = ['README.md', '00 - PROJECT DASHBOARD.md', '03 - DEVELOPMENT STATUS.md', '10 - Claude Code/Operating Instructions.md',
   '10 - Claude Code/Project Context.md', 'Templates/Development Session.md', '.obsidian/app.json'];
 for (const r of REQUIRED) if (!existsSync(join(ROOT, r))) problems.push(`missing ${r}`);
 if (!readFileSync('CLAUDE.md', 'utf8').includes('knowledge/10 - Claude Code/Operating Instructions.md')) problems.push('CLAUDE.md does not point to the vault');

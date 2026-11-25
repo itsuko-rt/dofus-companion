@@ -1,3 +1,6 @@
+---
+type: technical
+---
 # Integrations and dependencies
 
 ## External services

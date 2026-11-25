@@ -1,5 +1,7 @@
 # Research archive
 
+> **Archived 2026-11-25.** Kept unchanged as history. Current version: [[05 - DOCUMENTATION INDEX]].
+
 Older or long research documents. These are kept in the repository's `docs/` folder rather than copied here, so there is a single copy.
 
 | Document | Date | Content | Still valid? |

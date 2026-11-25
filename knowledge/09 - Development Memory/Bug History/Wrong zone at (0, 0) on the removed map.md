@@ -4,7 +4,7 @@ status: fixed then removed
 severity: medium
 found: 2026-11-20
 ---
-# Wrong zone at [0, 0] on the removed map
+# Wrong zone at (0, 0) on the removed map
 
 ## What happened
 About 1,800 unplaced instance maps parked at [0, 0] outvoted the real map, so [0, 0] showed Cité d'Astrub instead of Village d'Amakna (22 coordinates wrong).

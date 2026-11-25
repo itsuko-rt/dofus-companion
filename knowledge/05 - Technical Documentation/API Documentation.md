@@ -1,3 +1,6 @@
+---
+type: technical
+---
 # API documentation
 
 *All routes are in `app/api/`. Verified 2026-11-20.*

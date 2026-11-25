@@ -1,3 +1,6 @@
+---
+type: technical
+---
 # Data pipeline
 
 ## Import (`npm run import`)

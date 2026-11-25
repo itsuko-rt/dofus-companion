@@ -1,5 +1,7 @@
 # Priorities
 
+> **Archived 2026-11-25.** Kept unchanged as history. Current version: [[01 - PROJECT ROADMAP]].
+
 *Set from `docs/RELEASE_READINESS.md` (2026-11-20). Reorder when the owner decides otherwise.*
 
 1. **Launch blockers:** e-mail provider, production environment variables, backups, staging security run, legal review. See [[Release Checklist]].

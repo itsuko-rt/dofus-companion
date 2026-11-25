@@ -1,3 +1,6 @@
+---
+type: technical
+---
 # Character sync and the scanner (OCR)
 
 ## Character sync

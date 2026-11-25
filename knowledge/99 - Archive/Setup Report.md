@@ -1,5 +1,7 @@
 # Obsidian setup report (2026-11-20)
 
+> **Archived 2026-11-25.** Kept unchanged as history. Current version: [[05 - DOCUMENTATION INDEX]].
+
 Work done by Claude Code on branch docs/obsidian-setup. Session note: [[2026-11-20 Obsidian setup]].
 
 ## 1. What was already installed
@@ -14,20 +16,20 @@ Work done by Claude Code on branch docs/obsidian-setup. Session note: [[2026-11-
 ## 3. What I configured
 - **Registered the vault:** the `obsidian://open?path=` link does not register an unknown folder. So I closed Obsidian (it had no vault open, so nothing was lost), wrote `obsidian.json` with `knowledge/` as the open vault, and restarted it. Obsidian then created `workspace.json` in the vault, which shows it opened it.
 - **Obsidian's defaults:** on first opening, Obsidian added its default core plugins to `core-plugins.json`: Canvas, Bases, File recovery and Note composer are on. It also created `appearance.json` (ribbon shown). Both files are kept in Git because they hold no personal data.
-- **Dashboard:** rebuilt [[Home]] with a status snapshot, a feature status table (implemented, in progress, planned, blocked or rejected, NEEDS VERIFICATION), active priorities, and sections for the technical docs, game research, builds, professions, security and deployment.
+- **Dashboard:** rebuilt [[00 - PROJECT DASHBOARD]] with a status snapshot, a feature status table (implemented, in progress, planned, blocked or rejected, NEEDS VERIFICATION), active priorities, and sections for the technical docs, game research, builds, professions, security and deployment.
 - **Research view:** `06 - Research and Sources/Research.base` lists every note with `type: research`, grouped by its label. It is a native Bases view, so no plugin is needed. Home embeds it.
 
 ## 4. Documentation populated or corrected
 - [[Architecture]]: the installed package versions (read from `node_modules`) and a table of all 24 page routes (read from `app/**/page.tsx`).
 - [[XP Routes]] and [[Kamas Routes]]: research frontmatter completed (source: none found, confidence low, HYPOTHESIS). Every research note now has a source, source type, game version, research date, verification date and confidence. The other 18 already did.
 - [[Verification Status]]: added NEEDS VERIFICATION, a technical marker kept separate from the research labels. [[Documentation Rules]] now lists the status words *in progress*, *rejected* and *needs verification*.
-- [[Current Status]], [[Milestones]] and one session summary: changed "not pushed" to pushed (the commits are on `main` since 2026-11-20).
+- [[03 - DEVELOPMENT STATUS]], [[Milestones]] and one session summary: changed "not pushed" to pushed (the commits are on `main` since 2026-11-20).
 - The decision to drop the internal map is unchanged: [[ADR-0005 Remove the in-site map]]. Home shows it as rejected, and `/carte` links to DofusDB and Dofus Maps.
 - Not added: class play advice, XP and kamas routes. There is still no sourced data for them, and nothing was invented.
 
 ## 5. Claude Code integration
 `CLAUDE.md` keeps all of its rules. Two retrieval steps were added before a task:
-- check the *Known limitations* section of [[Current Status]];
+- check the *Known limitations* section of [[03 - DEVELOPMENT STATUS]];
 - reuse existing research and the labels in `06 - Research and Sources` before searching again.
 
 [[Operating Instructions]] now records the plugin assessment below.
@@ -66,7 +68,7 @@ Also:
 
 ## 9. How to open and use the vault
 - **Open it:** start Obsidian. It reopens `Documents\Atlas-des-Douze\knowledge` automatically; to switch vaults, use the vault icon at the bottom left.
-- **Start here:** [[Home]] (also bookmarked).
+- **Start here:** [[00 - PROJECT DASHBOARD]] (also bookmarked).
 - **New note from a template:** create a note, then run *Templates: Insert template* from the command palette (Ctrl+P).
 - **Find by label:** open `Research.base`, or search `verification: COMMUNITY`.
 - **Before committing vault edits:** run `node scripts/check-knowledge.ts` from the repository root.

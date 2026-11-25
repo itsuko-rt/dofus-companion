@@ -1,11 +1,11 @@
 ---
 type: report
-status: proposal
+status: done
 date: 2026-11-25
 ---
 # Cleanup report
 
-This report covers phases 1 and 2: the audit, and the cleanup proposal. **Nothing has been moved, renamed, merged or deleted.** The only change to the vault is this new note. Phases 3 to 6 wait for the owner's approval: see the questions at the end.
+This report covers the audit and the cleanup proposal (sections 1–5, written before any change), then what was done once the owner approved it on 2026-11-25 (section 6, at the end). **Nothing was deleted.**
 
 > **Project name:** the brief says "Dofus Solo Roadmap". The vault and the code are **Atlas des Douze** (`src/brand.ts`). This report keeps that name. Tell me if you want a rename.
 
@@ -29,7 +29,7 @@ The folders already match most categories in the brief: overview, roadmap, techn
 - Obsidian setup:
   - core plugins only, with **Bases** on and Dataview not installed;
   - the Templates folder is set;
-  - [[Home]] is bookmarked.
+  - [[00 - PROJECT DASHBOARD]] is bookmarked.
 
 ### 2.2 Out-of-date content (the main problem)
 The dashboard and planning notes describe the project as of 2026-11-20. Since then, the code has gained:
@@ -42,15 +42,15 @@ The dashboard and planning notes describe the project as of 2026-11-20. Since th
 
 | Note | What is wrong | Checked against |
 |---|---|---|
-| [[Home]] | Several problems: see the list below the table | `npm test`, `app/` |
-| [[Current Status]] | Dated sections pile up, newest in the middle. "Last updated 2026-11-20", but it has 2026-11-23 content. "develop: 90/90". It ends with "Nothing in progress, PR #2 ready", which is no longer the state | git branches |
+| [[00 - PROJECT DASHBOARD]] | Several problems: see the list below the table | `npm test`, `app/` |
+| [[03 - DEVELOPMENT STATUS]] | Dated sections pile up, newest in the middle. "Last updated 2026-11-20", but it has 2026-11-23 content. "develop: 90/90". It ends with "Nothing in progress, PR #2 ready", which is no longer the state | git branches |
 | [[Feature Backlog]] | Some items are marked *planned* but are done: all 19 classes, and the dungeon view (`app/encyclopedie/donjon/[id]/page.tsx`) | `app/` |
 | [[Project Overview]] | No rows for the encyclopaedia, atelier, companion, level page or Almanax. The Nav now shows « Encyclopédie », not « Cartes » | `components/Nav.tsx` |
 | [[Product Roadmap]], [[Milestones]], [[Vision and Goals]] | Status as of 2026-11-20. Milestones stop on 2026-11-20. Goals still say "Crâ and Pandawa" | git log |
 | [[Architecture]] | The pages table lists 24 routes; there are 33 now | `app/**/page.tsx` |
 | [[Monsters]] | Says monster data is "not shown on the site yet". Monster sheets exist since 2026-11-21 | `app/encyclopedie/monstre/[id]/page.tsx` |
 
-What is wrong in [[Home]]:
+What is wrong in [[00 - PROJECT DASHBOARD]]:
 - The status line is dated 2026-11-20 and says "72 unit tests, 22 E2E".
 - "In progress: nothing".
 - Almanax is listed as blocked, but it is implemented.
@@ -59,8 +59,8 @@ What is wrong in [[Home]]:
 ### 2.3 Duplicated information
 | Topic | Repeated in | Effect |
 |---|---|---|
-| Feature status | [[Home]], [[Project Overview]], [[Current Status]], [[Feature Backlog]], [[Product Roadmap]], [[Vision and Goals]] (goals table) | Six places to update; they already disagree |
-| Priorities and next steps | [[Home]], [[Priorities]], [[Current Status]], [[Ecosystem Architecture]] (next steps) | Same |
+| Feature status | [[00 - PROJECT DASHBOARD]], [[Project Overview]], [[03 - DEVELOPMENT STATUS]], [[Feature Backlog]], [[Product Roadmap]], [[Vision and Goals]] (goals table) | Six places to update; they already disagree |
+| Priorities and next steps | [[00 - PROJECT DASHBOARD]], [[Priorities]], [[03 - DEVELOPMENT STATUS]], [[Ecosystem Architecture]] (next steps) | Same |
 | The reports in `docs/` | [[Quick Links]] (table) and [[Research Archive]] | Two partial lists |
 | Commit history | [[Milestones]], [[2026-11-19 log]], [[2026-11-20 log]], session summaries | Logs stopped on 2026-11-20; the session summaries took over |
 | Plugin assessment | [[Setup Report]] and [[Operating Instructions#Plugins]] | Same table twice |
@@ -68,7 +68,7 @@ What is wrong in [[Home]]:
 ### 2.4 Orphans and naming
 - **Orphans** (no note links to them):
   - [[Research Archive]];
-  - [[Wrong zone at [0, 0] on the removed map]]: it is listed in [[Bug History]], but the bracket in its name stops the link from resolving in some tools;
+  - [[Wrong zone at (0, 0) on the removed map]]: it is listed in [[Bug History]], but the bracket in its name stops the link from resolving in some tools;
   - `README.md`, which is normal for a README.
 - **Frontmatter:** 47 of 109 notes have none. This includes every dashboard, planning and technical note. Research, ADR, bug and session notes have it.
 - **Tags:** none are used. The `type:` field already sorts notes, so tags would add little.
@@ -94,9 +94,9 @@ What is wrong in [[Home]]:
 ### 3.2 Merge (the content is kept; the old note becomes a short pointer or goes to the archive)
 | From | Into | Why |
 |---|---|---|
-| [[Home]] + the essentials of [[Project Overview]] | **`00 - PROJECT DASHBOARD`** | One entry point. Today, four dashboard notes overlap |
+| [[00 - PROJECT DASHBOARD]] + the essentials of [[Project Overview]] | **`00 - PROJECT DASHBOARD`** | One entry point. Today, four dashboard notes overlap |
 | [[Product Roadmap]] + [[Milestones]] + [[Priorities]] + [[Feature Backlog]] + the goals table of [[Vision and Goals]] | **`01 - PROJECT ROADMAP`** (one status table, refreshed against the code) | Feature status lives in one place |
-| [[Current Status]] (rewritten as a snapshot, not a pile of dated sections) | **`03 - DEVELOPMENT STATUS`** | The dated history is already in the session summaries |
+| [[03 - DEVELOPMENT STATUS]] (rewritten as a snapshot, not a pile of dated sections) | **`03 - DEVELOPMENT STATUS`** | The dated history is already in the session summaries |
 | [[Research Archive]] + the `docs/` table of [[Quick Links]] | **`05 - DOCUMENTATION INDEX`** | One list of everything, notes and reports |
 
 [[Vision and Goals]] keeps its principles. [[Quick Links]] keeps its commands and key files.
@@ -106,7 +106,7 @@ What is wrong in [[Home]]:
 |---|---|
 | [[Setup Report]] | One-off report of the Obsidian setup on 2026-11-20. It is history, not a dashboard |
 | [[2026-11-19 log]], [[2026-11-20 log]], [[Development Logs]] | Stopped on 2026-11-20; replaced by the session summaries |
-| The old [[Home]], [[Current Status]], [[Product Roadmap]], [[Milestones]], [[Priorities]], [[Feature Backlog]] | Only if you choose option B below. With option A, they are renamed or merged instead |
+| The old [[00 - PROJECT DASHBOARD]], [[03 - DEVELOPMENT STATUS]], [[Product Roadmap]], [[Milestones]], [[Priorities]], [[Feature Backlog]] | Only if you choose option B below. With option A, they are renamed or merged instead |
 
 ### 3.4 Update in place (facts only, checked against the code)
 - [[Project Overview]]: add the missing modules.
@@ -162,7 +162,7 @@ I propose **one** new view: a `Development.base` listing the session summaries a
 
 ## 5. Decisions needed from the owner
 1. **Approve the plan** in section 3: merges, archive, updates. No deletions.
-2. **Option A or B** for [[Home]] and [[Current Status]]:
+2. **Option A or B** for [[00 - PROJECT DASHBOARD]] and [[03 - DEVELOPMENT STATUS]]:
    - **A (recommended):** rename them to `00 - PROJECT DASHBOARD` and `03 - DEVELOPMENT STATUS`. Then update the paths in four tooling files:
      - `CLAUDE.md`;
      - the REQUIRED list in `scripts/check-knowledge.ts` (one line);
@@ -171,3 +171,59 @@ I propose **one** new view: a `Development.base` listing the session summaries a
    - **B:** keep both notes as one-line pointers to the new notes. No tooling file is touched, but there are two names for one thing.
 3. **Branch docs/system-documentation:** leave it as it is? (recommended)
 4. **Project name:** keep « Atlas des Douze »?
+
+## 6. What was done (phases 3–6, approved 2026-11-25)
+The owner approved the plan with **option A**. Questions 3 and 4 were not answered separately, so the recommended choices were applied:
+- the branch docs/system-documentation is left as it is;
+- the project name stays « Atlas des Douze ».
+
+### Backups
+- Branch **docs/vault-cleanup**, from `feature/atlas-ecosystem`.
+- First commit: this report, with the vault exactly as it was.
+- Zip copy: `Documents\knowledge-backup-2026-11-25.zip`, outside Git.
+- Every move used `git mv`, so each note keeps its history.
+
+### Changes
+| Change | Notes |
+|---|---|
+| **Renamed** (option A) | `Home` → [[00 - PROJECT DASHBOARD]] (rewritten); `Current Status` → [[03 - DEVELOPMENT STATUS]] (rewritten as a snapshot; the old dated sections are in its git history and in the session summaries) |
+| **Created** | [[01 - PROJECT ROADMAP]], [[02 - PROJECT ARCHITECTURE]], [[04 - TECHNICAL DEBT]], [[05 - DOCUMENTATION INDEX]], `Development.base` (embedded in the dashboard) |
+| **Archived** to `99 - Archive`, unchanged except for a one-line "Archived" banner | [[Product Roadmap]], [[Milestones]], [[Priorities]], [[Feature Backlog]], [[Research Archive]], [[Setup Report]], [[Development Logs]], [[2026-11-19 log]], [[2026-11-20 log]] |
+| **Renamed for link safety** | `Wrong zone at [0, 0] on the removed map` → [[Wrong zone at (0, 0) on the removed map]]. Obsidian does not allow brackets in link names |
+| **Facts updated against the code** | [[Project Overview]] (6 missing modules), [[Architecture]] (33 routes), [[Monsters]] and [[Dungeons]] (sheets exist now), [[Vision and Goals]] (all 19 classes), [[Ecosystem Architecture]] and [[Operating Instructions]] (point to the new notes) |
+| **Links** | 23 notes relinked. Session summaries only had `Home` and `Current Status` renamed in their links; nothing else in them changed. Live notes point to the roadmap instead of the archived planning notes |
+| **Frontmatter** | Added `type` to the dashboard, planning and technical notes (10 existing notes, plus the 6 new ones). 35 hub, design, security and archive notes still have none, by choice |
+| **Tooling** (option A) | `CLAUDE.md` (paths), `scripts/check-knowledge.ts` (the REQUIRED list, one line), `.obsidian/bookmarks.json` (bookmark → dashboard), `README.md` (layout table) |
+
+Not changed:
+- the ADRs and bug notes (apart from the one bug-note rename above);
+- the text of the session summaries and the research notes;
+- the templates and the other `.obsidian` files;
+- `docs/` and all source code.
+
+### Final validation
+| Check | Result |
+|---|---|
+| `node scripts/check-knowledge.ts` | **Pass** (114 notes) |
+| Broken links (own scan) | 0. Only `[[Note]]`, a syntax example in [[Documentation Rules]], is reported |
+| Orphan notes | 0 |
+| Duplicate names | 0 |
+| Templates | 5, unchanged, still in `Templates/` (the folder set in `.obsidian/templates.json`) |
+| Plugins | Core only, unchanged; no community plugin added (Dataview is not installed, so Bases is used) |
+| `Development.base` and `Research.base` render in Obsidian | **NEEDS VERIFICATION**: written from the Bases syntax, not seen on screen |
+
+### Final structure
+```
+knowledge/
+  00 - PROJECT DASHBOARD.md   ← start here (bookmarked)
+  01 - PROJECT ROADMAP.md
+  02 - PROJECT ARCHITECTURE.md
+  03 - DEVELOPMENT STATUS.md
+  04 - TECHNICAL DEBT.md
+  05 - DOCUMENTATION INDEX.md
+  06 - CLEANUP REPORT.md
+  Development.base
+  00 - Dashboard/ … 10 - Claude Code/   (same folders as before)
+  99 - Archive/
+  Templates/
+```

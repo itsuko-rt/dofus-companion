@@ -1,5 +1,7 @@
 # Milestones
 
+> **Archived 2026-11-25.** Kept unchanged as history. Current version: [[01 - PROJECT ROADMAP]].
+
 | Date | Milestone | Commit |
 |---|---|---|
 | 2026-11-19 | Initial quest graph and quest map from game data | `1c8b1c3` |

@@ -64,6 +64,8 @@ See [[Companion Window]] and [[ADR-0008 Companion window in the browser]].
 See the « Do not build » list in [[Competitor Analysis]]: prices, breaking and runes, the profession XP formula ([[ADR-0007 Profession XP comes from the player's screen]]), breeding, maps, multi-account tools.
 
 ## Next steps (planned)
+Their place in the overall order: [[01 - PROJECT ROADMAP]].
+
 1. **Sitemap and SEO:** dungeons and zones are in the sitemap since 2026-11-21 (624 URLs, every one crawled by the E2E suite). Sets, items and monsters (about 27,000) need a sitemap index and a sampled crawl.
 2. **Encyclopaedia filters:** items by type and level, like the equipment page, and that page's rows linked to sheets.
 3. **More companion guides:** a region's quests, a dungeon's achievements, the atelier list as a checklist.

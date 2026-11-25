@@ -8,14 +8,14 @@ date: 2026-11-20
 - Audit written: `docs/GAME_DATA_AND_PRODUCT_AUDIT.md`. No application code changed.
 - Vault notes updated:
   - class-specific quests in [[Quests]];
-  - the first-visit bug and the Succès slowness in [[Current Status#Known limitations]];
+  - the first-visit bug and the Succès slowness in [[03 - DEVELOPMENT STATUS#Known limitations]];
   - two lines in [[Feature Backlog]].
 
 ## Why
 The owner asked to analyse the game data, support every class, and find the cause of slow Quêtes and Succès navigation, before any development.
 
 ## Files affected
-`docs/GAME_DATA_AND_PRODUCT_AUDIT.md`, [[Quests]], [[Current Status]], [[Quick Links]], [[Feature Backlog]], [[Session Summaries]].
+`docs/GAME_DATA_AND_PRODUCT_AUDIT.md`, [[Quests]], [[03 - DEVELOPMENT STATUS]], [[Quick Links]], [[Feature Backlog]], [[Session Summaries]].
 
 ## Tests performed and results
 - **Data:** SQL on the 3.7.14.18 database and reads of the raw files.

@@ -22,7 +22,7 @@
   - no ads or analytics without consent;
   - commit or push only when the owner asks;
   - the owner's e-mail stays private.
-- **State:** pre-launch; see [[Current Status]].
+- **State:** pre-launch; see [[03 - DEVELOPMENT STATUS]].
 - **Owner preferences:** concise answers; smallest complete change; honest reporting of what was and was not verified.
 
 Then go to [[Operating Instructions]] for what to read next.

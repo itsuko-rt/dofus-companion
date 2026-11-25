@@ -32,7 +32,7 @@ The old page opened on a long category list, with Temporis (754 achievements of 
 - `app/api/achievements/route.ts` (`?ids=`) and `app/api/achievements/search/route.ts` (new); see [[API Documentation]].
 - `components/progression/AchievementsView.tsx` (rewritten) and `components/progression/AchievementCard.tsx` (new).
 - Tests: `tests/achievement-guide.test.ts` (new), real-data search tests in `tests/data.test.ts`, and two rewritten Succès tests in `e2e/ui.spec.ts`.
-- Vault: [[Current Status]], [[Design Decisions]], [[API Documentation]].
+- Vault: [[03 - DEVELOPMENT STATUS]], [[Design Decisions]], [[API Documentation]].
 
 ## Tests performed and results
 - Typecheck clean. `npm test`: **97/97**.

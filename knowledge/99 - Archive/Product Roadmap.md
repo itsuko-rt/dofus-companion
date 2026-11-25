@@ -1,5 +1,7 @@
 # Product roadmap
 
+> **Archived 2026-11-25.** Kept unchanged as history. Current version: [[01 - PROJECT ROADMAP]].
+
 This is the original five-phase plan from `docs/RAPPORT_ARCHITECTURE.md` §9 (2026-11-19), with today's status. The implementation differs from the plan in places; those differences are recorded as decisions.
 
 | Phase | Plan | Status (2026-11-20) |

@@ -6,7 +6,7 @@ The repository's `CLAUDE.md` points here. These rules apply to every task in thi
 Research → Verification → Knowledge base → Specification → Implementation → Tests → Documentation update.
 
 ## Before development (targeted, never the whole vault)
-1. Read [[Project Context]] (short) and [[Current Status]].
+1. Read [[Project Context]] (short) and [[03 - DEVELOPMENT STATUS]].
 2. Read only the notes for the area the task touches:
 
 | Task touches | Read |
@@ -14,6 +14,7 @@ Research → Verification → Knowledge base → Specification → Implementatio
 | Quests, achievements, conditions | [[Architecture]], [[Data Pipeline]], [[Quests]], [[Achievements]] |
 | Accounts, sessions, API | [[Authentication]], [[API Documentation]], [[Security Overview]] |
 | Scanner | [[Character Sync OCR]] |
+| Encyclopaedia, atelier, companion window | [[Ecosystem Architecture]], [[Companion Window]] |
 | Builds, equipment, classes | [[Builds and Progression]], [[Cra]] / [[Pandawa]], [[Integrations]] |
 | Professions | [[Professions]] and the profession's note |
 | UI | [[Visual Identity]], [[UI UX Guidelines]], [[Components]] |
@@ -29,7 +30,7 @@ When the change is significant (new feature, new data source, schema or API chan
 - add an ADR for a real decision (never edit an old decision: supersede it);
 - record new dependencies and integrations in [[Integrations]];
 - record new game-data sources in [[Official Sources]] or [[Community Sources]], with their labels;
-- update the status in [[Current Status]], [[Feature Backlog]] or [[Product Roadmap]], and new limits in [[Current Status#Known limitations]].
+- update the status in [[03 - DEVELOPMENT STATUS]] and [[01 - PROJECT ROADMAP]], debt in [[04 - TECHNICAL DEBT]], new notes in [[05 - DOCUMENTATION INDEX]], and new limits in [[03 - DEVELOPMENT STATUS#Known limitations]].
 
 Skip all of this for trivial changes (typos, small refactors, a style tweak).
 
