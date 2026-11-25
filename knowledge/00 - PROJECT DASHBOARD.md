@@ -34,6 +34,7 @@ The entry point to the vault. Atlas des Douze is a free companion site for DOFUS
 | Encyclopaedia: monsters, items, dungeons, zones, sets | `/encyclopedie` | [[Ecosystem Architecture]] |
 | Atelier and drop odds | `/metiers/atelier` | [[Ecosystem Architecture]] |
 | Companion window | `/compagnon` | Not checked above the real game yet: [[Companion Window]] |
+| Windows game companion (in progress) | `companion/`, panel on `/compagnon` | Character from the DOFUS window title, list reading, sync with the site: [[Game Companion Design]] |
 | Characters, spells of all 19 classes, builds, equipment | `/personnage`, `/builds`, `/equipement` | Build quality is COMMUNITY: [[Builds and Progression]] |
 | Professions and XP calculator | `/metiers` | [[Professions]] |
 | Almanax of the day | home page | [[Data Pipeline]] |

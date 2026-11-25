@@ -37,7 +37,7 @@ Migrations live in `src/server/appdb.ts` (forward only). SQL copies are in `migr
 | `users` | id, email (unique, case-insensitive), password_hash (scrypt), created_at, plan | `plan` is always `free` for now |
 | `sessions` | token_hash (SHA-256), user_id, created_at, expires_at | 30 days; `ON DELETE CASCADE` |
 | `password_resets` | token_hash, user_id, expires_at, used_at | 60 minutes, single use |
-| `characters` | id, user_id, name, data (JSON), updated_at | Primary key `(user_id, id)`, so two users can't collide |
+| `characters` | id, user_id, name, data (JSON), updated_at | Primary key `(user_id, id)`, so two users can't collide. Since 2026-11-25 `data` may also hold `gameName`, `server`, `account`, `lastSeenAt`, and history entries with source `companion` and an `eventId`. These fields are optional and checked by `sanitizeCharacter`. No table change (no migration) |
 | `login_failures` | key (SHA-256 of e-mail and/or IP), at | Throttling; purged after 1 hour |
 | `schema_migrations` | version, applied_at | |
 

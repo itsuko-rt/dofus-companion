@@ -17,7 +17,8 @@ const csp = [
   `img-src 'self' data: blob:${ads ? ' https:' : ''}`,
   "font-src 'self'",
   // data: — Tesseract's wasm core is inlined as a data: URL that it fetches
-  `connect-src 'self' data: https://cdn.jsdelivr.net https://cloudflareinsights.com${dev ? ' ws:' : ''}${ads ? ' https:' : ''}`,
+  // 127.0.0.1:47120: the player's own Windows companion (knowledge: Game Companion Design §6), loopback only
+  `connect-src 'self' data: https://cdn.jsdelivr.net https://cloudflareinsights.com http://127.0.0.1:47120${dev ? ' ws:' : ''}${ads ? ' https:' : ''}`,
   `frame-src ${ads ? 'https:' : "'none'"}`,
   "object-src 'none'",
   "base-uri 'self'",

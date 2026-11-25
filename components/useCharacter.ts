@@ -180,6 +180,26 @@ export function importBackup(text: string): { imported: number; replaced: number
   return { imported: imported.length, replaced };
 }
 
+// ---------- Windows companion: it writes to the character it saw in DOFUS, which may not be the active one
+function current(): Store { if (!loaded) { store = load(); loaded = true; } return store; }
+export const getCharacters = () => current().characters;
+/** Edits one character by id (stamped for sync). False when it does not exist. */
+export function updateCharacterById(id: string, fn: (c: Character) => Character): boolean {
+  const s = current();
+  if (!s.characters.some((c) => c.id === id)) return false;
+  const now = new Date().toISOString();
+  set({ activeId: s.activeId, characters: s.characters.map((c) => (c.id === id ? { ...fn(c), updatedAt: now } : c)) });
+  return true;
+}
+export function selectCharacter(id: string) {
+  const s = current();
+  if (s.activeId !== id && s.characters.some((c) => c.id === id)) set({ activeId: id, characters: s.characters });
+}
+export function addCharacter(c: Character) {
+  const s = current();
+  set({ activeId: c.id, characters: [...s.characters, c] });
+}
+
 // ---------- hook
 export function useCharacter() {
   const s = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);

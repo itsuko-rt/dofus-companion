@@ -1,7 +1,8 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BookOpen, Compass, Home, Pickaxe, Shirt, Swords, UserRound, CircleUser } from 'lucide-react';
+import { BookOpen, Compass, Home, Pickaxe, Shirt, Swords, UserRound, CircleUser, MonitorCheck, MonitorX } from 'lucide-react';
+import { useCompanionSync } from './companion/companion-sync';
 import { BRAND } from '../src/brand.ts';
 import { SUPPORTED_BREEDS } from './breeds';
 import { useCharacter } from './useCharacter';
@@ -39,6 +40,7 @@ export default function Nav() {
   useWarmQuests(path);
   const ch = useCharacter();
   const session = useSession();
+  const companion = useCompanionSync(); // also keeps the Windows companion in sync on every page, once paired
   const breed = SUPPORTED_BREEDS.find((b) => b.id === ch.character.profile.breed)?.name;
   const breedInfo = SUPPORTED_BREEDS.find((b) => b.id === ch.character.profile.breed);
   const link = (active: boolean) =>
@@ -61,6 +63,13 @@ export default function Nav() {
         );
       })}
       <div className="ml-auto flex h-full shrink-0 items-center gap-2">
+        {companion.paired && (
+          <Link href="/compagnon" className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs ${companion.connected ? 'text-done' : 'text-muted'}`}
+            aria-label={companion.connected ? `Compagnon Windows relié${companion.pending.length ? `, ${companion.pending.length} à confirmer` : ''}` : 'Compagnon Windows déconnecté'}>
+            {companion.connected ? <MonitorCheck size={16} aria-hidden /> : <MonitorX size={16} aria-hidden />}
+            {companion.pending.length > 0 && <span className="rounded-full bg-accent px-1.5 text-[10px] font-semibold text-accent-ink">{companion.pending.length}</span>}
+          </Link>
+        )}
         {ch.hasCharacter && (
           <Link href="/personnage" className="hidden items-center gap-2 rounded-md border border-line bg-surface py-0.5 pl-0.5 pr-3 text-xs hover:border-faint sm:flex">
             <span className="h-8 w-8 overflow-hidden rounded border border-black/40" style={{ background: breedInfo?.hue ?? 'var(--color-surface-2)' }}>

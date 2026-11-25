@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import CompanionView from '../../components/companion/CompanionView';
+import CompanionSyncPanel from '../../components/companion/CompanionSyncPanel';
 import { PageHero, SECTION } from '../../components/ui';
 import { pageMeta } from '../../src/seo.ts';
 
@@ -15,6 +16,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ f
   return (
     <div className="h-full overflow-y-auto">
       <PageHero color={SECTION.scan} kicker="Pendant que vous jouez" title="Compagnon" />
+      <div className="px-4 pt-4"><CompanionSyncPanel /></div>
       <CompanionView />
     </div>
   );

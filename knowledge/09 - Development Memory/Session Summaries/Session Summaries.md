@@ -2,6 +2,7 @@
 
 One note per significant session, named `YYYY-MM-DD <topic>`, from [[Development Session]]. Newest first.
 
+- [[2026-11-25 Game companion phase 6 sync]]
 - [[2026-11-25 Game companion phases 4 and 5]]
 - [[2026-11-25 Game companion audit and phase 3]]
 - [[2026-11-25 Vault cleanup and reorganisation]]

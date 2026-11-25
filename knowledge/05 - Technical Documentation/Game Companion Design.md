@@ -7,7 +7,7 @@ date: 2026-11-25
 
 Design for a Windows companion that turns what DOFUS shows on screen into progress on the player's Atlas profiles.
 
-**Status (2026-11-25):** the design was approved. **Phases 3–5 are built and tested**: window and character ([[#10. Phase 3: built]]), then quest and achievement lists ([[#11. Phases 4 and 5: built (quest and achievement lists)]]). Phases 6–9 are planned. Decision record: [[ADR-0009 Windows companion reads the window title and screen]].
+**Status (2026-11-25):** the design was approved. **Phases 3–6 are built and tested**: window and character ([[#10. Phase 3: built]]), quest and achievement lists ([[#11. Phases 4 and 5: built (quest and achievement lists)]]), and the sync with the site ([[#12. Phase 6: built (sync with the site)]]). Phases 7–9 are planned. Decision record: [[ADR-0009 Windows companion reads the window title and screen]].
 
 Related:
 - what exists: [[Character Sync OCR]], [[Companion Window]];
@@ -308,3 +308,61 @@ Electron's Node (24.22) loads the site's TypeScript files directly, so `src/` co
 - Phase 6: the site reads the events (local API, pairing, pending queue, modes applied).
 - Phase 7: profiles matched by exact name.
 - Phase 8: the overlay.
+
+## 12. Phase 6: built (sync with the site)
+### How it works
+- **Companion:**
+  - serves its events on `127.0.0.1:47120` (`companion/api.mjs`; endpoints in [[API Documentation]]);
+  - keeps the site's answer for each event in its log (`{ ack, status }` lines);
+  - shows « Site relié » or the time of the last call, and the pairing code, with « Copier le code » and « Nouveau code ».
+- **Site** (`components/companion/companion-sync.ts`, panel `components/companion/CompanionSyncPanel.tsx` on `/compagnon`, badge in the nav):
+  - once paired, it polls every 2 s (5 s when disconnected) on every page;
+  - it validates each event (`parseEvent`) and decides (`decide`, in `src/companion-sync.ts`);
+  - it writes through the character store (`updateCharacterById`), then acknowledges.
+  - The pairing code, the last event read and the pending list are kept in `localStorage` (`atlas:companion:v1`).
+- **Decisions:**
+
+  | Event | Linked profile (exact `gameName`) | No profile |
+  |---|---|---|
+  | `character.seen` | that profile becomes active; `lastSeenAt` is set, and the class if it had none | « Nouveau personnage vu dans DOFUS » card: *Créer son profil*, *Associer* to a profile with no in-game name yet, or *Ignorer* |
+  | completion, Observation mode | noted, not written | noted |
+  | completion, Assisted mode | waits for *Confirmer* / *Refuser* (or *Tout confirmer*) | waits for the profile |
+  | completion, Automatic mode | written if `certain`, otherwise waits | waits for the profile |
+  | completion already in the history (same `eventId`) or already done | ignored | — |
+
+- **Where completions go:** always to the profile of the character that was **seen**, never to the active one by default. A profile linked later gets its waiting readings re-decided.
+- **Idempotent:** the history entry keeps the `eventId`, and it survives the account's server copy. After a page reload, or a companion that sends everything again, nothing is applied twice.
+- **Emergency stop and mode** can be changed on the site too (`POST /v1/control`).
+- **The site without the companion:** nothing calls `127.0.0.1:47120` until it is paired (E2E-checked), and no badge is shown.
+- **Data model:** see [[Database Schema]] (optional character fields, no table change).
+
+### Tests (2026-11-25)
+- **Unit:**
+  - `tests/companion-sync.test.ts`: validation, exact names, the three modes, idempotency, the server round trip, sightings;
+  - `tests/companion-api.test.ts`: token, origin, Host, events after an id, acknowledgements, controls, 413.
+  
+  `npm test`: 125/125.
+- **E2E `e2e/companion-sync.spec.ts`:** a stand-in companion built on the real `companion/api.mjs`, on port 47120, and the real site. It checks:
+  - a wrong code is refused;
+  - pairing works;
+  - a new character gets a card and no profile without a click; then profile creation and the class;
+  - Assisted mode waits, then confirms;
+  - Automatic mode writes the certain readings, holds the uncertain one, and leaves the other profile untouched;
+  - a close name (`Abc-Deff`) gets its own card, then is linked to an existing profile;
+  - after a reload plus a full replay, nothing is applied twice;
+  - the emergency stop from the site reaches the companion;
+  - a disconnection, then a reconnection.
+  
+  A second test checks that nothing calls the companion without pairing.
+- **Full E2E suite** (desktop and mobile): **65 passed, 1 skipped** by design, 0 failed.
+- **Real companion:**
+  - its API answers 401 without a token;
+  - the pairing code now survives restarts (bug found and fixed: the code was made at each start without being saved);
+  - the panel renders on the real site with no console error.
+  
+  **Not checked:** pairing the real companion with the site and seeing a real character arrive. That needs the owner to paste the code; copying it from the settings file was refused by the session's permission rules, so it was not done.
+
+### Limits
+- The site applies events only while one of its pages is open in the browser.
+- On a production https site, Chrome asks the player to allow access to the local network the first time. Not tested (not deployed).
+- The pending list lives in the browser where the site is open. Another browser sees the result once applied, through the account, but not the waiting cards.

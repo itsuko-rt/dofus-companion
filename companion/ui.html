@@ -46,11 +46,23 @@
 </section>
 
 <section>
+  <h2>Site Atlas</h2>
+  <div class="row"><span id="siteDot" class="dot"></span><strong id="siteStatus"></strong></div>
+  <p class="muted">Pour relier le site : ouvrez la page « Compagnon » d’Atlas dans votre navigateur et collez ce code d’appairage.</p>
+  <div class="row">
+    <code id="token" style="font-size:12px;letter-spacing:.04em"></code>
+    <button id="copyToken">Copier le code</button>
+    <button id="newToken" title="L’ancien code ne marchera plus : il faudra coller le nouveau sur le site">Nouveau code</button>
+  </div>
+  <p id="apiErr" class="err"></p>
+</section>
+
+<section>
   <h2>Mode</h2>
   <label class="mode"><input type="radio" name="mode" value="observation"> <span><strong>Observation</strong> : lit et note, n’enregistre rien.</span></label>
   <label class="mode"><input type="radio" name="mode" value="assisted"> <span><strong>Assisté</strong> : vous confirmez chaque changement.</span></label>
   <label class="mode"><input type="radio" name="mode" value="automatic"> <span><strong>Automatique</strong> : enregistre ce qui est lu avec certitude ; le reste attend votre confirmation.</span></label>
-  <p class="muted">L’enregistrement sur le site arrive avec la synchronisation (prochaine étape). Pour l’instant, tout est noté dans l’historique local.</p>
+  <p class="muted">C’est le site qui enregistre la progression, dans le profil du personnage vu dans DOFUS, jamais dans un autre. Le mode se change ici ou sur le site.</p>
 </section>
 
 <section>
@@ -97,6 +109,7 @@
 const $ = (id) => document.getElementById(id);
 const TYPES = { 'character.seen': 'Personnage détecté', 'quest.completed': 'Quête terminée', 'achievement.completed': 'Succès obtenu', 'companion.stopped': 'Arrêt d’urgence', 'companion.resumed': 'Reprise' };
 let drag = null;
+const SITE = { applied: 'enregistré sur le site', pending: 'en attente sur le site', rejected: 'refusé', ignored: 'non enregistré' };
 const time = (iso) => new Date(iso).toLocaleTimeString('fr-FR');
 let s = null;
 
@@ -144,12 +157,21 @@ function render() {
     const what = e.name ? ` : ${e.name} (${e.characterKey})` : e.characterKey ? ` : ${e.characterKey} (${e.className})` : '';
     li.textContent = `${time(e.at)} · ${TYPES[e.type] ?? e.type}${what}`;
     if (e.objectId) { const tag = document.createElement('span'); tag.className = e.certain ? 'tag ok' : 'tag'; tag.textContent = e.certain ? 'sûr' : 'à confirmer'; li.append(tag); }
+    if (SITE[e.status]) { const tag = document.createElement('span'); tag.className = e.status === 'applied' ? 'tag ok' : 'tag'; tag.textContent = SITE[e.status]; li.append(tag); }
     return li;
   }));
   $('log').textContent = `Historique local : ${s.logPath}`;
+  const seen = s.siteSeenAt && Date.now() - Date.parse(s.siteSeenAt) < 15000;
+  $('siteDot').classList.toggle('on', !!seen);
+  $('siteStatus').textContent = s.api.error ? 'Liaison impossible' : seen ? 'Site relié' : s.siteSeenAt ? `Site vu à ${time(s.siteSeenAt)}` : 'Site pas encore relié';
+  $('apiErr').textContent = s.api.error ?? '';
+  $('token').textContent = `${s.settings.token.slice(0, 6)}…${s.settings.token.slice(-6)}`;
 }
 
 $('capture').onclick = () => window.atlas.capture();
+$('copyToken').onclick = async () => { await window.atlas.copyToken(); $('copyToken').textContent = 'Copié'; setTimeout(() => { $('copyToken').textContent = 'Copier le code'; }, 1500); };
+$('newToken').onclick = () => window.atlas.newToken();
+setInterval(() => s && render(), 5000); // the « Site relié » light goes out when the site stops calling
 $('list').onchange = (e) => window.atlas.set({ list: e.target.value });
 $('fullRegion').onclick = () => window.atlas.set({ region: null });
 function showBox(r) {

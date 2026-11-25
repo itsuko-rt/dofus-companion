@@ -2,12 +2,13 @@
 // captures the game window on demand, by hotkey or at an interval (off by default), and reads the list the player
 // shows (finished quests, obtained achievements) into completion events.
 // Read-only: it never touches the game's process, memory, network or input. Captures stay in memory.
-import { app, BrowserWindow, desktopCapturer, globalShortcut, ipcMain, Menu, nativeImage, Tray } from 'electron';
-import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { app, BrowserWindow, clipboard, desktopCapturer, globalShortcut, ipcMain, Menu, nativeImage, Tray } from 'electron';
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { parseDofusTitle } from '../src/game-window.ts';
 import { closeOcr, completions, LISTS, loadCatalogs, readLines } from './read.mjs';
+import { createApi, PORT } from './api.mjs';
 
 // test runs (--self-test…) may run next to the real companion; only the real one takes the single-instance lock
 const TEST_RUN = process.argv.some((a) => a.startsWith('--self-test'));
@@ -28,6 +29,10 @@ if (!(settings.list in LISTS)) settings.list = 'none';
 if (!validRegion(settings.region)) settings.region = null;
 if (!validUrl(settings.atlasUrl)) settings.atlasUrl = 'http://127.0.0.1:3101';
 settings.intervalSec = clampInterval(settings.intervalSec);
+// pairing code: the site sends it with every request; a new one can be made from the companion window
+// saved at once: a code that changed at every start would unpair the site after each restart
+if (!/^[a-f0-9]{64}$/.test(settings.token ?? '')) { settings.token = randomBytes(32).toString('hex'); mkdirSync(DIR, { recursive: true }); saveSettings(); }
+const DEFAULT_ORIGINS = ['http://127.0.0.1:3101', 'http://localhost:3101', 'http://localhost:3000', 'http://127.0.0.1:3000'];
 
 const state = {
   stopped: false,
@@ -38,7 +43,10 @@ const state = {
   reading: false,
   lastRead: null,       // { at, list, lines, found, certain, fresh, signSeen, error?, text? }
   events: [],           // newest first, the last 50
+  api: { port: PORT },  // { port, error? }
+  siteSeenAt: null,     // last request from the paired site
 };
+const all = [];        // every event of the log (30 days), oldest first, with the status the site gave it
 const sent = new Set();  // `${character}|${type}|${object}` already in the log: never logged twice
 let ui = null, tray = null, watchTimer = null, intervalTimer = null, catalogs = null, lastPrint = null;
 
@@ -59,6 +67,7 @@ function record(type, data) {
   const e = { eventId: eventId(), at: new Date().toISOString(), type, ...data, status: 'new' };
   appendFileSync(LOG, JSON.stringify(e) + '\n');
   if (e.objectId) sent.add(dedupKey(e));
+  all.push(e);
   state.events.unshift(e);
   state.events.length = Math.min(state.events.length, 50);
   push();
@@ -70,8 +79,12 @@ function pruneLog() {
   const cutoff = Date.now() - KEEP_DAYS * 86_400_000;
   const keep = readFileSync(LOG, 'utf8').split('\n').filter((l) => { try { return Date.parse(JSON.parse(l).at) >= cutoff; } catch { return false; } });
   writeFileSync(LOG, keep.length ? keep.join('\n') + '\n' : '');
-  const all = keep.map((l) => JSON.parse(l));
-  for (const e of all) if (e.objectId) sent.add(dedupKey(e));
+  const byId = new Map();
+  for (const x of keep.map((l) => JSON.parse(l))) {
+    if (x.ack) { const e = byId.get(x.ack); if (e) e.status = x.status; continue; } // the site's answer to an event
+    byId.set(x.eventId, x); all.push(x);
+    if (x.objectId) sent.add(dedupKey(x));
+  }
   state.events = all.slice(-50).reverse();
 }
 
@@ -210,6 +223,42 @@ function scheduleInterval() {
   if (!state.stopped && settings.intervalSec) intervalTimer = setInterval(() => capture('interval'), settings.intervalSec * 1000);
 }
 
+// ---------- local API for the Atlas site (companion/api.mjs)
+const origins = () => [...new Set([...DEFAULT_ORIGINS, new URL(settings.atlasUrl).origin])];
+function apiStatus() {
+  state.siteSeenAt = new Date().toISOString(); push();
+  const w = state.windows.find((x) => x.sourceId === state.activeId);
+  return {
+    app: 'atlas-companion', version: app.getVersion(), mode: settings.mode, stopped: state.stopped, dofus: state.windows.length > 0,
+    active: w?.character ? { characterKey: w.character.name, className: w.character.className, breedId: w.character.breedId, gameVersion: w.version } : null,
+    list: settings.list, lastEventId: all.at(-1)?.eventId ?? null,
+  };
+}
+function startApi() {
+  const server = createApi({
+    token: () => settings.token, origins,
+    status: apiStatus,
+    events: (after) => all.filter((e) => !after || e.eventId > after).slice(0, 200),
+    ack: (acks) => {
+      const at = new Date().toISOString();
+      for (const a of acks) {
+        const e = all.find((x) => x.eventId === a.eventId);
+        if (!e) continue;
+        e.status = a.status;
+        appendFileSync(LOG, JSON.stringify({ ack: a.eventId, status: a.status, at }) + '\n');
+      }
+      push();
+    },
+    control: (c) => {
+      if (c.mode) { settings.mode = c.mode; saveSettings(); }
+      if (typeof c.stop === 'boolean' && c.stop !== state.stopped) setStopped(c.stop);
+      push();
+    },
+  });
+  server.on('error', (e) => { state.api = { port: PORT, error: e.code === 'EADDRINUSE' ? `Le port ${PORT} est déjà utilisé : un autre compagnon est peut-être ouvert.` : e.message }; push(); });
+  server.listen(PORT, '127.0.0.1');
+}
+
 function snapshot() {
   return { ...state, settings, lists: Object.fromEntries(Object.entries(LISTS).map(([k, v]) => [k, v.label])), hotkeys: { capture: HOTKEY_CAPTURE, stop: HOTKEY_STOP }, logPath: LOG };
 }
@@ -254,6 +303,8 @@ ipcMain.handle('set', (_e, patch) => {
   return snapshot();
 });
 ipcMain.handle('reloadCatalog', () => refreshCatalog());
+ipcMain.handle('copyToken', () => { clipboard.writeText(settings.token); return true; });
+ipcMain.handle('newToken', () => { settings.token = randomBytes(32).toString('hex'); saveSettings(); push(); return snapshot(); });
 
 app.on('second-instance', showUi);
 app.on('window-all-closed', () => { /* keep running in the tray */ });
@@ -271,7 +322,7 @@ app.whenReady().then(() => {
   globalShortcut.register(HOTKEY_CAPTURE, () => capture('hotkey'));
   globalShortcut.register(HOTKEY_STOP, () => setStopped(!state.stopped));
   watchTimer = setInterval(watch, 2000);
-  watch(); scheduleInterval(); updateTray(); showUi(); refreshCatalog();
+  watch(); scheduleInterval(); updateTray(); showUi(); refreshCatalog(); startApi();
 });
 
 // `electron . --self-test` prints what it sees (classes and versions, no character names), captures once in memory and

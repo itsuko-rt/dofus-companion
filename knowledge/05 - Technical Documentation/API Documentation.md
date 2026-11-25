@@ -46,3 +46,31 @@ Busy server (too many password hashes queued): `503` with `Retry-After`.
 | `DELETE /api/characters/:id` | session, same origin | Scoped to the user |
 
 Responses of auth and character routes are `no-store`. Details and test evidence: [[Security Audit]].
+
+## Windows companion local API (`companion/api.mjs`, since 2026-11-25)
+This is served by the companion on the player's PC, not by the site: `http://127.0.0.1:47120`. The site calls it from the browser, once paired ([[Game Companion Design]]).
+
+| Method and path | Body / query | Answer |
+|---|---|---|
+| `GET /v1/status` | — | `{ app, version, mode, stopped, dofus, active: { characterKey, className, breedId, gameVersion } or null, list, lastEventId }` |
+| `GET /v1/events` | `?after=<eventId>` | `{ events: [...] }`, oldest first, at most 200. Event ids sort by time |
+| `POST /v1/ack` | `{ acks: [{ eventId, status }] }`, status `applied` / `pending` / `rejected` / `ignored`, at most 500 | `{ ok: true }`. Kept in the companion's log |
+| `POST /v1/control` | `{ mode? , stop? }` | the new status |
+
+Every request needs:
+- `Authorization: Bearer <64 hex>`, the pairing code shown by the companion;
+- a `Host` of `127.0.0.1:47120` or `localhost:47120` (DNS rebinding);
+- an `Origin`, when present, from the allow-list: `http://127.0.0.1:3101`, `http://localhost:3101`, `http://localhost:3000`, `http://127.0.0.1:3000`, and the companion's `atlasUrl`.
+
+Bodies are JSON, 64 KB at most. Error codes:
+
+| Code | Meaning |
+|---|---|
+| 400 | Invalid body or query |
+| 401 | Missing or wrong token |
+| 403 | Origin not in the allow-list |
+| 413 | Body over 64 KB |
+| 415 | Not JSON |
+| 421 | Wrong `Host` |
+
+CORS answers carry `Access-Control-Allow-Private-Network: true` for Chrome's local-network rules.

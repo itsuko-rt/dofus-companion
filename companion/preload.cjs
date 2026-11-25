@@ -7,4 +7,6 @@ contextBridge.exposeInMainWorld('atlas', {
   stop: (v) => ipcRenderer.invoke('stop', v),
   set: (patch) => ipcRenderer.invoke('set', patch),
   reloadCatalog: () => ipcRenderer.invoke('reloadCatalog'),
+  copyToken: () => ipcRenderer.invoke('copyToken'),
+  newToken: () => ipcRenderer.invoke('newToken'),
 });

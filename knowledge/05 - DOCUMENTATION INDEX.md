@@ -172,6 +172,7 @@ Every note in the vault, and every long report in the repository's `docs/` folde
 | [[2026-11-21 Achievements visual redesign]] | Session summary, 2026-11-21 |
 | [[2026-11-21 Ecosystem research and encyclopaedia]] | Session summary, 2026-11-21 |
 | [[2026-11-23 Scanner that saves quests and achievements]] | Session summary, 2026-11-23 |
+| [[2026-11-25 Game companion phase 6 sync]] | Session summary, 2026-11-25 |
 | [[2026-11-25 Game companion phases 4 and 5]] | Session summary, 2026-11-25 |
 | [[2026-11-25 Game companion audit and phase 3]] | Session summary, 2026-11-25 |
 | [[2026-11-25 Vault cleanup and reorganisation]] | Session summary, 2026-11-25 |

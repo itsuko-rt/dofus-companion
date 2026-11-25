@@ -25,23 +25,36 @@ export interface Character {
   /** audit trail of progress changes, newest last (undo, provenance, "recently completed") */
   history: HistoryEntry[];
   updatedAt: string;
+  /** exact in-game name, set when the player links this profile to a character the Windows companion saw */
+  gameName?: string;
+  /** game server and a free account label, declared by the player (never an Ankama login) */
+  server?: string;
+  account?: string;
+  /** when the companion last saw this character in the DOFUS window */
+  lastSeenAt?: string;
 }
 
 /** Where a change came from. 'inferred' state is never stored: it is recomputed from game conditions. */
-export type ChangeSource = 'manual' | 'import' | 'scan' | 'prerequisites';
+export type ChangeSource = 'manual' | 'import' | 'scan' | 'prerequisites' | 'companion';
 export const CHANGE_SOURCES: Record<ChangeSource, string> = {
   manual: 'Coché à la main',
   import: 'Importé (sauvegarde)',
   scan: 'Capture d’écran, confirmé',
   prerequisites: 'Prérequis, confirmé',
+  companion: 'Compagnon Windows',
 };
-export interface HistoryEntry { at: string; source: ChangeSource; added: string[]; removed: string[]; label: string }
+/** `eventId`: the companion event that made this change; an event already in the history is never applied again */
+export interface HistoryEntry { at: string; source: ChangeSource; added: string[]; removed: string[]; label: string; eventId?: string }
 
 const MAX_IDS = 20_000;
 const MAX_BUILDS = 50;
 const MAX_HISTORY = 200;
 const ID_RE = /^[a-z][a-z0-9]{1,40}$/;
-const NODE_RE = /^(quest|ach|dungeon|obj):\d{1,9}$/;
+export const NODE_RE = /^(quest|ach|dungeon|obj):\d{1,9}$/;
+export const EVENT_ID_RE = /^[a-z0-9]{10,40}$/;
+
+/** optional fields are left out when empty, so older characters keep the same JSON */
+const opt = <K extends string>(k: K, v: string) => (v ? { [k]: v } as Record<K, string> : {});
 
 export function sanitizeCharacter(raw: unknown, fallbackId: string): Character | null {
   if (!raw || typeof raw !== 'object') return null;
@@ -80,9 +93,14 @@ export function sanitizeCharacter(raw: unknown, fallbackId: string): Character |
       const x = h as Record<string, unknown>;
       const source = x.source as ChangeSource;
       if (!(source in CHANGE_SOURCES)) return [];
-      return [{ at: str(x.at, 40), source, added: ids(x.added).slice(0, 2000), removed: ids(x.removed).slice(0, 2000), label: str(x.label, 160) }];
+      const eventId = typeof x.eventId === 'string' && EVENT_ID_RE.test(x.eventId) ? x.eventId : undefined;
+      return [{ at: str(x.at, 40), source, added: ids(x.added).slice(0, 2000), removed: ids(x.removed).slice(0, 2000), label: str(x.label, 160), ...(eventId ? { eventId } : {}) }];
     }).slice(-MAX_HISTORY),
     updatedAt: str(r.updatedAt, 40) || new Date(0).toISOString(),
+    ...opt('gameName', str(r.gameName, 40).trim()),
+    ...opt('server', str(r.server, 40).trim()),
+    ...opt('account', str(r.account, 40).trim()),
+    ...opt('lastSeenAt', /^\d{4}-\d\d-\d\dT[\d:.]+Z$/.test(str(r.lastSeenAt, 40)) ? str(r.lastSeenAt, 40) : ''),
   };
 }
 
