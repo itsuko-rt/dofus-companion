@@ -1,11 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { completions } from '../src/companion-read.ts';
+import { completions, headingSet } from '../src/companion-read.ts';
 import { buildCatalog } from '../src/recognize.ts';
 
 const catalogs = {
   quest: buildCatalog([{ id: 'quest:1093', name: 'Offrande à Danizzal' }, { id: 'quest:1556', name: 'La chapelle noire' }, { id: 'quest:7', name: 'Le Dofus Ébène' }, { id: 'quest:8', name: 'Le Dofus Ébène' }]),
-  achievement: buildCatalog([{ id: 'ach:486', name: 'Mine de Sakaï' }, { id: 'ach:9', name: 'Le Dofus Ébène' }]),
+  achievement: buildCatalog([{ id: 'ach:486', name: 'Mine de Sakaï' }, { id: 'ach:9', name: 'Le Dofus Ébène' }, { id: 'ach:77', name: 'Landes de Cania' }]),
+  // category, area and subarea names, as served by /api/compagnon/titres (fictional subset)
+  headings: headingSet(['Astrub', 'Donjons', 'Landes de Cania', 'Quêtes mondiales']),
 };
 const lines = (...t: [string, number][]) => t.map(([text, confidence]) => ({ text, confidence }));
 
@@ -31,4 +33,27 @@ test('companion evidence: nothing is read without a declared list, from a poorly
   assert.deepEqual(completions(lines(['Offrande à Danizzal', 20]), catalogs, 'quests-done').readings, []);
   assert.deepEqual(completions(lines(['Offrande à Danizzal', 90]), catalogs, 'achievements-done').readings, []);
   assert.deepEqual(completions(lines(['Mine de Sakaï', 90]), catalogs, 'achievements-done').readings.map((x) => x.objectId), ['ach:486']);
+});
+
+test('false readings: a name that is also a heading or a place is never certain (Landes de Cania is a subarea and an achievement)', () => {
+  const r = completions(lines(['Landes de Cania', 95]), catalogs, 'achievements-done');
+  assert.deepEqual(r.readings.map((x) => [x.objectId, x.certain, x.heading]), [['ach:77', false, true]]);
+  // headings alone (tabs, categories, areas) never give a completion
+  assert.deepEqual(completions(lines(['Terminées', 95], ['Astrub', 95], ['Quêtes mondiales', 95], ['Donjons', 95]), catalogs, 'quests-done').readings, []);
+});
+
+test('false readings: a chat line that mentions a quest, a level column or numbers alone give nothing', () => {
+  const chat = lines(
+    ['[Général] Joueur42 : quelqu’un pour Offrande à Danizzal ce soir ?', 90],
+    ['(Commerce) vends Mine de Sakaï clé 50 000 k', 88],
+    ['niv. 50', 90], ['3 500', 90], ['12/40', 85], ['', 90],
+  );
+  assert.deepEqual(completions(chat, catalogs, 'quests-done').readings, []);
+  assert.deepEqual(completions(chat, catalogs, 'achievements-done').readings, []);
+});
+
+test('false readings: without the heading list (an old cache), readings are proposed but none is certain', () => {
+  const { headings: _, ...noHeadings } = catalogs;
+  const r = completions(lines(['Offrande à Danizzal', 92]), noHeadings, 'quests-done');
+  assert.deepEqual(r.readings.map((x) => [x.objectId, x.certain]), [['quest:1093', false]]);
 });

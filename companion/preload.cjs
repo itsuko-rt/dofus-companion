@@ -9,4 +9,5 @@ contextBridge.exposeInMainWorld('atlas', {
   reloadCatalog: () => ipcRenderer.invoke('reloadCatalog'),
   copyToken: () => ipcRenderer.invoke('copyToken'),
   newToken: () => ipcRenderer.invoke('newToken'),
+  overlay: (visible) => ipcRenderer.invoke('overlay', visible),
 });

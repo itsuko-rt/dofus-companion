@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'">
+<title>Atlas · overlay</title>
+<style>
+  :root { color-scheme: dark; --text: #eadfc8; --muted: #a89676; --accent: #e8c77a; --bad: #e07a5f; --ok: #8fbf6a; --line: #3a2e22; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; height: 100%; background: #17120d; color: var(--text); font: 12px/1.4 "Segoe UI", system-ui, sans-serif; overflow: hidden; user-select: none; }
+  header { display: flex; align-items: center; gap: 6px; padding: 6px 8px; background: #241c14; border-bottom: 1px solid var(--line); -webkit-app-region: drag; cursor: move; }
+  header strong { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--bad); flex: none; }
+  .dot.on { background: var(--ok); }
+  button { -webkit-app-region: no-drag; background: #3a2e22; color: var(--text); border: 1px solid #5a4733; border-radius: 4px; padding: 3px 7px; font: inherit; cursor: pointer; }
+  button:hover { border-color: var(--accent); }
+  button:disabled { opacity: .5; cursor: default; }
+  button.stop { background: #5a2a20; border-color: #8a3f30; }
+  .x { padding: 0 6px; line-height: 18px; }
+  main { padding: 6px 8px; display: flex; flex-direction: column; gap: 6px; }
+  .row { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+  .muted { color: var(--muted); }
+  .err { color: var(--bad); }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li { padding: 2px 0; border-top: 1px solid var(--line); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tag { font-size: 10px; padding: 0 4px; border-radius: 3px; border: 1px solid var(--line); margin-left: 3px; }
+  .tag.ok { color: var(--ok); border-color: var(--ok); }
+</style>
+</head>
+<body>
+<header>
+  <span id="dot" class="dot"></span>
+  <strong id="who">Atlas</strong>
+  <button class="x" id="hide" title="Masquer l’overlay (Ctrl+Shift+F10)" aria-label="Masquer l’overlay">×</button>
+</header>
+<main>
+  <div class="muted" id="line"></div>
+  <div class="row">
+    <button id="capture">Capturer</button>
+    <button id="stop" class="stop">Arrêt d’urgence</button>
+  </div>
+  <div id="read" class="muted"></div>
+  <ul id="events" aria-label="Dernières lectures"></ul>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const MODE = { observation: 'Observation', assisted: 'Assisté', automatic: 'Automatique' };
+const LIST = { none: 'rien à lire', 'quests-done': 'quêtes terminées', 'achievements-done': 'succès obtenus' };
+const SITE = { applied: 'enregistré', pending: 'à confirmer sur le site', rejected: 'refusé', ignored: 'non enregistré' };
+let s = null;
+window.atlas.onState((next) => { s = next; render(); });
+
+function render() {
+  const w = s.windows.find((x) => x.sourceId === s.activeId);
+  $('dot').classList.toggle('on', !!w?.character && !s.stopped);
+  $('who').textContent = s.stopped ? 'Atlas : arrêté' : w?.character ? `${w.character.name} · ${w.character.className}` : w ? 'DOFUS : aucun personnage' : 'DOFUS non détecté';
+  const site = s.siteSeenAt && Date.now() - Date.parse(s.siteSeenAt) < 15000;
+  $('line').textContent = `${MODE[s.settings.mode]} · lit : ${LIST[s.settings.list] ?? s.settings.list} · site ${site ? 'relié' : 'non relié'}`;
+  $('capture').disabled = s.stopped || !w;
+  $('capture').title = `Capturer et lire (${s.hotkeys.capture.replace('CommandOrControl', 'Ctrl')})`;
+  $('stop').textContent = s.stopped ? 'Reprendre' : 'Arrêt d’urgence';
+  const r = s.lastRead;
+  $('read').className = r?.error ? 'err' : 'muted';
+  $('read').textContent = s.reading ? 'Lecture en cours…' : !r ? '' : r.error ? r.error : `${r.found} reconnu(s), ${r.certain} sûr(s), ${r.fresh} nouveau(x)`;
+  const done = s.events.filter((e) => e.objectId).slice(0, 5);
+  $('events').replaceChildren(...done.map((e) => {
+    const li = document.createElement('li');
+    li.textContent = e.name ?? e.objectId;
+    li.title = `${e.name ?? e.objectId} (${e.characterKey})`;
+    const tag = document.createElement('span');
+    tag.className = e.status === 'applied' ? 'tag ok' : 'tag';
+    tag.textContent = SITE[e.status] ?? (e.certain ? 'sûr' : 'à confirmer');
+    li.append(tag);
+    return li;
+  }));
+}
+$('capture').onclick = () => window.atlas.capture();
+$('stop').onclick = () => window.atlas.stop(!s.stopped);
+$('hide').onclick = () => window.atlas.overlay(false);
+setInterval(() => s && render(), 5000);
+</script>
+</body>
+</html>

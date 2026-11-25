@@ -12,7 +12,7 @@ A snapshot of where the project stands, checked against the code. Replace this s
 | Check | Result | When |
 |---|---|---|
 | `npm run typecheck` | clean | 2026-11-25 |
-| `npm test` | 125/125 | 2026-11-25 |
+| `npm test` | 132/132 | 2026-11-25 |
 | E2E (Playwright, desktop and mobile) | 66 passed, 1 skipped by design, 0 failed | 2026-11-25 |
 | Production build | OK | 2026-11-23 |
 
@@ -31,7 +31,7 @@ The modules are listed in [[00 - PROJECT DASHBOARD#What is built (implemented an
 ## In progress
 - **Scanner on the real game:** built and tested on synthetic game-like images only. Waiting for the owner to try it on a real « Terminées » list and an obtained-achievements list ([[2026-11-23 Scanner that saves quests and achievements]]).
 - **Companion window above the real game:** built and tested in the browser. Not checked over a running DOFUS client ([[Companion Window]]).
-- **Windows game companion** (branch feature/game-companion): phases 3–6 built: character from the window title, capture, quest and achievement lists, and sync with the site (pairing, modes, confirmations, idempotent writes), several characters and accounts (front window followed, server and account labels, unlink). Phases 8–9 next ([[Game Companion Design]]).
+- **Windows game companion** (branch feature/game-companion): phases 3–6 built: character from the window title, capture, quest and achievement lists, and sync with the site (pairing, modes, confirmations, idempotent writes), several characters and accounts (front window followed, server and account labels, unlink), the always-on-top overlay, and hardening (heading names never certain, log restored after restarts, window lockdown). All 9 phases built; the owner's test on real game lists is next ([[Game Companion Design]]).
 
 ## Blocking a public launch
 From [[Release Checklist]]:

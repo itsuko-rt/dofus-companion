@@ -449,3 +449,18 @@ export const loadAlmanax = (path: string) => withDb(path, (db): AlmanaxEntry[] |
   return (db.prepare('SELECT a.id, a.dates, a.name, a.description, a.item_id, a.qty, i.name item FROM almanax a JOIN item i ON i.id = a.item_id ORDER BY a.id').all() as Record<string, any>[])
     .map((r) => ({ id: r.id, dates: JSON.parse(r.dates), name: r.name, description: r.description, item: r.item, qty: r.qty, source: source(r.item_id) }));
 });
+
+/**
+ * Names the game shows as headings or places (quest and achievement categories, areas, subareas), for the Windows
+ * companion: a quest or achievement named like one of them is never read as certain, since the heading itself may be
+ * on screen (13 achievements share a category name and 207 a subarea name, 3.7.14.18).
+ */
+export function loadHeadingNames(path: string): { version: string; names: string[] } {
+  const db = new DatabaseSync(path, { readOnly: true });
+  try {
+    const version = (db.prepare('SELECT id FROM game_version').get() as { id: string }).id;
+    const rows = db.prepare(`SELECT name FROM quest_category UNION SELECT name FROM achievement_category
+      UNION SELECT name FROM world_area UNION SELECT name FROM world_subarea`).all() as { name: string | null }[];
+    return { version, names: [...new Set(rows.map((r) => r.name?.trim()).filter((n): n is string => !!n))].sort() };
+  } finally { db.close(); }
+}

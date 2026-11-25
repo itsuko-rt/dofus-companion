@@ -97,6 +97,8 @@
 
 <section>
   <div class="row"><button id="stop" class="stop">Arrêt d’urgence</button><span class="muted">ou <kbd id="hks"></kbd></span></div>
+  <div class="row" style="margin-top:8px"><button id="overlay">Afficher l’overlay</button><span class="muted">ou <kbd id="hko"></kbd></span></div>
+  <p class="muted">L’overlay est une petite fenêtre au-dessus du jeu : personnage, mode, dernières lectures, capture et arrêt. Cliquer dessus ne retire pas la main au jeu, et il n’apparaît jamais dans les captures.</p>
 </section>
 
 <section>
@@ -131,6 +133,8 @@ function render() {
   $('hks').textContent = s.hotkeys.stop.replace('CommandOrControl', 'Ctrl');
   $('capture').disabled = s.stopped || !active;
   $('stop').textContent = s.stopped ? 'Reprendre' : 'Arrêt d’urgence';
+  $('overlay').textContent = s.settings.overlay.visible ? 'Masquer l’overlay' : 'Afficher l’overlay';
+  $('hko').textContent = s.overlayHotkey.replace('CommandOrControl', 'Ctrl');
   const c = s.lastCapture;
   $('cap').className = c?.error ? 'err' : 'muted';
   $('cap').textContent = !c ? '' : c.error ? `${time(c.at)} : ${c.error}` : `${time(c.at)} : ${c.width} × ${c.height} px (${c.trigger})`;
@@ -171,6 +175,7 @@ function render() {
 $('capture').onclick = () => window.atlas.capture();
 $('copyToken').onclick = async () => { await window.atlas.copyToken(); $('copyToken').textContent = 'Copié'; setTimeout(() => { $('copyToken').textContent = 'Copier le code'; }, 1500); };
 $('newToken').onclick = () => window.atlas.newToken();
+$('overlay').onclick = () => window.atlas.overlay(!s.settings.overlay.visible);
 setInterval(() => s && render(), 5000); // the « Site relié » light goes out when the site stops calling
 $('list').onchange = (e) => window.atlas.set({ list: e.target.value });
 $('fullRegion').onclick = () => window.atlas.set({ region: null });

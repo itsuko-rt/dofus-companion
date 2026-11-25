@@ -2,6 +2,8 @@
 
 One note per significant session, named `YYYY-MM-DD <topic>`, from [[Development Session]]. Newest first.
 
+- [[2026-11-25 Game companion phase 9 hardening]]
+- [[2026-11-25 Game companion phase 8 overlay]]
 - [[2026-11-25 Game companion phase 7 characters and accounts]]
 - [[2026-11-25 Game companion phase 6 sync]]
 - [[2026-11-25 Game companion phases 4 and 5]]

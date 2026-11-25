@@ -39,6 +39,22 @@ test('companion API: no token, a wrong token or another site gets nothing', asyn
   });
 });
 
+test('companion API: the browser\'s preflight is answered for the Atlas site only, with the local-network permission', async () => {
+  await withApi(async (call) => {
+    const pre = { 'access-control-request-method': 'GET', 'access-control-request-headers': 'authorization', 'access-control-request-private-network': 'true' };
+    const ok = await call('/v1/events', { method: 'OPTIONS', headers: { ...pre, origin: ORIGIN } });
+    assert.equal(ok.status, 204);
+    assert.equal(ok.headers.get('access-control-allow-origin'), ORIGIN);
+    assert.equal(ok.headers.get('access-control-allow-private-network'), 'true');
+    assert.match(ok.headers.get('access-control-allow-headers') ?? '', /authorization/);
+    const evil = await call('/v1/events', { method: 'OPTIONS', headers: { ...pre, origin: 'https://evil.example' } });
+    assert.equal(evil.status, 403);
+    assert.equal(evil.headers.get('access-control-allow-private-network'), null);
+    // an allowed page still needs the token for the real request
+    assert.equal((await call('/v1/events', { headers: { origin: ORIGIN } })).status, 401);
+  });
+});
+
 test('companion API: a request for another host name (DNS rebinding) is refused', async () => {
   await withApi(async (call) => {
     const { request } = await import('node:http');

@@ -6,6 +6,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { binaryViews } from '../src/threshold.ts';
 import { buildCatalog } from '../src/recognize.ts';
+import { headingSet } from '../src/companion-read.ts';
 export { completions, LISTS } from '../src/companion-read.ts';
 
 /** Game names for the matcher, from the site (cached, so it still works when the site is not running). */
@@ -16,7 +17,10 @@ export async function loadCatalogs(atlasUrl, dir) {
     const r = await fetch(new URL('/api/graph', atlasUrl), { signal: AbortSignal.timeout(15_000) });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     const g = await r.json();
-    data = { version: g.version, nodes: g.nodes.filter((n) => n.kind === 'quest' || n.kind === 'achievement').map((n) => ({ id: n.id, kind: n.kind, name: n.label })) };
+    const h = await fetch(new URL('/api/compagnon/titres', atlasUrl), { signal: AbortSignal.timeout(15_000) });
+    if (!h.ok) throw new Error(`titres HTTP ${h.status}`);
+    const { names } = await h.json();
+    data = { version: g.version, headings: Array.isArray(names) ? names.filter((n) => typeof n === 'string') : [], nodes: g.nodes.filter((n) => n.kind === 'quest' || n.kind === 'achievement').map((n) => ({ id: n.id, kind: n.kind, name: n.label })) };
     writeFileSync(cache, JSON.stringify(data));
   } catch (e) {
     try { data = JSON.parse(readFileSync(cache, 'utf8')); source = 'cache'; }
@@ -27,6 +31,8 @@ export async function loadCatalogs(atlasUrl, dir) {
     version: data.version, source,
     counts: { quest: data.nodes.filter((n) => n.kind === 'quest').length, achievement: data.nodes.filter((n) => n.kind === 'achievement').length },
     quest: of('quest'), achievement: of('achievement'),
+    // an older cache without heading names: nothing is certain until the site is reached again
+    headings: Array.isArray(data.headings) ? headingSet(data.headings) : undefined,
   };
 }
 

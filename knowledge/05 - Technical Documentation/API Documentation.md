@@ -16,6 +16,7 @@ type: technical
 | `GET /api/achievements/objectives` | — | static |
 | `GET /api/encyclopedie/search?q=&kind=` | text trimmed to 80 characters, at least 2; `kind` one of item, monster, dungeon, zone, set (400 otherwise); at most 30 results | `max-age=3600` |
 | `GET /api/atelier?lines=id:qty,…&sub=1` | at most 100 lines, quantities 1–100,000, malformed parts ignored; resources and intermediate crafts from the game recipes | `max-age=3600` |
+| `GET /api/compagnon/titres` | — ; `{ version, names }`: quest and achievement category, area and subarea names, for the Windows companion's evidence rules | static (built once) |
 | `GET /api/compagnon[?guide=<slug>]` | slug `[a-z0-9-]{1,80}` (400 otherwise, 404 unknown); guide list or one guide's steps | `max-age=3600` |
 
 Achievement rows (since 2026-11-21): each objective may carry `place` (`kind` monster, zone or dungeon; `level` range; `zones`), from an exact name match in the game's monster, zone and dungeon tables; `dofus` is a list of `{ name, slug }` (slug of `/guides/dofus/<slug>`). The page adds `v=2` to these URLs so a browser never reuses a cached response of the former shape.

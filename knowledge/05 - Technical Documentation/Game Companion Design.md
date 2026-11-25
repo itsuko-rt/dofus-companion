@@ -1,13 +1,13 @@
 ---
 type: technical
-status: in progress
+status: built
 date: 2026-11-25
 ---
 # Game companion design
 
 Design for a Windows companion that turns what DOFUS shows on screen into progress on the player's Atlas profiles.
 
-**Status (2026-11-25):** the design was approved. **Phases 3–7 are built and tested**: window and character ([[#10. Phase 3: built]]), quest and achievement lists ([[#11. Phases 4 and 5: built (quest and achievement lists)]]), the sync with the site ([[#12. Phase 6: built (sync with the site)]]), and several characters and accounts ([[#13. Phase 7: built (several characters and accounts)]]). Phases 8–9 are planned. Decision record: [[ADR-0009 Windows companion reads the window title and screen]].
+**Status (2026-11-25):** the design was approved. **Phases 3–7 are built and tested**: window and character ([[#10. Phase 3: built]]), quest and achievement lists ([[#11. Phases 4 and 5: built (quest and achievement lists)]]), the sync with the site ([[#12. Phase 6: built (sync with the site)]]), several characters and accounts ([[#13. Phase 7: built (several characters and accounts)]]), the overlay ([[#14. Phase 8: built (the overlay)]]), and the hardening and test report ([[#15. Phase 9: hardening and test report]]). **All nine phases are done.** The main open risk is accuracy on real game lists, which is not measured yet. Decision record: [[ADR-0009 Windows companion reads the window title and screen]].
 
 Related:
 - what exists: [[Character Sync OCR]], [[Companion Window]];
@@ -276,7 +276,7 @@ Electron's Node (24.22) loads the site's TypeScript files directly, so `src/` co
 - **No duplicates:** an event is never logged twice for the same character, type and object. The log is reloaded at start.
 - **Without a character in game** (login screen), nothing is read.
 - **At an interval,** a list is read again only when the framed part changed. The detector is the same as the browser share's.
-- **Game names** come from the site's public `/api/graph` (setting `atlasUrl`, default `http://127.0.0.1:3101`). They are cached in `game-names.json`, so reading still works when the site is down.
+- **Game names** (and, since phase 9, the heading and place names from `/api/compagnon/titres`) come from the site's public `/api/graph` (setting `atlasUrl`, default `http://127.0.0.1:3101`). They are cached in `game-names.json`, so reading still works when the site is down.
 - A version mismatch between the site's data and the game is shown.
 - « Voir le texte lu » shows the raw OCR text of the last read.
 
@@ -403,3 +403,82 @@ Electron's Node (24.22) loads the site's TypeScript files directly, so `src/` co
 ### Limits
 - **Two characters with the same name on two servers** cannot be told apart: the window title has no server. Atlas refuses to link one name to two profiles, so the second one stays unlinked, rather than progress going to the wrong profile.
 - A profile can be relinked to another in-game name only after « Délier ».
+
+## 14. Phase 8: built (the overlay)
+### What it does
+- **An optional small window above the game** (`companion/overlay.html`). It shows:
+  - the character played and its class, with a status light;
+  - the mode, the list being read, and whether the site is linked;
+  - a summary of the last reading, and the last 5 readings with their site status (« enregistré », « à confirmer sur le site »…);
+  - « Capturer » and « Arrêt d’urgence » / « Reprendre » buttons, and × to hide it.
+- **Shown or hidden** with **Ctrl+Shift+F10**, the tray menu, « Afficher l’overlay » in the companion window, or `npm start -- --overlay`. It stays shown across restarts, and its position and size are kept.
+- **Above the game, without getting in the way:**
+  - always on top at the « screen-saver » level, so it also stays above a borderless DOFUS window;
+  - **not focusable**: a click on it never takes the keyboard away from DOFUS, and the foreground reader of phase 7 keeps seeing DOFUS in front;
+  - no taskbar entry, 94 % opacity, dragged by its title bar.
+- **Never in the captures:** the companion captures the DOFUS window itself, not the screen, so a window above it is not part of the frame. This follows from window capture; it was not measured pixel by pixel.
+- Same sandboxed bridge as the main window (`companion/preload.cjs`), and a strict content security policy.
+
+### Tests (2026-11-25)
+- `--self-test-ui` now also opens the overlay hidden: no renderer error, the expected text, `isAlwaysOnTop()` true, `isFocusable()` false.
+- **Real PC, with DOFUS running:** Windows reports the overlay window as **visible, topmost (`WS_EX_TOPMOST`) and no-activate (`WS_EX_NOACTIVATE`)**.
+- **Not checked:**
+  - how it looks above the game (no screen view in this session);
+  - DOFUS in exclusive full screen, where Windows may hide every other window;
+  - dragging it.
+
+### Troubleshooting
+| Symptom | Fix |
+|---|---|
+| The overlay disappears when DOFUS is in full screen | Use DOFUS in windowed or borderless window mode |
+| The overlay is off screen (screen changed) | Hide it and show it again, or delete `overlay.bounds` in `settings.json` |
+
+## 15. Phase 9: hardening and test report
+### Found and fixed
+- **False completions from headings (data finding, 2026-11-25).** In the 3.7.14.18 data:
+  - 13 achievements share their name with an achievement category;
+  - 207 share it with a subarea, and 16 with an area (dungeon and exploration achievements, such as « Landes de Cania » or « Prison de Madrestam »);
+  - 1 quest shares its name with an area.
+  
+  Such a heading on screen would have been read as a certain completion. **Rule now:** a name that is also a category, area or subarea name is never certain. It is still proposed as « à confirmer » (`heading: true` in its evidence), so Automatic mode never writes it alone.
+  - The names come from a new static route, `/api/compagnon/titres` (397 names, game data only), cached with the game names.
+  - Without that list (an older cache), nothing is certain.
+  - On the synthetic achievement list, « Pierres de l'élévation » moved from certain to « à confirmer » for this reason. The 7 quests stay certain.
+- **The log after a restart** (`companion/log.mjs`, unit tested):
+  - the site's last answer per event is restored;
+  - the de-duplication keys come back;
+  - lines older than 30 days go, along with the answers to events no longer kept;
+  - a line cut short by a crash is dropped;
+  - a repeated event id is kept once.
+- **Electron lockdown:** the companion's windows can neither open a pop-up nor navigate to another page. This is checked by the UI self-test.
+- **Hostile text:** a name with HTML in it is shown as text in the companion and the overlay (`textContent`). It is checked by the self-test: no element created, no script run. The site's panel renders through React, which escapes text.
+
+### What was tested (2026-11-25, all passing)
+| Area | How | Result |
+|---|---|---|
+| Typecheck | `npm run typecheck` | clean |
+| Unit | `npm test` (tests below) | **132/132** |
+| — evidence rules and false readings | `tests/companion-read.test.ts`: headings, chat lines that mention a quest, level columns, numbers, shared names, wrong list, missing heading list | 6/6 |
+| — sync rules | `tests/companion-sync.test.ts`: validation, exact names, modes, idempotency, server round trip | 5/5 |
+| — local API security | `tests/companion-api.test.ts`: token, origin, preflight with the local-network header, DNS rebinding, body limits, validated answers | 4/4 |
+| — log and restarts | `tests/companion-log.test.ts` | 3/3 |
+| — title, thresholding | `tests/game-window.test.ts`, `tests/threshold.test.ts` | 6/6 |
+| End to end | `npx playwright test`, desktop and mobile, including `e2e/companion-sync.spec.ts`: pairing, modes, duplicates, page reload and full replay, disconnection, two characters on two accounts, unlink, no calls without pairing | **66 passed, 1 skipped** by design, 0 failed |
+| Browser scanner after the shared refactor | `e2e/scan.spec.ts` (inside the suite) | passing |
+| Companion pipeline | `--self-test-read` on the synthetic lists | quests 7/7 certain; achievements 4/5 read, 3 certain, 1 « à confirmer » (heading) |
+| Companion windows | `--self-test-ui` | no renderer error; overlay always on top and not focusable; pop-ups and navigation blocked; hostile text inert |
+| Real game | `--self-test` and Windows window flags | title read in game and on the selection screen; 4K capture not black; 0 false completions on a full game screen; overlay topmost and no-activate |
+| Dependencies | `npm audit` (site, production deps) and `npm audit` (companion) | 0 vulnerabilities each |
+
+### Known limitations (still open)
+- **Accuracy on a real « Terminées » list or obtained-achievements list has not been measured.** Every list test so far used synthetic game-like images. This is the main open risk.
+- Not tested:
+  - two real DOFUS windows at once;
+  - the overlay's look over the game;
+  - exclusive full screen;
+  - Chrome's local-network prompt on an https production site.
+- **Level and server are not read from the game:** the window title carries neither.
+- Two characters with the same name on two servers cannot be told apart. One stays unlinked.
+- The site applies events only while one of its pages is open.
+- A corrupted `settings.json` creates a new pairing code, so the site has to be paired again.
+- **Whether Ankama accepts automatic screen reading is not confirmed** (UNVERIFIED). Interval capture stays off by default.

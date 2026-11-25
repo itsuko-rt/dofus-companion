@@ -10,6 +10,7 @@ import { parseDofusTitle } from '../src/game-window.ts';
 import { closeOcr, completions, LISTS, loadCatalogs, readLines } from './read.mjs';
 import { createApi, PORT } from './api.mjs';
 import { watchForeground } from './foreground.mjs';
+import { dedupKey, readLog } from './log.mjs';
 
 // test runs (--self-test…) may run next to the real companion; only the real one takes the single-instance lock
 const TEST_RUN = process.argv.some((a) => a.startsWith('--self-test'));
@@ -22,6 +23,7 @@ const LOG = join(DIR, 'events.jsonl');
 const MODES = ['observation', 'assisted', 'automatic'];
 const HOTKEY_CAPTURE = 'CommandOrControl+Shift+F9';
 const HOTKEY_STOP = 'CommandOrControl+Shift+F12';
+const HOTKEY_OVERLAY = 'CommandOrControl+Shift+F10';
 const KEEP_DAYS = 30;
 
 const settings = { mode: 'assisted', intervalSec: 0, list: 'none', region: null, atlasUrl: 'http://127.0.0.1:3101', ...readJson(SETTINGS) };
@@ -30,6 +32,7 @@ if (!(settings.list in LISTS)) settings.list = 'none';
 if (!validRegion(settings.region)) settings.region = null;
 if (!validUrl(settings.atlasUrl)) settings.atlasUrl = 'http://127.0.0.1:3101';
 settings.intervalSec = clampInterval(settings.intervalSec);
+settings.overlay = { visible: settings.overlay?.visible === true, bounds: validBounds(settings.overlay?.bounds) ? settings.overlay.bounds : null };
 // pairing code: the site sends it with every request; a new one can be made from the companion window
 // saved at once: a code that changed at every start would unpair the site after each restart
 if (!/^[a-f0-9]{64}$/.test(settings.token ?? '')) { settings.token = randomBytes(32).toString('hex'); mkdirSync(DIR, { recursive: true }); saveSettings(); }
@@ -50,6 +53,7 @@ const state = {
 const all = [];        // every event of the log (30 days), oldest first, with the status the site gave it
 const sent = new Set();  // `${character}|${type}|${object}` already in the log: never logged twice
 let ui = null, tray = null, watchTimer = null, intervalTimer = null, catalogs = null, lastPrint = null;
+let overlay = null;    // the always-on-top overlay window, when shown
 let foreground = null;  // title of the window in front (null until known, or when the foreground watcher fails)
 let announced = null;   // character last announced to the site as the one being played
 
@@ -59,12 +63,12 @@ function validRegion(r) {
   return !!r && ['x', 'y', 'w', 'h'].every((k) => typeof r[k] === 'number' && r[k] >= 0 && r[k] <= 1)
     && r.w >= 0.03 && r.h >= 0.03 && r.x + r.w <= 1.0001 && r.y + r.h <= 1.0001;
 }
+function validBounds(b) { return !!b && ['x', 'y', 'width', 'height'].every((k) => Number.isInteger(b[k])) && b.width >= 200 && b.height >= 120 && b.width <= 1200 && b.height <= 1200; }
 function validUrl(u) { try { return ['http:', 'https:'].includes(new URL(u).protocol); } catch { return false; } }
 function saveSettings() { writeFileSync(SETTINGS, JSON.stringify(settings, null, 2)); }
 
 /** Time-sortable unique id (timestamp + random), for idempotent writes on the site. */
 const eventId = () => Date.now().toString(36).padStart(10, '0') + randomBytes(8).toString('hex');
-const dedupKey = (e) => `${e.characterKey}|${e.type}|${e.objectId}`;
 
 function record(type, data) {
   const e = { eventId: eventId(), at: new Date().toISOString(), type, ...data, status: 'new' };
@@ -79,15 +83,10 @@ function record(type, data) {
 
 function pruneLog() {
   if (!existsSync(LOG)) return;
-  const cutoff = Date.now() - KEEP_DAYS * 86_400_000;
-  const keep = readFileSync(LOG, 'utf8').split('\n').filter((l) => { try { return Date.parse(JSON.parse(l).at) >= cutoff; } catch { return false; } });
-  writeFileSync(LOG, keep.length ? keep.join('\n') + '\n' : '');
-  const byId = new Map();
-  for (const x of keep.map((l) => JSON.parse(l))) {
-    if (x.ack) { const e = byId.get(x.ack); if (e) e.status = x.status; continue; } // the site's answer to an event
-    byId.set(x.eventId, x); all.push(x);
-    if (x.objectId) sent.add(dedupKey(x));
-  }
+  const { lines, events, sent: keys } = readLog(readFileSync(LOG, 'utf8'), Date.now(), KEEP_DAYS);
+  writeFileSync(LOG, lines.length ? lines.join('\n') + '\n' : '');
+  all.push(...events);
+  for (const k of keys) sent.add(k);
   state.events = all.slice(-50).reverse();
 }
 
@@ -194,7 +193,7 @@ async function readCapture(img, w) {
       record(r.type, {
         ...e, name: r.name, className: w.character.className, previous: 'unknown', next: 'done',
         certain: r.certain, confidence: r.confidence, gameVersion: w.version,
-        evidence: { source: 'ocr', screen: list, text: r.text, signSeen, dataVersion: catalogs.version },
+        evidence: { source: 'ocr', screen: list, text: r.text, signSeen, dataVersion: catalogs.version, ...(r.heading ? { heading: true } : {}) },
       });
     }
     state.lastRead = {
@@ -284,9 +283,9 @@ function startApi() {
 }
 
 function snapshot() {
-  return { ...state, settings, lists: Object.fromEntries(Object.entries(LISTS).map(([k, v]) => [k, v.label])), hotkeys: { capture: HOTKEY_CAPTURE, stop: HOTKEY_STOP }, logPath: LOG };
+  return { ...state, settings, overlayHotkey: HOTKEY_OVERLAY, lists: Object.fromEntries(Object.entries(LISTS).map(([k, v]) => [k, v.label])), hotkeys: { capture: HOTKEY_CAPTURE, stop: HOTKEY_STOP }, logPath: LOG };
 }
-function push() { ui?.webContents.send('state', snapshot()); }
+function push() { const s = snapshot(); ui?.webContents.send('state', s); overlay?.webContents.send('state', s); }
 
 function updateTray() {
   if (!tray) return;
@@ -296,9 +295,40 @@ function updateTray() {
     { label: 'Ouvrir', click: showUi },
     { label: 'Capturer maintenant', enabled: !state.stopped, click: () => capture('menu') },
     { label: state.stopped ? 'Reprendre' : 'Arrêt d’urgence', click: () => setStopped(!state.stopped) },
+    { label: settings.overlay.visible ? 'Masquer l’overlay' : 'Afficher l’overlay', click: () => showOverlay(!settings.overlay.visible) },
     { type: 'separator' },
     { label: 'Quitter', click: () => app.quit() },
   ]));
+}
+
+/**
+ * The optional overlay: a small window above the game (« screen-saver » level, so it stays above a borderless DOFUS
+ * window too). Not focusable: clicking it never takes the keyboard away from the game. It is a separate window, so it
+ * never appears in the captures, which read the DOFUS window only.
+ */
+function showOverlay(visible, { test = false } = {}) {
+  settings.overlay.visible = visible;
+  if (!test) saveSettings();
+  if (!visible) { overlay?.close(); overlay = null; updateTray(); push(); return; }
+  if (!overlay) {
+    const b = settings.overlay.bounds;
+    overlay = new BrowserWindow({
+      width: b?.width ?? 300, height: b?.height ?? 230, ...(b ? { x: b.x, y: b.y } : {}),
+      frame: false, alwaysOnTop: true, skipTaskbar: true, focusable: false, show: false,
+      minimizable: false, maximizable: false, fullscreenable: false, backgroundColor: '#17120d', title: 'Atlas · overlay',
+      webPreferences: { preload: join(import.meta.dirname, 'preload.cjs'), contextIsolation: true, sandbox: true, nodeIntegration: false },
+    });
+    overlay.setAlwaysOnTop(true, 'screen-saver');
+    overlay.setOpacity(0.94);
+    overlay.loadFile(join(import.meta.dirname, 'overlay.html'));
+    overlay.webContents.on('did-finish-load', push);
+    if (!test) overlay.once('ready-to-show', () => overlay?.showInactive());
+    let t = null;
+    const keep = () => { clearTimeout(t); t = setTimeout(() => { if (overlay) { settings.overlay.bounds = overlay.getBounds(); saveSettings(); } }, 400); };
+    overlay.on('moved', keep); overlay.on('resized', keep);
+    overlay.on('closed', () => { overlay = null; });
+  }
+  updateTray(); push();
 }
 
 function showUi() {
@@ -327,9 +357,15 @@ ipcMain.handle('set', (_e, patch) => {
   return snapshot();
 });
 ipcMain.handle('reloadCatalog', () => refreshCatalog());
+ipcMain.handle('overlay', (_e, v) => { showOverlay(v === true); return snapshot(); });
 ipcMain.handle('copyToken', () => { clipboard.writeText(settings.token); return true; });
 ipcMain.handle('newToken', () => { settings.token = randomBytes(32).toString('hex'); saveSettings(); push(); return snapshot(); });
 
+// the companion's windows show only its own two pages: no pop-up, no navigation elsewhere (Electron security checklist)
+app.on('web-contents-created', (_e, wc) => {
+  wc.setWindowOpenHandler(() => ({ action: 'deny' }));
+  wc.on('will-navigate', (e) => e.preventDefault());
+});
 app.on('second-instance', showUi);
 app.on('window-all-closed', () => { /* keep running in the tray */ });
 let stopForeground = null;
@@ -346,8 +382,10 @@ app.whenReady().then(() => {
   tray.on('click', showUi);
   globalShortcut.register(HOTKEY_CAPTURE, () => capture('hotkey'));
   globalShortcut.register(HOTKEY_STOP, () => setStopped(!state.stopped));
+  globalShortcut.register(HOTKEY_OVERLAY, () => showOverlay(!settings.overlay.visible));
   watchTimer = setInterval(watch, 2000);
   watch(); scheduleInterval(); updateTray(); showUi(); refreshCatalog(); startApi();
+  if (settings.overlay.visible || process.argv.includes('--overlay')) showOverlay(true); // `npm start -- --overlay`
   // if the foreground watcher cannot run, the companion falls back to « the window whose character changed last »
   stopForeground = watchForeground(onForeground, () => { foreground = null; stopForeground = null; });
 });
@@ -378,7 +416,7 @@ async function readTest(file, list) {
     if (c.error) throw new Error(c.error);
     const lines = await readLines(nativeImage.createFromPath(file), null, DIR);
     const { readings, signSeen } = completions(lines, c, list);
-    console.log(JSON.stringify({ lines: lines.length, signSeen, text: process.argv.includes("--text") ? lines.map((l) => `${Math.round(l.confidence)} ${l.text}`) : undefined, readings: readings.map((r) => ({ id: r.objectId, certain: r.certain, confidence: r.confidence })) }));
+    console.log(JSON.stringify({ lines: lines.length, signSeen, text: process.argv.includes("--text") ? lines.map((l) => `${Math.round(l.confidence)} ${l.text}`) : undefined, readings: readings.map((r) => ({ id: r.objectId, certain: r.certain, heading: !!r.heading, confidence: r.confidence })) }));
   } catch (e) {
     console.log(JSON.stringify({ error: e.message }));
   }
@@ -403,6 +441,8 @@ async function uiTest() {
       { at: now, type: 'quest.completed', objectId: 'quest:1093', name: 'Offrande à Danizzal', characterKey: 'Testperso', certain: true },
       { at: now, type: 'quest.completed', objectId: 'quest:1556', name: 'La chapelle noire', characterKey: 'Testperso', certain: false },
       { at: now, type: 'character.seen', characterKey: 'Testperso', className: 'Iop' },
+      // a hostile name (from a damaged log, say) must stay text
+      { at: now, type: 'quest.completed', objectId: 'quest:1', name: '<img src=x onerror="window.__pwned=1">', characterKey: 'Testperso', certain: false },
     ],
   });
   Object.assign(settings, { list: 'quests-done', region: { x: 0.2, y: 0.1, w: 0.5, h: 0.7 } });
@@ -410,6 +450,18 @@ async function uiTest() {
   await new Promise((r) => setTimeout(r, 500));
   const text = await win.webContents.executeJavaScript('document.body.innerText');
   const boxShown = await win.webContents.executeJavaScript("!document.getElementById('box').hidden");
-  console.log(JSON.stringify({ errors, boxShown, text }));
+  showOverlay(true, { test: true });
+  overlay.webContents.on('console-message', (e) => { if (e.level === 'error') errors.push(`overlay: ${e.message}`); });
+  await new Promise((r) => overlay.webContents.once('did-finish-load', r));
+  push();
+  await new Promise((r) => setTimeout(r, 400));
+  const hostile = await win.webContents.executeJavaScript("({ img: document.querySelectorAll('img[src=x]').length, pwned: !!window.__pwned, shown: document.body.innerText.includes('<img src=x') })");
+  const before = BrowserWindow.getAllWindows().length;
+  const popup = await win.webContents.executeJavaScript("window.open('https://example.com') === null");
+  await win.webContents.executeJavaScript("location.href = 'https://example.com'; true");
+  await new Promise((r) => setTimeout(r, 500));
+  const lock = { popupBlocked: popup && BrowserWindow.getAllWindows().length === before, stayed: win.webContents.getURL().endsWith('ui.html') };
+  const overlayInfo = { alwaysOnTop: overlay.isAlwaysOnTop(), focusable: overlay.isFocusable(), inTaskbar: false, text: await overlay.webContents.executeJavaScript('document.body.innerText') };
+  console.log(JSON.stringify({ errors, boxShown, text, overlay: overlayInfo, hostile, lock }));
   app.exit(0);
 }
