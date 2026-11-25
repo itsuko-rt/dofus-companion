@@ -1,5 +1,6 @@
 // Reads the DOFUS window title, which the game sets to « <character> - <class> - <version> - <channel> » once a
-// character is in game (seen on 3.7.14.18, 2026-11-25). The title comes from the OS window list: nothing touches
+// character is in game, and to « Dofus <version> - <channel> » on the login and character-selection screens (both seen
+// on 3.7.14.18, 2026-11-25). The title comes from the OS window list: nothing touches
 // the game. Character names may contain hyphens (« Abc-Def »), so the title is split on « - » with spaces, from
 // the right.
 import breeds from './breed-data.json' with { type: 'json' };
@@ -18,6 +19,8 @@ const VERSION = /^\d+(\.\d+){1,3}$/;
 export function parseDofusTitle(title: string): GameWindow | null {
   const t = title.trim();
   if (/^dofus$/i.test(t)) return { version: '', channel: '', character: null };
+  const login = /^dofus (\d+(?:\.\d+){1,3}) - ([A-Za-z]{2,20})$/i.exec(t);
+  if (login) return { version: login[1], channel: login[2], character: null };
   const parts = t.split(' - ');
   if (parts.length < 3) return null;
   const channel = parts.at(-1)!.trim(), version = parts.at(-2)!.trim();

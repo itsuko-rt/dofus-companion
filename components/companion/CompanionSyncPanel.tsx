@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import { Check, Link2, MonitorCheck, MonitorX, Pause, Play, UserPlus, X } from 'lucide-react';
 import { companion, eventLabel, useCompanionSync } from './companion-sync';
-import { useCharacter } from '../useCharacter';
+import { updateCharacterById, useCharacter, type Character } from '../useCharacter';
 import { Button, Card, SectionTitle } from '../ui';
 import type { CompanionEvent, CompanionMode } from '../../src/companion-sync.ts';
 
@@ -76,6 +76,8 @@ export default function CompanionSyncPanel() {
 
       <Pending items={s.pending} onError={setError} />
 
+      <Linked playing={st?.active?.characterKey ?? null} />
+
       {s.recent.length > 0 && (
         <section>
           <h3 className="mb-1 text-xs font-medium uppercase tracking-wide text-faint">Derniers événements</h3>
@@ -92,6 +94,49 @@ export default function CompanionSyncPanel() {
         </section>
       )}
     </Card>
+  );
+}
+
+/** Profiles linked to an in-game name, grouped by the account label the player chose. */
+function Linked({ playing }: { playing: string | null }) {
+  const ch = useCharacter();
+  const linked = ch.characters.filter((c) => c.gameName);
+  if (!linked.length) return null;
+  // one list sorted by account, headings inside it: a row keeps its fields when its account changes (no remount)
+  const sorted = [...linked].sort((a, b) => (a.account ?? '').localeCompare(b.account ?? '') || a.name.localeCompare(b.name));
+  const accounts = new Set(sorted.map((c) => c.account ?? ''));
+  const field = (c: Character, k: 'server' | 'account', label: string) => (
+    <label className="flex flex-col text-[11px] text-faint">{label}
+      <input defaultValue={c[k] ?? ''} maxLength={40} aria-label={`${label} de ${c.name}`}
+        onBlur={(e) => { const v = e.target.value.trim(); if (v !== (c[k] ?? '')) updateCharacterById(c.id, (x) => ({ ...x, [k]: v || undefined })); }}
+        className="w-36 rounded border border-line bg-bg px-1.5 py-1 text-sm text-text" />
+    </label>
+  );
+  return (
+    <section aria-label="Profils liés au jeu">
+      <h3 className="mb-1 text-xs font-medium uppercase tracking-wide text-faint">Profils liés au jeu</h3>
+      <p className="mb-2 text-xs text-muted">Chaque profil reçoit uniquement ce que le compagnon lit pour son nom exact dans DOFUS. Le serveur et le compte servent à vous y retrouver ; ils ne sont pas lus dans le jeu.</p>
+      <ul className="flex flex-col divide-y divide-line/60">
+        {sorted.flatMap((c, i) => {
+          const heading = accounts.size > 1 && (i === 0 || (sorted[i - 1].account ?? '') !== (c.account ?? ''))
+            ? [<li key={`account:${c.account ?? ''}`} className="pt-2 text-xs font-medium text-muted">{c.account || 'Sans compte'}</li>] : [];
+          return [...heading, (
+            <li key={c.id} className="flex flex-wrap items-end gap-3 py-2 text-sm">
+              <span className="min-w-40 flex-1">
+                <span className="font-medium">{c.name}</span>{c.gameName !== c.name && <span className="text-muted"> · en jeu : {c.gameName}</span>}
+                {playing === c.gameName && <span className="ml-2 rounded border border-done px-1.5 text-[11px] text-done">en jeu</span>}
+                {ch.character.id === c.id && <span className="ml-2 rounded border border-accent px-1.5 text-[11px] text-accent">profil actif</span>}
+                <span className="block text-xs text-faint">Vu pour la dernière fois : {c.lastSeenAt ? new Date(c.lastSeenAt).toLocaleString('fr-FR') : '—'}</span>
+              </span>
+              {field(c, 'server', 'Serveur')}
+              {field(c, 'account', 'Compte')}
+              <Button variant="ghost" className="px-2 py-1 text-xs" onClick={() => updateCharacterById(c.id, (x) => ({ ...x, gameName: undefined }))}
+                aria-label={`Délier ${c.name} du jeu`}>Délier</Button>
+            </li>
+          )];
+        })}
+      </ul>
+    </section>
   );
 }
 

@@ -37,7 +37,7 @@ function fakeCompanion(origin: string) {
   return c;
 }
 
-const chars = async (page: Page) => (await localStore(page)).characters as unknown as { id: string; name: string; gameName?: string; done: string[]; history: { eventId?: string; source: string }[]; profile: { breed?: number } }[];
+const chars = async (page: Page) => (await localStore(page)).characters as unknown as { id: string; name: string; gameName?: string; account?: string; server?: string; done: string[]; history: { eventId?: string; source: string }[]; profile: { breed?: number } }[];
 const activeId = (page: Page) => page.evaluate((k) => JSON.parse(localStorage.getItem(k)!).activeId as string, STORE);
 
 test.describe.configure({ mode: 'serial' });
@@ -82,7 +82,7 @@ test('pairing, profiles by exact name, assisted and automatic modes, duplicates,
     await expect.poll(() => fake.acks.get(q1.eventId)).toBe('applied');
 
     // automatic: certain readings are written at once; an uncertain one waits; the other character is untouched
-    await page.getByRole('radio', { name: 'Automatique' }).check();
+    await page.getByRole('radio', { name: 'Automatique' }).click(); // checked once the companion answers
     await expect.poll(() => fake.mode).toBe('automatic');
     fake.quest('Abc-Def', 'quest:1556', 'La chapelle noire');
     const unsure = fake.quest('Abc-Def', 'quest:2073', 'Question d’évolution', false);
@@ -131,6 +131,60 @@ test('pairing, profiles by exact name, assisted and automatic modes, duplicates,
 
     // expected in the console: the deliberate wrong code (401) and the stopped companion
     expect(errors.filter((e) => !/ERR_CONNECTION_REFUSED|Failed to fetch|net::ERR|status of 401/.test(e))).toEqual([]);
+  } finally {
+    await fake.stop();
+  }
+});
+
+test('two characters on two accounts: the active profile follows the game, readings never cross, unlinking', async ({ page, baseURL }) => {
+  test.setTimeout(90_000);
+  const fake = fakeCompanion(new URL(baseURL!).origin);
+  fake.mode = 'automatic';
+  await fake.start();
+  try {
+    await seedLocal(page, 'Sans lien');
+    await page.goto('/compagnon');
+    await page.getByLabel('Code d’appairage').fill(TOKEN);
+    await page.getByRole('button', { name: 'Relier' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Relié' })).toBeVisible();
+
+    // two characters, one per account (two DOFUS windows): both get a profile on the player's click
+    fake.seen('Alpha-Un', 'Crâ', 9);
+    await page.getByText('Nouveau personnage vu dans DOFUS : Alpha-Un').waitFor();
+    await page.getByRole('button', { name: 'Créer son profil' }).click();
+    fake.seen('Beta-Deux', 'Sadida', 10);
+    await page.getByText('Nouveau personnage vu dans DOFUS : Beta-Deux').waitFor();
+    await page.getByRole('button', { name: 'Créer son profil' }).click();
+    await expect.poll(async () => (await chars(page)).filter((c) => c.gameName).map((c) => c.gameName).sort()).toEqual(['Alpha-Un', 'Beta-Deux']);
+    const byName = async (n: string) => (await chars(page)).find((c) => c.gameName === n)!;
+    const alpha = await byName('Alpha-Un'), beta = await byName('Beta-Deux');
+    expect(await activeId(page)).toBe(beta.id);
+
+    // the player goes back to the first window: the site follows
+    fake.seen('Alpha-Un', 'Crâ', 9);
+    await expect.poll(() => activeId(page)).toBe(alpha.id);
+    // a reading of the other window, while Alpha is active, goes to Beta only
+    fake.quest('Beta-Deux', 'quest:1556', 'La chapelle noire');
+    fake.quest('Alpha-Un', 'quest:1093', 'Offrande à Danizzal');
+    await expect.poll(async () => [(await byName('Alpha-Un')).done, (await byName('Beta-Deux')).done]).toEqual([['quest:1093'], ['quest:1556']]);
+    expect(await activeId(page)).toBe(alpha.id);
+    expect((await chars(page)).find((c) => c.name === 'Sans lien')!.done).toEqual([]);
+
+    // account and server labels, kept with the profile
+    await page.getByLabel('Compte de Beta-Deux').fill('Compte secondaire');
+    await page.getByLabel('Serveur de Beta-Deux').fill('Draconiros');
+    await page.getByLabel('Serveur de Beta-Deux').blur();
+    await expect.poll(async () => { const b = await byName('Beta-Deux'); return [b.account, b.server]; }).toEqual(['Compte secondaire', 'Draconiros']);
+    await expect(page.getByText('Compte secondaire', { exact: true })).toBeVisible(); // a second account group appears
+
+    // unlinking: the profile keeps its progress, and the name is a stranger again
+    await page.getByRole('button', { name: 'Délier Beta-Deux du jeu' }).click();
+    await expect.poll(async () => (await chars(page)).find((c) => c.id === beta.id)!.gameName).toBeUndefined();
+    expect((await chars(page)).find((c) => c.id === beta.id)!.done).toEqual(['quest:1556']);
+    fake.quest('Beta-Deux', 'quest:18', 'Wogew l’hewmite');
+    fake.seen('Beta-Deux', 'Sadida', 10);
+    await expect(page.getByText('Nouveau personnage vu dans DOFUS : Beta-Deux')).toBeVisible();
+    expect((await chars(page)).find((c) => c.id === beta.id)!.done).toEqual(['quest:1556']);
   } finally {
     await fake.stop();
   }

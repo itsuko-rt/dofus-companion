@@ -9,6 +9,7 @@ import { randomBytes } from 'node:crypto';
 import { parseDofusTitle } from '../src/game-window.ts';
 import { closeOcr, completions, LISTS, loadCatalogs, readLines } from './read.mjs';
 import { createApi, PORT } from './api.mjs';
+import { watchForeground } from './foreground.mjs';
 
 // test runs (--self-test…) may run next to the real companion; only the real one takes the single-instance lock
 const TEST_RUN = process.argv.some((a) => a.startsWith('--self-test'));
@@ -49,6 +50,8 @@ const state = {
 const all = [];        // every event of the log (30 days), oldest first, with the status the site gave it
 const sent = new Set();  // `${character}|${type}|${object}` already in the log: never logged twice
 let ui = null, tray = null, watchTimer = null, intervalTimer = null, catalogs = null, lastPrint = null;
+let foreground = null;  // title of the window in front (null until known, or when the foreground watcher fails)
+let announced = null;   // character last announced to the site as the one being played
 
 function readJson(p) { try { return JSON.parse(readFileSync(p, 'utf8')); } catch { return {}; } }
 function clampInterval(v) { const n = Math.round(Number(v)); return Number.isFinite(n) && n >= 5 && n <= 3600 ? n : 0; }
@@ -96,32 +99,53 @@ async function refreshCatalog() {
   push();
 }
 
-/** Every 2 s: the DOFUS windows and the character each one shows. A new character in a window is an event. */
+/**
+ * Makes a DOFUS window the active one. The site hears about it (character.seen) only when the character played
+ * changes, so its active profile follows the game; a window whose character changes in the background (another
+ * account) is announced when the player comes to it.
+ */
+function setActive(w, source) {
+  if (state.activeId !== w.sourceId) { state.activeId = w.sourceId; lastPrint = null; }
+  if (w.character && announced !== w.character.name) {
+    announced = w.character.name;
+    record('character.seen', {
+      characterKey: w.character.name, className: w.character.className, breedId: w.character.breedId,
+      gameVersion: w.version, confidence: 1, evidence: { source },
+    });
+  }
+  push(); updateTray();
+}
+
+/** Every 2 s: the DOFUS windows and the character each one shows. */
 async function watch() {
   let sources;
   try { sources = await desktopCapturer.getSources({ types: ['window'], thumbnailSize: { width: 0, height: 0 }, fetchWindowIcons: false }); }
   catch { return; }
   const before = new Map(state.windows.map((w) => [w.sourceId, w]));
   const windows = sources.flatMap((s) => { const g = parseDofusTitle(s.name); return g ? [{ sourceId: s.id, title: s.name, ...g }] : []; });
+  const same = JSON.stringify(windows) === JSON.stringify(state.windows);
+  state.windows = windows;
   for (const w of windows) {
     const old = before.get(w.sourceId);
     const changed = !old || old.character?.name !== w.character?.name;
-    if (changed && w.character) {
-      // shortcut: the OS window list does not say which window is in front; with several DOFUS windows the one whose
-      // character changed last is active, and the player can pick another in the companion window. Upgrade with a
-      // foreground-window check if multi-account players need it.
-      state.activeId = w.sourceId;
-      lastPrint = null;
-      record('character.seen', {
-        characterKey: w.character.name, className: w.character.className, breedId: w.character.breedId,
-        gameVersion: w.version, confidence: 1, evidence: { source: 'window-title' },
-      });
-    }
+    // a character entering the game: active if its window is in front, or if the foreground is not known
+    if (changed && w.character && (foreground === null || foreground === w.title || windows.length === 1)) setActive(w, 'window-title');
   }
-  if (!windows.some((w) => w.sourceId === state.activeId)) state.activeId = windows.find((w) => w.character)?.sourceId ?? windows[0]?.sourceId ?? null;
-  const same = JSON.stringify(windows) === JSON.stringify(state.windows);
-  state.windows = windows;
+  if (!windows.some((w) => w.sourceId === state.activeId)) {
+    const next = windows.find((w) => w.title === foreground) ?? windows.find((w) => w.character) ?? windows[0];
+    if (next) setActive(next, 'window-title'); else { state.activeId = null; announced = null; }
+  }
   if (!same) { push(); updateTray(); }
+}
+
+/** The player brought another window to the front: if it is a DOFUS window, its character is now the one played. */
+function onForeground(title) {
+  foreground = title;
+  const g = parseDofusTitle(title);
+  if (!g?.character) return;
+  const w = state.windows.find((x) => x.title === title);
+  if (w) setActive(w, 'foreground');
+  else void watch(); // a window the 2 s list has not seen yet
 }
 
 /** One frame of the active DOFUS window, kept in memory only; read when the player said which list it shows. */
@@ -297,7 +321,7 @@ ipcMain.handle('set', (_e, patch) => {
   if ('intervalSec' in patch) settings.intervalSec = clampInterval(patch.intervalSec);
   if (patch.list === 'none' || patch.list in LISTS) { settings.list = patch.list; lastPrint = null; }
   if ('region' in patch && (patch.region === null || validRegion(patch.region))) { settings.region = patch.region; lastPrint = null; }
-  if (typeof patch.activeId === 'string' && state.windows.some((w) => w.sourceId === patch.activeId)) state.activeId = patch.activeId;
+  if (typeof patch.activeId === 'string') { const w = state.windows.find((x) => x.sourceId === patch.activeId); if (w) setActive(w, 'player'); }
   if (typeof patch.atlasUrl === 'string' && validUrl(patch.atlasUrl) && patch.atlasUrl !== settings.atlasUrl) { settings.atlasUrl = patch.atlasUrl; refreshCatalog(); }
   saveSettings(); scheduleInterval(); push();
   return snapshot();
@@ -308,7 +332,8 @@ ipcMain.handle('newToken', () => { settings.token = randomBytes(32).toString('he
 
 app.on('second-instance', showUi);
 app.on('window-all-closed', () => { /* keep running in the tray */ });
-app.on('will-quit', () => { globalShortcut.unregisterAll(); closeOcr(); });
+let stopForeground = null;
+app.on('will-quit', () => { globalShortcut.unregisterAll(); closeOcr(); stopForeground?.(); });
 
 const SELF_TEST = process.argv.includes('--self-test');
 const READ_TEST = process.argv.indexOf('--self-test-read');
@@ -323,6 +348,8 @@ app.whenReady().then(() => {
   globalShortcut.register(HOTKEY_STOP, () => setStopped(!state.stopped));
   watchTimer = setInterval(watch, 2000);
   watch(); scheduleInterval(); updateTray(); showUi(); refreshCatalog(); startApi();
+  // if the foreground watcher cannot run, the companion falls back to « the window whose character changed last »
+  stopForeground = watchForeground(onForeground, () => { foreground = null; stopForeground = null; });
 });
 
 // `electron . --self-test` prints what it sees (classes and versions, no character names), captures once in memory and

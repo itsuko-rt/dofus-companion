@@ -21,6 +21,9 @@ test('game window title: every class of the game data is recognised', () => {
 test('game window title: login screens have no character; other windows are not DOFUS', () => {
   assert.deepEqual(parseDofusTitle('Dofus'), { version: '', channel: '', character: null });
   assert.equal(parseDofusTitle('Dofus - 3.7.14.18 - Release')?.character, null);
+  // the login and character-selection screens, as seen in the game on 2026-11-25
+  assert.deepEqual(parseDofusTitle('Dofus 3.7.14.18 - Release'), { version: '3.7.14.18', channel: 'Release', character: null });
+  assert.equal(parseDofusTitle('Dofus 3.7.14.18 - Release extra'), null);
   for (const t of ['Dofus - Wikipédia - Google Chrome', 'Ankama Launcher', 'Atlas des Douze — Succès', 'a - b - c - d', '']) {
     assert.equal(parseDofusTitle(t), null, t);
   }

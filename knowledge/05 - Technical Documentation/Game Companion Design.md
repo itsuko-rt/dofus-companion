@@ -7,7 +7,7 @@ date: 2026-11-25
 
 Design for a Windows companion that turns what DOFUS shows on screen into progress on the player's Atlas profiles.
 
-**Status (2026-11-25):** the design was approved. **Phases 3–6 are built and tested**: window and character ([[#10. Phase 3: built]]), quest and achievement lists ([[#11. Phases 4 and 5: built (quest and achievement lists)]]), and the sync with the site ([[#12. Phase 6: built (sync with the site)]]). Phases 7–9 are planned. Decision record: [[ADR-0009 Windows companion reads the window title and screen]].
+**Status (2026-11-25):** the design was approved. **Phases 3–7 are built and tested**: window and character ([[#10. Phase 3: built]]), quest and achievement lists ([[#11. Phases 4 and 5: built (quest and achievement lists)]]), the sync with the site ([[#12. Phase 6: built (sync with the site)]]), and several characters and accounts ([[#13. Phase 7: built (several characters and accounts)]]). Phases 8–9 are planned. Decision record: [[ADR-0009 Windows companion reads the window title and screen]].
 
 Related:
 - what exists: [[Character Sync OCR]], [[Companion Window]];
@@ -35,7 +35,7 @@ Notes on the brief:
 ### What DOFUS exposes without touching the game (checked on the owner's PC, 2026-11-25)
 | Source | What it gives | Use |
 |---|---|---|
-| **The game window's title** | `<character name> - <class> - 3.7.14.18 - Release`, read through the window list of the OS | **Character name, class and game version, with no OCR.** It changes when the player switches character, so switches are detected reliably |
+| **The game window's title** | `<character name> - <class> - 3.7.14.18 - Release` in game, `Dofus 3.7.14.18 - Release` on the login and character-selection screens, read through the window list of the OS | **Character name, class and game version, with no OCR.** It changes when the player switches character, so switches are detected reliably |
 | Process list | Whether `Dofus.exe` runs | Connection status |
 | `%APPDATA%\zaap\gamesLogs\dofus-dofus3\*.log` | Engine, network and chat-connection messages only: no character, level, server, quest or achievement data | Not used |
 | `%LOCALAPPDATA%Low\Ankama\Dofus` | Crash-reporter (Sentry) files only | Not used |
@@ -366,3 +366,40 @@ Electron's Node (24.22) loads the site's TypeScript files directly, so `src/` co
 - The site applies events only while one of its pages is open in the browser.
 - On a production https site, Chrome asks the player to allow access to the local network the first time. Not tested (not deployed).
 - The pending list lives in the browser where the site is open. Another browser sees the result once applied, through the account, but not the waiting cards.
+
+## 13. Phase 7: built (several characters and accounts)
+### What changed
+- **The active DOFUS window follows the player.** With several DOFUS windows (several accounts), the companion reads which window is **in front** from Windows: the title of the foreground window, through `GetForegroundWindow` and `GetWindowText` (`companion/foreground.mjs`).
+  - This is the same kind of read-only OS information as the window list. Nothing about the game's process, memory or input is touched.
+  - It runs as one small PowerShell loop, ends with the companion, and adds no dependency.
+- **When the site hears about it:** `character.seen` is sent when the character being played changes, either because the front window changed or because a character entered the game in the front window.
+  - A window whose character changes in the background is announced when the player comes to it.
+  - If the foreground cannot be read, the old rule applies: the window whose character changed last.
+  - This replaces the `shortcut:` of phase 3.
+- **Readings always carry the character of the captured window.** A reading for one account never goes to the other one, whichever profile is active on the site.
+- **Login and character-selection screens:** the real title is « Dofus <version> - <channel> » (seen on 3.7.14.18, 2026-11-25), not « Dofus - <version> - … » as assumed in phase 3. Without the fix, the companion said « DOFUS non détecté » on those screens. The parser and its tests were corrected.
+- **Site, « Profils liés au jeu »:**
+  - each linked profile shows its in-game name, the « en jeu » and « profil actif » tags, and when it was last seen;
+  - it has **Serveur** and **Compte** fields: labels for the player, not read from the game;
+  - a **Délier** button: the profile keeps its progress, and the name is treated as a new character again;
+  - profiles are sorted by account, with a heading per account.
+- **Bug found by the E2E test and fixed:** typing an account moved the row into another group and remounted it, so the server typed next was lost. The rows are now one keyed list.
+
+### Tests (2026-11-25)
+- **E2E** (`e2e/companion-sync.spec.ts`, new test, two characters on two accounts, Automatic mode):
+  - both profiles are created only on clicks;
+  - the active profile follows the character played;
+  - a reading of the other window goes only to its own character, while the other profile stays active and unlinked profiles stay untouched;
+  - server and account are saved, and the account heading appears;
+  - after unlinking, the profile keeps its progress, a new reading for that name is not written to it, and the name gets a « Nouveau personnage » card again.
+  
+  Companion-sync spec: 3/3.
+- **Full suite:** `npm test` 125/125; E2E **66 passed, 1 skipped** by design, 0 failed.
+- **Real game:**
+  - the foreground reader returned the title of the window in front, without error;
+  - with DOFUS on the character-selection screen, the self-test now finds the window (version 3.7.14.18, no character) instead of nothing.
+- **Not checked:** two real DOFUS windows at once (one game account was available), and a live alt-tab between them.
+
+### Limits
+- **Two characters with the same name on two servers** cannot be told apart: the window title has no server. Atlas refuses to link one name to two profiles, so the second one stays unlinked, rather than progress going to the wrong profile.
+- A profile can be relinked to another in-game name only after « Délier ».
